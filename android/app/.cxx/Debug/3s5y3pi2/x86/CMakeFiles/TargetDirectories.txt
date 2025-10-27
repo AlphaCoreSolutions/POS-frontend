@@ -1,0 +1,2 @@
+D:/FLutter applications/fixed_pos/android/app/.cxx/Debug/3s5y3pi2/x86/CMakeFiles/edit_cache.dir
+D:/FLutter applications/fixed_pos/android/app/.cxx/Debug/3s5y3pi2/x86/CMakeFiles/rebuild_cache.dir

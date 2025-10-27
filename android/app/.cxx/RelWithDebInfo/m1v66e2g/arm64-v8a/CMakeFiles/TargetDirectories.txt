@@ -1,0 +1,2 @@
+D:/FLutter applications/fixed_pos/android/app/.cxx/RelWithDebInfo/m1v66e2g/arm64-v8a/CMakeFiles/edit_cache.dir
+D:/FLutter applications/fixed_pos/android/app/.cxx/RelWithDebInfo/m1v66e2g/arm64-v8a/CMakeFiles/rebuild_cache.dir
