@@ -156,8 +156,8 @@ class ApiHandler {
       for (var order in data) {
         double total = order['grandTotal']?.toDouble() ?? 0;
         DateTime date = DateTime.parse(order['orderPlaced']);
-        double x = date.millisecondsSinceEpoch
-            .toDouble(); // or convert to day number
+        double x =
+            date.millisecondsSinceEpoch.toDouble(); // or convert to day number
         double y = total;
         spots.add(FlSpot(x, y));
       }
@@ -340,9 +340,8 @@ class ApiHandler {
 
       final decoded = json.decode(response.body);
       // Your controller returns a List, but this makes it robust if it ever wraps:
-      final List<dynamic> list = decoded is List
-          ? decoded
-          : (decoded['items'] as List? ?? const []);
+      final List<dynamic> list =
+          decoded is List ? decoded : (decoded['items'] as List? ?? const []);
       debugPrint('Raw API response: $list');
 
       return list
@@ -368,6 +367,40 @@ class ApiHandler {
       return list.map((e) => Category.fromJson(e)).toList();
     }
     throw Exception('Failed leaf categories: ${resp.statusCode}');
+  }
+
+  /// Advanced search for categories
+  Future<List<Category>> searchCategories(String searchQuery,
+      {int? orgId}) async {
+    final queryParams = <String, String>{
+      'searchQuery': searchQuery,
+    };
+
+    // Add orgId if provided
+    if (orgId != null) {
+      queryParams['orgId'] = orgId.toString();
+    }
+
+    final uri = Uri.parse(
+      '$CategoryUri/AdvanceSearch',
+    ).replace(queryParameters: queryParams);
+
+    print('🟡 [searchCategories] GET $uri');
+    print('🔵 [searchCategories] searchQuery: $searchQuery, orgId: $orgId');
+
+    final resp = await http.get(
+      uri,
+      headers: {'Content-type': 'application/json; charset=UTF-8'},
+    );
+
+    print('🟢 [searchCategories] Status: ${resp.statusCode}');
+    print('🟢 [searchCategories] Body: ${resp.body}');
+
+    if (resp.statusCode == 200) {
+      final List list = json.decode(resp.body);
+      return list.map((e) => Category.fromJson(e)).toList();
+    }
+    throw Exception('Failed to search categories: ${resp.statusCode}');
   }
 
   /// Client-side helpers
@@ -691,8 +724,8 @@ class ApiHandler {
 
         int? bestSellerId = productUsage.entries.isNotEmpty
             ? productUsage.entries
-                  .reduce((a, b) => a.value > b.value ? a : b)
-                  .key
+                .reduce((a, b) => a.value > b.value ? a : b)
+                .key
             : null;
 
         if (bestSellerId != null) {

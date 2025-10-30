@@ -24,6 +24,9 @@ class _AddCategoryState extends State<AddCategory> {
 
   int? _orgId;
   List<Category> _all = [];
+  List<Category> _filteredCategories = [];
+  final TextEditingController _categorySearchController =
+      TextEditingController();
   Category? _parent;
 
   // theme colors you used
@@ -49,11 +52,15 @@ class _AddCategoryState extends State<AddCategory> {
       _orgId = await SessionManager.getOrganizationId();
       debugPrint('🔎 Loaded orgId from session: $_orgId');
 
-      // 2) fetch all categories once; filter locally if orgId > 0
-      final all = await _api.getCategoryData();
-      _all = (_orgId ?? 0) > 0
-          ? all.where((c) => c.organizationId == _orgId).toList()
-          : all;
+      // 2) fetch categories using organization-specific API if orgId is available
+      if ((_orgId ?? 0) > 0) {
+        _all = await _api.getLeafCategoriesByOrg(_orgId!);
+      } else {
+        // Fallback to getting all categories and filter locally
+        final all = await _api.getCategoryData();
+        _all = all;
+      }
+      _filteredCategories = _all;
     } catch (e) {
       _loadError = 'Failed to load data: $e';
     } finally {
@@ -64,6 +71,49 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   int _validOrgIdOrZero(int? id) => (id ?? 0) > 0 ? id! : 0;
+
+  // Search categories using the AdvanceSearch API
+  void _searchCategories(String query) async {
+    if (query.trim().isEmpty) {
+      // If search is empty, get all categories for the organization
+      if (_orgId != null && _orgId! > 0) {
+        try {
+          final searchResults =
+              await _api.searchCategories('1 = 1', orgId: _orgId);
+          setState(() {
+            _filteredCategories = searchResults;
+          });
+        } catch (e) {
+          // Fallback to organization-specific categories
+          final orgCategories = await _api.getLeafCategoriesByOrg(_orgId!);
+          setState(() {
+            _filteredCategories = orgCategories;
+          });
+        }
+      } else {
+        setState(() {
+          _filteredCategories = _all;
+        });
+      }
+      return;
+    }
+
+    try {
+      final searchResults = await _api.searchCategories(query, orgId: _orgId);
+      setState(() {
+        _filteredCategories = searchResults;
+      });
+    } catch (e) {
+      // If search fails, filter locally
+      setState(() {
+        _filteredCategories = _all
+            .where((category) => category.categoryName
+                .toLowerCase()
+                .contains(query.toLowerCase()))
+            .toList();
+      });
+    }
+  }
 
   Future<void> _add() async {
     if (_loading || _saving) return;
@@ -220,6 +270,29 @@ class _AddCategoryState extends State<AddCategory> {
                                 textInputAction: TextInputAction.done,
                               ),
                               const SizedBox(height: 16),
+                              // Parent category search field
+                              TextField(
+                                controller: _categorySearchController,
+                                decoration: InputDecoration(
+                                  labelText: 'Search Parent Categories',
+                                  prefixIcon: Icon(Icons.search),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  suffixIcon: _categorySearchController
+                                          .text.isNotEmpty
+                                      ? IconButton(
+                                          icon: Icon(Icons.clear),
+                                          onPressed: () {
+                                            _categorySearchController.clear();
+                                            _searchCategories('');
+                                          },
+                                        )
+                                      : null,
+                                ),
+                                onChanged: _searchCategories,
+                              ),
+                              const SizedBox(height: 16),
                               // Parent chooser (optional)
                               FormBuilderDropdown<Category?>(
                                 name: 'parent',
@@ -232,7 +305,7 @@ class _AddCategoryState extends State<AddCategory> {
                                     value: null,
                                     child: Text('None (Top-level)'),
                                   ),
-                                  ..._all.map(
+                                  ..._filteredCategories.map(
                                     (c) => DropdownMenuItem<Category?>(
                                       value: c,
                                       child: Text(c.categoryName),

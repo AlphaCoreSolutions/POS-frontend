@@ -38,25 +38,44 @@ class _ProductsPageState extends State<ProductsPage> {
   Future<String> _categoryNameFor(dynamic catId) async {
     // Build cache once
     if (_catCache == null) {
-      final cats = await apiHandler.getCategoryData();
-      _catCache = {for (final c in cats) c.id: c.categoryName};
+      if (_orgId != null && _orgId! > 0) {
+        print("🔵 Building category cache for organization: $_orgId");
+        final cats = await apiHandler.getLeafCategoriesByOrg(_orgId!);
+        _catCache = {for (final c in cats) c.id: c.categoryName};
+        print("🟢 Category cache built with ${_catCache!.length} categories");
+      } else {
+        print("⚠️  Building category cache using default organization (1)");
+        final cats = await apiHandler.getLeafCategoriesByOrg(1);
+        _catCache = {for (final c in cats) c.id: c.categoryName};
+      }
     }
     return _catCache![_coerceId(catId)] ?? 'Uncategorized';
   }
 
   @override
   void initState() {
-    _loadOrganizationId();
     super.initState();
-    CategoryData();
-    getData();
+    _loadOrganizationId().then((_) {
+      // Load categories and products after organization ID is loaded
+      CategoryData();
+      getData();
+    });
   }
 
   void CategoryData() async {
-    categories = await apiHandler.getCategoryData();
+    if (_orgId != null && _orgId! > 0) {
+      print("🔵 Loading categories for organization: $_orgId");
+      categories = await apiHandler.getLeafCategoriesByOrg(_orgId!);
+      print("🟢 Loaded ${categories.length} organization-specific categories");
+    } else {
+      print("⚠️  No organization ID available, using default organization (1)");
+      categories = await apiHandler.getLeafCategoriesByOrg(1);
+    }
     setState(() {
-      if (data.isEmpty) {
-        print("Cateory data not her");
+      if (categories.isEmpty) {
+        print("❌ Category data not here");
+      } else {
+        print("✅ Successfully loaded ${categories.length} categories");
       }
     });
   }
@@ -88,12 +107,17 @@ class _ProductsPageState extends State<ProductsPage> {
   */
   void deleteCategory(int categoryID) async {
     await apiHandler.deleteCategory(categoryID: categoryID);
-    setState(() {});
+    // Refresh data after deletion
+    CategoryData();
+    getData();
+    // Clear category cache since categories changed
+    _catCache = null;
   }
 
   void deleteProduct(int productID) async {
     await apiHandler.deleteProducts(productID: productID);
-    setState(() {});
+    // Refresh data after deletion
+    getData();
   }
 
   void getUserInfo() async {
@@ -139,13 +163,18 @@ class _ProductsPageState extends State<ProductsPage> {
                                 getData();
                               }),
                           IconButton(
-                              onPressed: () {
-                                Navigator.push(
+                              onPressed: () async {
+                                final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) =>
                                           AddCategory(initialOrgId: _orgId),
                                     ));
+                                // If a category was added, refresh the data
+                                if (result != null) {
+                                  CategoryData();
+                                  getData();
+                                }
                               },
                               icon: Icon(Icons.add))
                         ],
@@ -296,11 +325,16 @@ class _ProductsPageState extends State<ProductsPage> {
                               onPressed: getData,
                             ), */
                           FloatingActionButton(
-                            onPressed: () {
-                              Navigator.push(
+                            onPressed: () async {
+                              final result = await Navigator.push(
                                   (context),
                                   MaterialPageRoute(
                                       builder: (context) => AddProducts()));
+                              // If a product was added, refresh the data
+                              if (result == true) {
+                                CategoryData();
+                                getData();
+                              }
                             },
                             backgroundColor: Color(0xFFE2725B),
                             foregroundColor: Colors.white,
@@ -462,14 +496,21 @@ class _ProductsPageState extends State<ProductsPage> {
                                             width: 20,
                                           ),
                                           IconButton(
-                                            onPressed: () {
-                                              Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          UpdateProduct(
-                                                              product: data[
-                                                                  index])));
+                                            onPressed: () async {
+                                              final result =
+                                                  await Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                          builder: (context) =>
+                                                              UpdateProduct(
+                                                                  product: data[
+                                                                      index])));
+                                              // If the product was updated, refresh the data
+                                              if (result == true) {
+                                                getData();
+                                                // Clear category cache in case categories changed
+                                                _catCache = null;
+                                              }
                                             },
                                             icon: Icon(Icons.edit_note_sharp),
                                             iconSize: screenHeight * 0.035,

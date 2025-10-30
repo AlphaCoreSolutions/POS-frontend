@@ -21,7 +21,12 @@ class _AddProductsState extends State<AddProducts> {
   final _formkey = GlobalKey<FormBuilderState>();
   ApiHandler apiHandler = ApiHandler();
   List<Category> categories = []; // Store categories fetched from the API
+  List<Category> filteredCategories =
+      []; // Store filtered categories for search
+  final TextEditingController _categorySearchController =
+      TextEditingController();
   int? _orgId = 0;
+  Category? _selectedCategory;
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
     setState(() {
@@ -31,17 +36,74 @@ class _AddProductsState extends State<AddProducts> {
 
   @override
   void initState() {
-    _loadOrganizationId();
     super.initState();
-    _fetchCategories(); // Fetch categories when the page loads
+    _loadOrganizationId().then((_) {
+      _fetchCategories(); // Fetch categories after organization ID is loaded
+    });
   }
 
   // Fetch categories from the API
   void _fetchCategories() async {
-    final fetchedCategories = await apiHandler.getCategoryData();
-    setState(() {
-      categories = fetchedCategories;
-    });
+    if (_orgId != null && _orgId! > 0) {
+      final fetchedCategories =
+          await apiHandler.getLeafCategoriesByOrg(_orgId!);
+      setState(() {
+        categories = fetchedCategories;
+        filteredCategories = fetchedCategories;
+      });
+    } else {
+      // Fallback to getting all categories if no org ID
+      final fetchedCategories = await apiHandler.getCategoryData();
+      setState(() {
+        categories = fetchedCategories;
+        filteredCategories = fetchedCategories;
+      });
+    }
+  }
+
+  // Search categories using the AdvanceSearch API
+  void _searchCategories(String query) async {
+    if (query.trim().isEmpty) {
+      // If search is empty, get all categories for the organization
+      if (_orgId != null && _orgId! > 0) {
+        try {
+          final searchResults =
+              await apiHandler.searchCategories('1 = 1', orgId: _orgId);
+          setState(() {
+            filteredCategories = searchResults;
+          });
+        } catch (e) {
+          // Fallback to organization-specific categories
+          final orgCategories =
+              await apiHandler.getLeafCategoriesByOrg(_orgId!);
+          setState(() {
+            filteredCategories = orgCategories;
+          });
+        }
+      } else {
+        setState(() {
+          filteredCategories = categories;
+        });
+      }
+      return;
+    }
+
+    try {
+      final searchResults =
+          await apiHandler.searchCategories(query, orgId: _orgId);
+      setState(() {
+        filteredCategories = searchResults;
+      });
+    } catch (e) {
+      // If search fails, filter locally
+      setState(() {
+        filteredCategories = categories
+            .where((category) => category.categoryName
+                .toLowerCase()
+                .contains(query.toLowerCase()))
+            .toList();
+      });
+    }
   }
 
   void AddProduct() async {
@@ -63,11 +125,19 @@ class _AddProductsState extends State<AddProducts> {
         Barcode: data['Barcode'],
       );
 
-      await apiHandler.AddProducts(product: product);
+      try {
+        await apiHandler.AddProducts(product: product);
+        if (!mounted) return;
+        // Return success result to indicate product was added
+        Navigator.pop(context, true);
+      } catch (e) {
+        if (!mounted) return;
+        // Show error message but don't return a result
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add product: $e')),
+        );
+      }
     }
-
-    if (!mounted) return;
-    Navigator.pop(context);
   }
 
   @override
@@ -118,25 +188,61 @@ class _AddProductsState extends State<AddProducts> {
     );
   }
 
-  // Build a dropdown for categories
+  // Build a searchable dropdown for categories
   Widget buildCategoryDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
-      child: FormBuilderDropdown(
-        name: 'ProductCategory',
-        decoration: InputDecoration(
-          labelText: 'Product Category',
-          prefixIcon: Icon(Icons.category, color: Colors.black54),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        validator:
-            FormBuilderValidators.compose([FormBuilderValidators.required()]),
-        items: categories.map((category) {
-          return DropdownMenuItem(
-            value: category.id, // Use the category name as the value
-            child: Text(category.categoryName),
-          );
-        }).toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search field for categories
+          TextField(
+            controller: _categorySearchController,
+            decoration: InputDecoration(
+              labelText: 'Search Categories',
+              prefixIcon: Icon(Icons.search, color: Colors.black54),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              suffixIcon: _categorySearchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.clear),
+                      onPressed: () {
+                        _categorySearchController.clear();
+                        _searchCategories('');
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: _searchCategories,
+          ),
+          const SizedBox(height: 10),
+          // Category dropdown
+          FormBuilderDropdown(
+            name: 'ProductCategory',
+            decoration: InputDecoration(
+              labelText: 'Product Category',
+              prefixIcon: Icon(Icons.category, color: Colors.black54),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            validator: FormBuilderValidators.compose(
+                [FormBuilderValidators.required()]),
+            items: filteredCategories.map((category) {
+              return DropdownMenuItem(
+                value: category.id,
+                child: Text(category.categoryName),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedCategory = filteredCategories.firstWhere(
+                  (category) => category.id == value,
+                  orElse: () => filteredCategories.first,
+                );
+              });
+            },
+          ),
+        ],
       ),
     );
   }

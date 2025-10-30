@@ -22,6 +22,10 @@ class _UpdateProductState extends State<UpdateProduct> {
   int? _orgId;
   bool _loadingCats = true;
   List<Category> _categories = [];
+  List<Category> _filteredCategories = [];
+  final TextEditingController _categorySearchController =
+      TextEditingController();
+  Category? _selectedCategory;
   late http.Response response;
 
   @override
@@ -33,18 +37,69 @@ class _UpdateProductState extends State<UpdateProduct> {
   Future<void> _loadOrgAndCategories() async {
     try {
       final orgId = await SessionManager.getOrganizationId();
-      final all = await _api.getCategoryData();
+      List<Category> categories;
+
+      if ((orgId ?? 0) > 0) {
+        categories = await _api.getLeafCategoriesByOrg(orgId!);
+      } else {
+        // Fallback to getting all categories
+        categories = await _api.getCategoryData();
+      }
+
       setState(() {
         _orgId = orgId;
-        _categories = (orgId ?? 0) > 0
-            ? all.where((c) => c.organizationId == orgId).toList()
-            : all;
+        _categories = categories;
+        _filteredCategories = categories;
         _loadingCats = false;
       });
     } catch (_) {
       setState(() {
         _categories = [];
+        _filteredCategories = [];
         _loadingCats = false;
+      });
+    }
+  }
+
+  // Search categories using the AdvanceSearch API
+  void _searchCategories(String query) async {
+    if (query.trim().isEmpty) {
+      // If search is empty, get all categories for the organization
+      if (_orgId != null && _orgId! > 0) {
+        try {
+          final searchResults =
+              await _api.searchCategories('1 = 1', orgId: _orgId);
+          setState(() {
+            _filteredCategories = searchResults;
+          });
+        } catch (e) {
+          // Fallback to organization-specific categories
+          final orgCategories = await _api.getLeafCategoriesByOrg(_orgId!);
+          setState(() {
+            _filteredCategories = orgCategories;
+          });
+        }
+      } else {
+        setState(() {
+          _filteredCategories = _categories;
+        });
+      }
+      return;
+    }
+
+    try {
+      final searchResults = await _api.searchCategories(query, orgId: _orgId);
+      setState(() {
+        _filteredCategories = searchResults;
+      });
+    } catch (e) {
+      // If search fails, filter locally
+      setState(() {
+        _filteredCategories = _categories
+            .where((category) => category.categoryName
+                .toLowerCase()
+                .contains(query.toLowerCase()))
+            .toList();
       });
     }
   }
@@ -69,10 +124,19 @@ class _UpdateProductState extends State<UpdateProduct> {
       Barcode: data['Barcode'],
     );
 
-    response =
-        await _api.updateProduct(id: widget.product.id, product: product);
-    if (!mounted) return;
-    Navigator.pop(context);
+    try {
+      response =
+          await _api.updateProduct(id: widget.product.id, product: product);
+      if (!mounted) return;
+      // Return success result to indicate product was updated
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      // Show error message but don't return a result
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update product: $e')),
+      );
+    }
   }
 
   @override
@@ -118,6 +182,28 @@ class _UpdateProductState extends State<UpdateProduct> {
                     },
                     child: Column(
                       children: [
+                        // Category search field
+                        TextField(
+                          controller: _categorySearchController,
+                          decoration: InputDecoration(
+                            labelText: 'Search Categories',
+                            prefixIcon: Icon(Icons.search),
+                            border: OutlineInputBorder(),
+                            suffixIcon:
+                                _categorySearchController.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(Icons.clear),
+                                        onPressed: () {
+                                          _categorySearchController.clear();
+                                          _searchCategories('');
+                                        },
+                                      )
+                                    : null,
+                          ),
+                          onChanged: _searchCategories,
+                        ),
+                        const SizedBox(height: 14),
+
                         // CATEGORY DROPDOWN (shows names, returns int id)
                         FormBuilderDropdown<int>(
                           name: 'ProductCategory',
@@ -129,13 +215,22 @@ class _UpdateProductState extends State<UpdateProduct> {
                           validator: FormBuilderValidators.required(),
                           initialValue: initialCatId,
                           items: [
-                            ..._categories.map(
+                            ..._filteredCategories.map(
                               (c) => DropdownMenuItem<int>(
                                 value: c.id,
                                 child: Text(c.categoryName),
                               ),
                             )
                           ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedCategory =
+                                  _filteredCategories.firstWhere(
+                                (category) => category.id == value,
+                                orElse: () => _filteredCategories.first,
+                              );
+                            });
+                          },
                         ),
                         const SizedBox(height: 14),
 
