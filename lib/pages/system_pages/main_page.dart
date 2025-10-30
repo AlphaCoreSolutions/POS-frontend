@@ -24,7 +24,7 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   final _barcodeController = TextEditingController();
   final _barcodeFocus = FocusNode();
   String _barcodeBuffer = '';
@@ -40,6 +40,7 @@ class _MainPageState extends State<MainPage> {
   int? _orgId = 0;
   // ignore: unused_field
   List<Category> _categories = [];
+  bool _hasBeenInitialized = false;
 
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
@@ -54,6 +55,62 @@ class _MainPageState extends State<MainPage> {
           '📂 Main page loaded ${cats.length} categories for organization $_orgId');
     } else {
       print('⚠️ Organization ID not available, skipping category load');
+    }
+  }
+
+  // Method to reload all data when returning to main page
+  Future<void> _reloadAllData() async {
+    print('🔄 Reloading all data on main page...');
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Reload products data
+      getData();
+
+      // Reload organization ID and then categories
+      await _loadOrganizationId();
+      if (_orgId != null) {
+        await _loadCategories();
+        await categoryData();
+      }
+
+      // Reload taxes and promo codes
+      await _fetchTaxes();
+      await apiHandler.fetchPromoCodes();
+
+      print('✅ Data reload completed');
+    } catch (e) {
+      print('❌ Error reloading data: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App came back to foreground - reload data
+      print('📱 App resumed, reloading data...');
+      _reloadAllData();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Only reload after the initial setup is complete
+    if (_hasBeenInitialized) {
+      print('🔄 Returning to main page, reloading data...');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _reloadAllData();
+        }
+      });
     }
   }
 
@@ -986,14 +1043,22 @@ class _MainPageState extends State<MainPage> {
 
   @override
   void initState() {
+    super.initState();
+
+    // Add lifecycle observer for app state changes
+    WidgetsBinding.instance.addObserver(this);
+
     getData();
     _subsCtrl = ScrollController();
-    super.initState();
 
     // Load organization ID first, then categories
     _loadOrganizationId().then((_) {
       _loadCategories();
       categoryData();
+      // Mark initialization as complete
+      setState(() {
+        _hasBeenInitialized = true;
+      });
     });
 
     requestPermissions();
@@ -1060,6 +1125,9 @@ class _MainPageState extends State<MainPage> {
 
   @override
   void dispose() {
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+
     _tipController.dispose();
     _subsCtrl.dispose();
     super.dispose();
@@ -1135,8 +1203,7 @@ class _MainPageState extends State<MainPage> {
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   onPressed: () {
-                    getData();
-                    categoryData();
+                    _reloadAllData();
                   },
                 ),
               ],
