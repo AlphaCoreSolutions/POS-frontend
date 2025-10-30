@@ -47,8 +47,14 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> _loadCategories() async {
-    final cats = await ApiHandler().getCategoryData();
-    setState(() => _categories = cats);
+    if (_orgId != null) {
+      final cats = await ApiHandler().getLeafCategoriesByOrg(_orgId!);
+      setState(() => _categories = cats);
+      print(
+          '📂 Main page loaded ${cats.length} categories for organization $_orgId');
+    } else {
+      print('⚠️ Organization ID not available, skipping category load');
+    }
   }
 
   //---------------------------------------------------------------
@@ -61,8 +67,8 @@ class _MainPageState extends State<MainPage> {
   int? _selectedSubId;
   late final ScrollController _subsCtrl;
   Map<int, String> get _catNameById => {
-    for (final c in _all) c.id: c.categoryName,
-  }; // _all: List<Category>
+        for (final c in _all) c.id: c.categoryName,
+      }; // _all: List<Category>
 
   //--------------------------------------------------------------
   ApiHandler apiHandler = ApiHandler();
@@ -465,8 +471,8 @@ class _MainPageState extends State<MainPage> {
             child: Theme(
               data: Theme.of(context).copyWith(
                 colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: const Color(0xFFB87333), // dark orange
-                ),
+                      primary: const Color(0xFFB87333), // dark orange
+                    ),
                 dialogBackgroundColor: Colors.grey[100],
                 textButtonTheme: TextButtonThemeData(
                   style: TextButton.styleFrom(
@@ -593,9 +599,8 @@ class _MainPageState extends State<MainPage> {
   void _togglePaymentMethod(bool value) {
     setState(() {
       isCash = value;
-      paymentMethod = isCash
-          ? 'Cash'
-          : 'Visa'; // Toggle between 'Cash' and 'Visa'
+      paymentMethod =
+          isCash ? 'Cash' : 'Visa'; // Toggle between 'Cash' and 'Visa'
     });
   }
 
@@ -665,8 +670,8 @@ class _MainPageState extends State<MainPage> {
       return;
     }
 
-    List<Promocodes> allPromoCodes = await apiHandler
-        .fetchPromoCodes(); // Use instance
+    List<Promocodes> allPromoCodes =
+        await apiHandler.fetchPromoCodes(); // Use instance
 
     List<Promocodes> filteredPromoCodes = allPromoCodes
         .where(
@@ -934,7 +939,12 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> categoryData() async {
-    final result = await apiHandler.getCategoryData();
+    if (_orgId == null) {
+      print('⚠️ Organization ID not available, skipping category data load');
+      return;
+    }
+
+    final result = await apiHandler.getLeafCategoriesByOrg(_orgId!);
     if (!mounted) return;
 
     // derive roots & clear subs
@@ -977,11 +987,15 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     getData();
-    categoryData();
     _subsCtrl = ScrollController();
-    _loadOrganizationId();
-    _loadCategories();
     super.initState();
+
+    // Load organization ID first, then categories
+    _loadOrganizationId().then((_) {
+      _loadCategories();
+      categoryData();
+    });
+
     requestPermissions();
     apiHandler.fetchPromoCodes();
     _fetchTaxes();
@@ -1155,16 +1169,16 @@ class _MainPageState extends State<MainPage> {
                                     contentPadding: EdgeInsets.symmetric(
                                       horizontal:
                                           MediaQuery.of(context).size.width *
-                                          0.02, // Horizontal padding
+                                              0.02, // Horizontal padding
                                       vertical:
                                           MediaQuery.of(context).size.height *
-                                          0.01, // Vertical padding
+                                              0.01, // Vertical padding
                                     ),
                                     labelText: translation(context).search,
                                     labelStyle: TextStyle(
                                       fontSize:
                                           MediaQuery.of(context).size.width *
-                                          0.02,
+                                              0.02,
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -1175,14 +1189,14 @@ class _MainPageState extends State<MainPage> {
                                     ),
                                     prefixIcon: Icon(
                                       Icons.search,
-                                      size:
-                                          MediaQuery.of(context).size.height *
+                                      size: MediaQuery.of(context).size.height *
                                           0.035,
                                     ),
                                   ),
                                   style: TextStyle(
-                                    fontSize:
-                                        MediaQuery.of(context).size.width *
+                                    fontSize: MediaQuery.of(context)
+                                            .size
+                                            .width *
                                         0.02, // Set text size to 3.5% of screen width
                                   ),
                                   onChanged: (query) {
@@ -1217,12 +1231,10 @@ class _MainPageState extends State<MainPage> {
                                 itemCount: _rootCategories.length + 1,
                                 itemBuilder: (context, index) {
                                   final isAll = index == 0;
-                                  final cat = isAll
-                                      ? null
-                                      : _rootCategories[index - 1];
-                                  final name = isAll
-                                      ? 'All'
-                                      : cat!.categoryName;
+                                  final cat =
+                                      isAll ? null : _rootCategories[index - 1];
+                                  final name =
+                                      isAll ? 'All' : cat!.categoryName;
 
                                   return GestureDetector(
                                     onTap: () => _onRootTap(cat),
@@ -1312,15 +1324,15 @@ class _MainPageState extends State<MainPage> {
                                                   return Material(
                                                     color: selected
                                                         ? cs.primary
-                                                              .withOpacity(0.08)
+                                                            .withOpacity(0.08)
                                                         : Colors.white,
                                                     elevation: selected ? 2 : 0,
                                                     shadowColor: cs.primary
                                                         .withOpacity(0.15),
                                                     borderRadius:
                                                         BorderRadius.circular(
-                                                          12,
-                                                        ),
+                                                      12,
+                                                    ),
                                                     child: InkWell(
                                                       onTap: () {
                                                         setState(
@@ -1331,30 +1343,33 @@ class _MainPageState extends State<MainPage> {
                                                       },
                                                       borderRadius:
                                                           BorderRadius.circular(
-                                                            12,
-                                                          ),
+                                                        12,
+                                                      ),
                                                       child: AnimatedContainer(
                                                         duration:
                                                             const Duration(
-                                                              milliseconds: 160,
-                                                            ),
+                                                          milliseconds: 160,
+                                                        ),
                                                         padding:
-                                                            const EdgeInsets.symmetric(
-                                                              vertical: 10,
-                                                              horizontal: 12,
-                                                            ),
-                                                        decoration: BoxDecoration(
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          vertical: 10,
+                                                          horizontal: 12,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
                                                           borderRadius:
-                                                              BorderRadius.circular(
-                                                                12,
-                                                              ),
+                                                              BorderRadius
+                                                                  .circular(
+                                                            12,
+                                                          ),
                                                           border: Border.all(
                                                             color: selected
                                                                 ? cs.primary
                                                                 : Colors.grey
-                                                                      .withOpacity(
-                                                                        0.22,
-                                                                      ),
+                                                                    .withOpacity(
+                                                                    0.22,
+                                                                  ),
                                                             width: selected
                                                                 ? 1.25
                                                                 : 1,
@@ -1367,30 +1382,31 @@ class _MainPageState extends State<MainPage> {
                                                               color: selected
                                                                   ? cs.primary
                                                                   : Colors.grey
-                                                                        .withOpacity(
-                                                                          0.18,
-                                                                        ),
+                                                                      .withOpacity(
+                                                                      0.18,
+                                                                    ),
                                                               duration:
                                                                   const Duration(
-                                                                    milliseconds:
-                                                                        160,
-                                                                  ),
+                                                                milliseconds:
+                                                                    160,
+                                                              ),
                                                               width: 28,
                                                               height: 28,
                                                               alignment:
                                                                   Alignment
                                                                       .center,
-                                                              decoration: BoxDecoration(
+                                                              decoration:
+                                                                  BoxDecoration(
                                                                 shape: BoxShape
                                                                     .circle,
                                                                 color: selected
                                                                     ? cs.primary
-                                                                          .withOpacity(
-                                                                            0.18,
-                                                                          )
+                                                                        .withOpacity(
+                                                                        0.18,
+                                                                      )
                                                                     : Colors
-                                                                          .grey
-                                                                          .shade200,
+                                                                        .grey
+                                                                        .shade200,
                                                               ),
                                                               child: Icon(
                                                                 Icons
@@ -1399,8 +1415,8 @@ class _MainPageState extends State<MainPage> {
                                                                 color: selected
                                                                     ? cs.primary
                                                                     : Colors
-                                                                          .grey
-                                                                          .shade700,
+                                                                        .grey
+                                                                        .shade700,
                                                               ),
                                                             ),
                                                             const SizedBox(
@@ -1414,8 +1430,10 @@ class _MainPageState extends State<MainPage> {
                                                                 overflow:
                                                                     TextOverflow
                                                                         .ellipsis,
-                                                                style: TextStyle(
-                                                                  color: const Color(
+                                                                style:
+                                                                    TextStyle(
+                                                                  color:
+                                                                      const Color(
                                                                     0xFF36454F,
                                                                   ),
                                                                   fontWeight:
@@ -1423,7 +1441,7 @@ class _MainPageState extends State<MainPage> {
                                                                           .w600,
                                                                   fontSize:
                                                                       screenWidth *
-                                                                      0.011,
+                                                                          0.011,
                                                                 ),
                                                               ),
                                                             ),
@@ -1437,9 +1455,8 @@ class _MainPageState extends State<MainPage> {
                                                               size: 18,
                                                               color: selected
                                                                   ? cs.primary
-                                                                  : Colors
-                                                                        .grey
-                                                                        .shade600,
+                                                                  : Colors.grey
+                                                                      .shade600,
                                                             ),
                                                           ],
                                                         ),
@@ -1494,21 +1511,21 @@ class _MainPageState extends State<MainPage> {
                                         final int? selectedSubId =
                                             _selectedSubId; // if you use subs
                                         // filter by ID, not by name
-                                        final rootSubIds =
-                                            (selectedRootId == null)
+                                        final rootSubIds = (selectedRootId ==
+                                                null)
                                             ? const <int>[]
                                             : _allCategories
-                                                  .where(
-                                                    (c) =>
-                                                        _toInt(c.id) ==
-                                                        _toInt(selectedRootId),
-                                                  )
-                                                  .map(
-                                                    (c) => _toInt(
-                                                      c.mainCategoryId,
-                                                    )!,
-                                                  )
-                                                  .toList();
+                                                .where(
+                                                  (c) =>
+                                                      _toInt(c.id) ==
+                                                      _toInt(selectedRootId),
+                                                )
+                                                .map(
+                                                  (c) => _toInt(
+                                                    c.mainCategoryId,
+                                                  )!,
+                                                )
+                                                .toList();
 
                                         final filteredProducts = data.where((
                                           p,
@@ -1520,13 +1537,14 @@ class _MainPageState extends State<MainPage> {
 
                                           final bool matchesRoot =
                                               (selectedRootId == null) ||
-                                              pCatId ==
-                                                  _toInt(selectedRootId) ||
-                                              rootSubIds.contains(pCatId);
+                                                  pCatId ==
+                                                      _toInt(selectedRootId) ||
+                                                  rootSubIds.contains(pCatId);
 
                                           final bool matchesSub =
                                               (selectedSubId == null) ||
-                                              (pCatId == _toInt(selectedSubId));
+                                                  (pCatId ==
+                                                      _toInt(selectedSubId));
 
                                           return matchesRoot && matchesSub;
                                         }).toList();
@@ -1534,11 +1552,11 @@ class _MainPageState extends State<MainPage> {
                                         return GridView.builder(
                                           gridDelegate:
                                               const SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: 4,
-                                                crossAxisSpacing: 10,
-                                                mainAxisSpacing: 10,
-                                                childAspectRatio: 1.2,
-                                              ),
+                                            crossAxisCount: 4,
+                                            crossAxisSpacing: 10,
+                                            mainAxisSpacing: 10,
+                                            childAspectRatio: 1.2,
+                                          ),
                                           itemCount: filteredProducts
                                               .length, // use filtered length
                                           itemBuilder: (context, index) {
@@ -1546,9 +1564,8 @@ class _MainPageState extends State<MainPage> {
                                                 filteredProducts[index];
 
                                             // look up the category name from its id
-                                            final categoryName =
-                                                _catNameById[product
-                                                    .ProductCategory] ??
+                                            final categoryName = _catNameById[
+                                                    product.ProductCategory] ??
                                                 'Uncategorized';
 
                                             return GestureDetector(
@@ -1620,8 +1637,7 @@ class _MainPageState extends State<MainPage> {
                           height: screenHeight * 1,
                           child: Container(
                             height: screenHeight * 2.3,
-                            width:
-                                screenWidth *
+                            width: screenWidth *
                                 0.35, // Set a fixed width for the right section
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -1686,7 +1702,7 @@ class _MainPageState extends State<MainPage> {
                                                           style: TextStyle(
                                                             fontSize:
                                                                 screenWidth *
-                                                                0.013,
+                                                                    0.013,
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                           ),
@@ -1696,7 +1712,7 @@ class _MainPageState extends State<MainPage> {
                                                           style: TextStyle(
                                                             fontSize:
                                                                 screenWidth *
-                                                                0.013,
+                                                                    0.013,
                                                           ),
                                                         ),
                                                         trailing: Text(
@@ -1704,7 +1720,7 @@ class _MainPageState extends State<MainPage> {
                                                           style: TextStyle(
                                                             fontSize:
                                                                 screenWidth *
-                                                                0.015,
+                                                                    0.015,
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             color: Colors.green,
@@ -1723,8 +1739,8 @@ class _MainPageState extends State<MainPage> {
                                                       ),
                                                       onPressed: () =>
                                                           _removeProductFromOrder(
-                                                            index,
-                                                          ),
+                                                        index,
+                                                      ),
                                                     ),
                                                     IconButton(
                                                       icon: Icon(
@@ -1757,15 +1773,14 @@ class _MainPageState extends State<MainPage> {
                                           link: _layerLinkpromo,
                                           child: LayoutBuilder(
                                             builder: (context, constraints) {
-                                              double textFieldWidth =
-                                                  constraints.maxWidth *
+                                              double textFieldWidth = constraints
+                                                      .maxWidth *
                                                   0.8; // Adjust width dynamically
-                                              double textSize =
-                                                  screenWidth *
+                                              double textSize = screenWidth *
                                                   0.013; // Adjust font size dynamically
                                               double paddingHorizontal =
                                                   screenWidth *
-                                                  0.02; // Adjust padding dynamically
+                                                      0.02; // Adjust padding dynamically
                                               double paddingVertical =
                                                   screenHeight * 0.015;
 
@@ -1781,8 +1796,9 @@ class _MainPageState extends State<MainPage> {
                                                   decoration: InputDecoration(
                                                     labelText:
                                                         AppLocalizations.of(
-                                                          context,
-                                                        )!.discount,
+                                                      context,
+                                                    )!
+                                                            .discount,
                                                     labelStyle: TextStyle(
                                                       fontSize: textSize,
                                                     ),
@@ -1790,11 +1806,10 @@ class _MainPageState extends State<MainPage> {
                                                         OutlineInputBorder(),
                                                     contentPadding:
                                                         EdgeInsets.symmetric(
-                                                          horizontal:
-                                                              paddingHorizontal,
-                                                          vertical:
-                                                              paddingVertical,
-                                                        ),
+                                                      horizontal:
+                                                          paddingHorizontal,
+                                                      vertical: paddingVertical,
+                                                    ),
                                                   ),
                                                   onChanged: findPromoCode,
                                                 ),
@@ -1853,11 +1868,9 @@ class _MainPageState extends State<MainPage> {
                                     children: [
                                       Expanded(
                                         child: SizedBox(
-                                          width:
-                                              screenWidth *
+                                          width: screenWidth *
                                               0.2, // Adjust width as needed
-                                          height:
-                                              screenHeight *
+                                          height: screenHeight *
                                               0.08, // Adjust height as needed
                                           child: TextField(
                                             controller: _tipController,
@@ -1868,8 +1881,7 @@ class _MainPageState extends State<MainPage> {
                                             ),
                                             onChanged: (value) {
                                               setState(() {
-                                                tips =
-                                                    double.tryParse(value) ??
+                                                tips = double.tryParse(value) ??
                                                     0.0;
                                               });
                                             },
@@ -2012,8 +2024,7 @@ class _MainPageState extends State<MainPage> {
                                         'Payment Method', // You can change this to any localized text
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize:
-                                              screenWidth *
+                                          fontSize: screenWidth *
                                               0.0115, // Adjust text size based on screen width
                                         ),
                                       ),
@@ -2023,8 +2034,7 @@ class _MainPageState extends State<MainPage> {
                                             paymentMethod, // Show the current payment method
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              fontSize:
-                                                  screenWidth *
+                                              fontSize: screenWidth *
                                                   0.0115, // Adjust text size based on screen width
                                             ),
                                           ),
@@ -2191,7 +2201,8 @@ class _MainPageState extends State<MainPage> {
                                       child: Text(
                                         AppLocalizations.of(
                                           context,
-                                        )!.printReceipt,
+                                        )!
+                                            .printReceipt,
                                         style: TextStyle(
                                           fontSize: screenWidth * 0.011,
                                         ),
@@ -2394,8 +2405,15 @@ class _AddProductDialogState extends State<AddProductDialog>
   }
 
   Future<void> _loadCategories() async {
-    final cats = await ApiHandler().getCategoryData();
-    setState(() => _categories = cats);
+    if (_orgId != null) {
+      final cats = await ApiHandler().getLeafCategoriesByOrg(_orgId!);
+      setState(() => _categories = cats);
+      print(
+          '📂 Dialog loaded ${cats.length} categories for organization $_orgId');
+    } else {
+      print(
+          '⚠️ Organization ID not available in dialog, skipping category load');
+    }
   }
 
   Future<void> _submit() async {
@@ -2434,8 +2452,8 @@ class _AddProductDialogState extends State<AddProductDialog>
       child: Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: const Color(0xFFB87333), // Dark orange focus
-          ),
+                primary: const Color(0xFFB87333), // Dark orange focus
+              ),
           inputDecorationTheme: InputDecorationTheme(
             focusedBorder: OutlineInputBorder(
               borderSide: const BorderSide(color: Color(0xFFB87333)),
