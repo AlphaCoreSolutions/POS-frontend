@@ -1,5 +1,6 @@
 import 'package:visionpos/utils/session_manager.dart';
 import 'package:visionpos/utils/api_config.dart';
+import 'package:visionpos/components/quick_api_switcher.dart';
 import 'package:flutter/material.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:http/http.dart' as http;
@@ -20,6 +21,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
   String? errorMessage;
+  String _currentEnvironment = ApiConfig.instance.environment;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentEnvironment = ApiConfig.instance.environment;
+  }
+
+  void _onEnvironmentChanged() {
+    setState(() {
+      _currentEnvironment = ApiConfig.instance.environment;
+    });
+  }
 
   Future<void> login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -70,6 +84,21 @@ class _LoginScreenState extends State<LoginScreen> {
     debugPrint('✅ orgId persisted = $stored'); // should be > 0
   }
 
+  String _getEnvironmentDisplayName(String environment) {
+    switch (environment) {
+      case ApiConfig.LOCAL:
+        return 'Local Development';
+      case ApiConfig.PRODUCTION:
+        return 'Production';
+      case ApiConfig.STAGING:
+        return 'Staging';
+      case ApiConfig.CUSTOM:
+        return 'Custom';
+      default:
+        return environment;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final darkCharcoal = const Color(0xFF36454F);
@@ -78,6 +107,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: Text(
+          'VisionPOS Login',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: darkCharcoal,
+        elevation: 0,
+        actions: [
+          QuickApiSwitcher(onEnvironmentChanged: _onEnvironmentChanged),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
@@ -90,6 +131,47 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: darkCharcoal,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // API Environment Indicator
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _currentEnvironment == ApiConfig.LOCAL
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.blue.withOpacity(0.1),
+                  border: Border.all(
+                    color: _currentEnvironment == ApiConfig.LOCAL
+                        ? Colors.green
+                        : Colors.blue,
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: _currentEnvironment == ApiConfig.LOCAL
+                          ? Colors.green
+                          : Colors.blue,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'API: ${_getEnvironmentDisplayName(_currentEnvironment)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _currentEnvironment == ApiConfig.LOCAL
+                            ? Colors.green.shade700
+                            : Colors.blue.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),

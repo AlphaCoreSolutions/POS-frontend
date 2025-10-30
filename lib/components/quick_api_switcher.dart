@@ -2,7 +2,10 @@ import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 
 class QuickApiSwitcher extends StatelessWidget {
-  const QuickApiSwitcher({Key? key}) : super(key: key);
+  final VoidCallback? onEnvironmentChanged;
+
+  const QuickApiSwitcher({Key? key, this.onEnvironmentChanged})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -12,6 +15,9 @@ class QuickApiSwitcher extends StatelessWidget {
       onSelected: (String environment) async {
         try {
           await ApiConfig.instance.setEnvironment(environment);
+          if (onEnvironmentChanged != null) {
+            onEnvironmentChanged!();
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Switched to ${_getEnvironmentName(environment)}'),

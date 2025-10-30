@@ -23,6 +23,9 @@ void main() async {
   // Initialize API configuration
   await ApiConfig.instance.initialize();
 
+  // Auto-switch to local API for development
+  await ApiConfig.instance.setEnvironment(ApiConfig.LOCAL);
+
   runApp(Main());
 }
 
