@@ -1,7 +1,7 @@
-import 'package:fixed_pos/utils/session_manager.dart';
-import 'package:fixed_pos/utils/api_config.dart';
+import 'package:visionpos/utils/session_manager.dart';
+import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';

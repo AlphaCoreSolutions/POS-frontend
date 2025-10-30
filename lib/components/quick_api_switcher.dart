@@ -1,4 +1,4 @@
-import 'package:fixed_pos/utils/api_config.dart';
+import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 
 class QuickApiSwitcher extends StatelessWidget {

@@ -1,16 +1,16 @@
 import 'dart:convert';
 
 import 'package:esc_pos_utils/esc_pos_utils.dart';
-import 'package:fixed_pos/L10n/app_localizations.dart';
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/models/promoCodes_model.dart';
-import 'package:fixed_pos/models/taxes_model.dart';
-import 'package:fixed_pos/pages/add_pages/add_category.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/models/category_model.dart';
-import 'package:fixed_pos/models/product_model.dart';
-import 'package:fixed_pos/utils/session_manager.dart';
-import 'package:fixed_pos/components/quick_api_switcher.dart';
+import 'package:visionpos/L10n/app_localizations.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/models/promoCodes_model.dart';
+import 'package:visionpos/models/taxes_model.dart';
+import 'package:visionpos/pages/add_pages/add_category.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/models/category_model.dart';
+import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/utils/session_manager.dart';
+import 'package:visionpos/components/quick_api_switcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';

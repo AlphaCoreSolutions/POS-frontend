@@ -1,4 +1,4 @@
-import 'package:fixed_pos/language_changing/constants.dart';
+import 'package:visionpos/language_changing/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 

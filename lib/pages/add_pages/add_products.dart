@@ -1,9 +1,9 @@
 //import 'dart:io';
 
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/models/product_model.dart';
-import 'package:fixed_pos/models/category_model.dart'; // Ensure you have this model
-import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/models/category_model.dart'; // Ensure you have this model
+import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';

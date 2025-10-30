@@ -1,7 +1,7 @@
 //import 'dart:io';
 
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:flutter/material.dart';
 
 class OrdersPage extends StatelessWidget {

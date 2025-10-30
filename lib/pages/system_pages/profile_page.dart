@@ -1,7 +1,7 @@
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/models/user_model.dart';
-import 'package:fixed_pos/pages/edit_pages/edit_page.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/models/user_model.dart';
+import 'package:visionpos/pages/edit_pages/edit_page.dart';
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatefulWidget {

@@ -1,17 +1,17 @@
-//import 'package:fixed_pos/L10n/L10n.dart';
+//import 'package:visionpos/L10n/L10n.dart';
 import 'dart:io';
 
-import 'package:fixed_pos/L10n/app_localizations.dart';
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/pages/essential_pages/MyHttpOverrides.dart';
-import 'package:fixed_pos/pages/system_pages/login_page.dart';
-import 'package:fixed_pos/utils/api_config.dart';
+import 'package:visionpos/L10n/app_localizations.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/pages/essential_pages/MyHttpOverrides.dart';
+import 'package:visionpos/pages/system_pages/login_page.dart';
+import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 //import 'package:provider/provider.dart';
-//import 'package:fixed_pos/providers/locale_provider.dart'; // Import the provider for managing locale
+//import 'package:visionpos/providers/locale_provider.dart'; // Import the provider for managing locale
 //import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:fixed_pos/components/side_menu.dart'; // Assuming side_menu.dart exists
-import 'package:fixed_pos/pages/system_pages/main_page.dart';
+import 'package:visionpos/components/side_menu.dart'; // Assuming side_menu.dart exists
+import 'package:visionpos/pages/system_pages/main_page.dart';
 import 'package:http/io_client.dart';
 import 'package:jwt_decode/jwt_decode.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Assuming main_page.dart exists

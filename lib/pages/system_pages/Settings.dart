@@ -1,13 +1,13 @@
-import 'package:fixed_pos/L10n/app_localizations.dart';
-import 'package:fixed_pos/main.dart';
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/language_changing/languages.dart';
-import 'package:fixed_pos/models/promoCodes_model.dart';
-import 'package:fixed_pos/models/taxes_model.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/utils/session_manager.dart';
-import 'package:fixed_pos/components/api_settings_dialog.dart';
-import 'package:fixed_pos/utils/api_config.dart';
+import 'package:visionpos/L10n/app_localizations.dart';
+import 'package:visionpos/main.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/language_changing/languages.dart';
+import 'package:visionpos/models/promoCodes_model.dart';
+import 'package:visionpos/models/taxes_model.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/utils/session_manager.dart';
+import 'package:visionpos/components/api_settings_dialog.dart';
+import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 

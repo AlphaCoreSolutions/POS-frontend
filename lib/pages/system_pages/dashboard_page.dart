@@ -1,9 +1,9 @@
 import 'dart:async';
 //import 'dart:io';
-import 'package:fixed_pos/models/product_model.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/pages/system_pages/orderDetails_page.dart';
+import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/pages/system_pages/orderDetails_page.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';

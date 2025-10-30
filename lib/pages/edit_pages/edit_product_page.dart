@@ -1,7 +1,7 @@
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/models/product_model.dart';
-import 'package:fixed_pos/models/category_model.dart';
-import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/models/category_model.dart';
+import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';

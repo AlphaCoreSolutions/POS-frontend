@@ -1,4 +1,4 @@
-import 'package:fixed_pos/L10n/app_localizations.dart';
+import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,7 +1,7 @@
-import 'package:fixed_pos/models/category_model.dart';
-import 'package:fixed_pos/pages/add_pages/add_category.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:visionpos/models/category_model.dart';
+import 'package:visionpos/pages/add_pages/add_category.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 
 class ManageCategoriesPage extends StatefulWidget {

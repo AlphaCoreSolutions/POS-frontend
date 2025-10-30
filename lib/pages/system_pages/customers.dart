@@ -1,7 +1,7 @@
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/models/customer_model.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/models/customer_model.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 
 class CustomersPage extends StatefulWidget {

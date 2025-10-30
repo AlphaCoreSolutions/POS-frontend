@@ -1,11 +1,11 @@
-import 'package:fixed_pos/language_changing/constants.dart';
-import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
-import 'package:fixed_pos/models/category_model.dart';
-import 'package:fixed_pos/models/product_model.dart';
-import 'package:fixed_pos/pages/add_pages/add_category.dart';
-import 'package:fixed_pos/pages/add_pages/add_products.dart';
-import 'package:fixed_pos/pages/edit_pages/edit_product_page.dart';
-import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/models/category_model.dart';
+import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/pages/add_pages/add_category.dart';
+import 'package:visionpos/pages/add_pages/add_products.dart';
+import 'package:visionpos/pages/edit_pages/edit_product_page.dart';
+import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 
 class ProductsPage extends StatefulWidget {
