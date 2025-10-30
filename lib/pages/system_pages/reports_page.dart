@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/utils/session_manager.dart';
+import 'package:visionpos/utils/pdf_service.dart';
 import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
@@ -96,6 +97,137 @@ class _ReportsPageState extends State<ReportsPage>
     }
   }
 
+  Future<void> _exportCurrentTab() async {
+    try {
+      final currentTab = _tabController.index;
+      late final pdfBytes;
+      late final fileName;
+
+      switch (currentTab) {
+        case 0: // Sales Overview
+          final dailySales = (_salesByDateRange?['dailySales'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+          final totalRevenue =
+              (_salesByDateRange?['totalRevenue'] ?? 0).toDouble();
+          final totalOrders = _salesByDateRange?['totalOrders'] ?? 0;
+
+          pdfBytes = await PdfService.generateSalesReport(
+            startDate: _startDate,
+            endDate: _endDate,
+            dailySales: dailySales,
+            topProducts: _topSellingProducts,
+            paymentMethods: _salesByPaymentMethod,
+            totalRevenue: totalRevenue,
+            totalOrders: totalOrders,
+          );
+          fileName =
+              'Sales_Report_${DateFormat('yyyyMMdd').format(_startDate)}_${DateFormat('yyyyMMdd').format(_endDate)}.pdf';
+          break;
+
+        case 1: // Top Products
+          final dailySales = (_salesByDateRange?['dailySales'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+          final totalRevenue =
+              (_salesByDateRange?['totalRevenue'] ?? 0).toDouble();
+          final totalOrders = _salesByDateRange?['totalOrders'] ?? 0;
+
+          pdfBytes = await PdfService.generateSalesReport(
+            startDate: _startDate,
+            endDate: _endDate,
+            dailySales: [],
+            topProducts: _topSellingProducts,
+            paymentMethods: [],
+            totalRevenue: totalRevenue,
+            totalOrders: totalOrders,
+          );
+          fileName =
+              'Top_Products_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
+          break;
+
+        case 4: // Inventory
+          final inventory = (_inventoryStatus?['products'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+          final lowStock = (_inventoryStatus?['lowStock'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+          final totalProducts = _inventoryStatus?['totalProducts'] ?? 0;
+          final totalValue = (_inventoryStatus?['totalValue'] ?? 0).toDouble();
+
+          pdfBytes = await PdfService.generateInventoryReport(
+            inventory: inventory,
+            lowStock: lowStock,
+            totalProducts: totalProducts,
+            totalValue: totalValue,
+          );
+          fileName =
+              'Inventory_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
+          break;
+
+        case 5: // Profit Analysis
+          final profitData = (_profitAnalysis?['details'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+          final totalRevenue =
+              (_profitAnalysis?['totalRevenue'] ?? 0).toDouble();
+          final totalCost = (_profitAnalysis?['totalCost'] ?? 0).toDouble();
+          final totalProfit = (_profitAnalysis?['totalProfit'] ?? 0).toDouble();
+          final profitMargin =
+              (_profitAnalysis?['profitMargin'] ?? 0).toDouble();
+
+          pdfBytes = await PdfService.generateProfitReport(
+            startDate: _startDate,
+            endDate: _endDate,
+            profitData: profitData,
+            totalRevenue: totalRevenue,
+            totalCost: totalCost,
+            totalProfit: totalProfit,
+            profitMargin: profitMargin,
+          );
+          fileName =
+              'Profit_Analysis_${DateFormat('yyyyMMdd').format(_startDate)}_${DateFormat('yyyyMMdd').format(_endDate)}.pdf';
+          break;
+
+        default:
+          // For other tabs, use sales report
+          final dailySales = (_salesByDateRange?['dailySales'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+          final totalRevenue =
+              (_salesByDateRange?['totalRevenue'] ?? 0).toDouble();
+          final totalOrders = _salesByDateRange?['totalOrders'] ?? 0;
+
+          pdfBytes = await PdfService.generateSalesReport(
+            startDate: _startDate,
+            endDate: _endDate,
+            dailySales: dailySales,
+            topProducts: _topSellingProducts,
+            paymentMethods: _salesByPaymentMethod,
+            totalRevenue: totalRevenue,
+            totalOrders: totalOrders,
+          );
+          fileName =
+              'Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
+      }
+
+      final filePath = await PdfService.savePdf(pdfBytes, fileName);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Report exported to: $filePath')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error exporting: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,16 +236,25 @@ class _ReportsPageState extends State<ReportsPage>
         backgroundColor: const Color(0xFF36454F),
         foregroundColor: Colors.white,
         actions: [
+          // Export Current Tab
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _exportCurrentTab,
+            tooltip: 'Export to PDF',
+          ),
+          // Date Range
           IconButton(
             icon: const Icon(Icons.date_range),
             onPressed: _selectDateRange,
             tooltip: 'Select Date Range',
           ),
+          // Refresh
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadAllReports,
             tooltip: 'Refresh',
           ),
+          const SizedBox(width: 8),
         ],
         bottom: TabBar(
           controller: _tabController,

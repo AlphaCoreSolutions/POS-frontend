@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/utils/session_manager.dart';
+import 'package:visionpos/utils/pdf_service.dart';
 import 'package:intl/intl.dart';
 
 class EnhancedDashboard extends StatefulWidget {
@@ -76,6 +77,34 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
     }
   }
 
+  Future<void> _exportToPDF() async {
+    try {
+      final pdfBytes = await PdfService.generateDashboardReport(
+        summary: _summary ?? {},
+        salesTrend: _salesTrend,
+        topProducts: _topProducts,
+        topCategories: _topCategories,
+        recentOrders: _recentOrders,
+      );
+
+      final fileName =
+          'Dashboard_Report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+      final filePath = await PdfService.savePdf(pdfBytes, fileName);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Dashboard exported to: $filePath')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error exporting: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,10 +113,18 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
         backgroundColor: const Color(0xFF36454F),
         foregroundColor: Colors.white,
         actions: [
+          // Export to PDF Button
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export to PDF',
+            onPressed: _exportToPDF,
+          ),
+          // Refresh Button
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadDashboardData,
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading

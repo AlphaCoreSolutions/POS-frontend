@@ -39,21 +39,23 @@ dependencies:
   flutter_form_builder:
   shared_preferences:
   cupertino_icons: 
-  google_fonts: ^6.2.1 # For modern typography
-  fl_chart: ^0.64.0 # For charts 
+  google_fonts: ^6.3.2 # For modern typography
+  fl_chart: ^1.1.1 # For charts 
   intl:
   #bluetooth_print: ^4.3.0 
   print_bluetooth_thermal: 
   esc_pos_utils: 
-  permission_handler: ^11.4.0 
-  flutter_blue_plus: 
+  permission_handler: ^12.0.1 
+  flutter_blue_plus: ^2.0.0 
   http:
-  provider:
-  translator: ^1.0.3+1
+  provider: ^6.1.5
+  translator: ^1.0.4
   equatable: ^2.0.5
   image_picker: ^1.1.2
   jwt_decode: ^0.3.1
   url_launcher:
+  pdf: ^3.8.4
+  path_provider: ^2.0.15
   
 
 dev_dependencies:
@@ -65,7 +67,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
