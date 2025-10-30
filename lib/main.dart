@@ -5,6 +5,7 @@ import 'package:fixed_pos/L10n/app_localizations.dart';
 import 'package:fixed_pos/language_changing/constants.dart';
 import 'package:fixed_pos/pages/essential_pages/MyHttpOverrides.dart';
 import 'package:fixed_pos/pages/system_pages/login_page.dart';
+import 'package:fixed_pos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 //import 'package:provider/provider.dart';
 //import 'package:fixed_pos/providers/locale_provider.dart'; // Import the provider for managing locale
@@ -15,9 +16,13 @@ import 'package:http/io_client.dart';
 import 'package:jwt_decode/jwt_decode.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Assuming main_page.dart exists
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = MyHttpOverrides();
+
+  // Initialize API configuration
+  await ApiConfig.instance.initialize();
+
   runApp(Main());
 }
 
@@ -31,7 +36,7 @@ class Main extends StatefulWidget {
     print("Setting new locale: $newLocale");
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _MainState? state = context.findAncestorStateOfType<_MainState>();
-      state.setLocale(newLocale);
+      state?.setLocale(newLocale);
     });
   }
 }
@@ -105,9 +110,7 @@ class _MainState extends State<Main> {
             MainPage(), // Main page remains the same
             if (!_loggedIn)
               Positioned.fill(
-                child: LoginScreen(
-                  onLoginSuccess: handleLoginSuccess,
-                ),
+                child: LoginScreen(onLoginSuccess: handleLoginSuccess),
               ),
           ],
         ),

@@ -10,6 +10,7 @@ import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
 import 'package:fixed_pos/models/category_model.dart';
 import 'package:fixed_pos/models/product_model.dart';
 import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:fixed_pos/components/quick_api_switcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -59,8 +60,9 @@ class _MainPageState extends State<MainPage> {
   Category? _selectedRoot;
   int? _selectedSubId;
   late final ScrollController _subsCtrl;
-  Map<int, String> get _catNameById =>
-      {for (final c in _all) c.id: c.categoryName}; // _all: List<Category>
+  Map<int, String> get _catNameById => {
+    for (final c in _all) c.id: c.categoryName,
+  }; // _all: List<Category>
 
   //--------------------------------------------------------------
   ApiHandler apiHandler = ApiHandler();
@@ -118,8 +120,9 @@ class _MainPageState extends State<MainPage> {
   String optionprinttype = "58 mm";
   List<String> options = ["58 mm", "80 mm"];
   // ignore: unused_field
-  final TextEditingController _txtText =
-      TextEditingController(text: "Hello developer");
+  final TextEditingController _txtText = TextEditingController(
+    text: "Hello developer",
+  );
   // ignore: unused_field
   bool _progress = false;
   // ignore: unused_field
@@ -171,8 +174,9 @@ class _MainPageState extends State<MainPage> {
       } else {
         final rootId = _toInt(cat.mainCategoryId);
         _activeSubs = _allCategories
-            .where((c) =>
-                _toInt(c.mainCategoryId) == rootId) // children of this root
+            .where(
+              (c) => _toInt(c.mainCategoryId) == rootId,
+            ) // children of this root
             .toList();
       }
     });
@@ -248,8 +252,9 @@ class _MainPageState extends State<MainPage> {
       connected = false;
     });
 
-    final bool result =
-        await PrintBluetoothThermal.connect(macPrinterAddress: macAddress);
+    final bool result = await PrintBluetoothThermal.connect(
+      macPrinterAddress: macAddress,
+    );
 
     if (result) {
       setState(() {
@@ -272,12 +277,15 @@ class _MainPageState extends State<MainPage> {
 
   void _printReceipt() async {
     if (connected) {
-      List<int> bytes = await generateWindowsTicket(OrderDto(
+      List<int> bytes = await generateWindowsTicket(
+        OrderDto(
           id: orderCount,
           orderItems: selectedItems,
           GrandTotal: _calculateGrandTotal(selectedItems),
           PaymentMethod: paymentMethod,
-          tip: tips));
+          tip: tips,
+        ),
+      );
       await PrintBluetoothThermal.writeBytes(bytes);
       print("Printing successful!");
     } else {
@@ -310,23 +318,32 @@ class _MainPageState extends State<MainPage> {
     List<int> bytes = [];
 
     // Add the header
-    bytes += generator.text('2Go Cafe',
-        styles: PosStyles(
-            align: PosAlign.center,
-            bold: true,
-            height: PosTextSize.size2,
-            width: PosTextSize.size2));
+    bytes += generator.text(
+      '2Go Cafe',
+      styles: PosStyles(
+        align: PosAlign.center,
+        bold: true,
+        height: PosTextSize.size2,
+        width: PosTextSize.size2,
+      ),
+    );
 
-    bytes += generator.text('Time: ${formattedTime}',
-        styles: PosStyles(align: PosAlign.center, bold: true));
+    bytes += generator.text(
+      'Time: ${formattedTime}',
+      styles: PosStyles(align: PosAlign.center, bold: true),
+    );
 
-    bytes += generator.text('Receipt # ${order.id}',
-        styles: PosStyles(align: PosAlign.center, bold: true));
+    bytes += generator.text(
+      'Receipt # ${order.id}',
+      styles: PosStyles(align: PosAlign.center, bold: true),
+    );
 
     bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
 
-    bytes += generator.text('Item:        Qty:         Price:',
-        styles: PosStyles(align: PosAlign.right, bold: true));
+    bytes += generator.text(
+      'Item:        Qty:         Price:',
+      styles: PosStyles(align: PosAlign.right, bold: true),
+    );
 
     bytes += generator.hr(); // Horizontal line
 
@@ -340,15 +357,20 @@ class _MainPageState extends State<MainPage> {
         double totalPrice = item.quantity * product.SellingPrice;
 
         // Ensure proper spacing
-        String productName =
-            product.ProductName.padRight(12); // 20-character width
-        String quantity =
-            'x${item.quantity}'.padLeft(5); // Right-align quantity
-        String price =
-            '${totalPrice.toStringAsFixed(2)} JOD'.padLeft(15); // Align price
+        String productName = product.ProductName.padRight(
+          12,
+        ); // 20-character width
+        String quantity = 'x${item.quantity}'.padLeft(
+          5,
+        ); // Right-align quantity
+        String price = '${totalPrice.toStringAsFixed(2)} JOD'.padLeft(
+          15,
+        ); // Align price
 
-        bytes += generator.text('$productName$quantity$price',
-            styles: PosStyles(align: PosAlign.left));
+        bytes += generator.text(
+          '$productName$quantity$price',
+          styles: PosStyles(align: PosAlign.left),
+        );
       }
     }
 
@@ -356,26 +378,31 @@ class _MainPageState extends State<MainPage> {
 
     // Add subtotal, taxes, and total
     bytes += generator.text(
-        'Subtotal:       ${_calculateSubtotal(selectedItems)} JOD',
-        styles: PosStyles(align: PosAlign.right, bold: true));
+      'Subtotal:       ${_calculateSubtotal(selectedItems)} JOD',
+      styles: PosStyles(align: PosAlign.right, bold: true),
+    );
 
     bytes += generator.text(
-        '${AppLocalizations.of(context)!.tax}(${selectedTaxType == "In-House" ? currentTaxes?.inHouse.toStringAsFixed(0) ?? 0 : currentTaxes?.takeOut.toStringAsFixed(0) ?? 0}%):      ${_calculateTaxes(selectedItems).toStringAsFixed(2)} JOD',
-        styles: PosStyles(align: PosAlign.right, bold: true));
+      '${AppLocalizations.of(context)!.tax}(${selectedTaxType == "In-House" ? currentTaxes?.inHouse.toStringAsFixed(0) ?? 0 : currentTaxes?.takeOut.toStringAsFixed(0) ?? 0}%):      ${_calculateTaxes(selectedItems).toStringAsFixed(2)} JOD',
+      styles: PosStyles(align: PosAlign.right, bold: true),
+    );
 
     bytes += generator.text(
-        'Total:      ${(order.GrandTotal + order.tip).toStringAsFixed(2)} JOD',
-        styles: PosStyles(align: PosAlign.right, bold: true));
+      'Total:      ${(order.GrandTotal + order.tip).toStringAsFixed(2)} JOD',
+      styles: PosStyles(align: PosAlign.right, bold: true),
+    );
 
     bytes += generator.feed(1);
 
     bytes += generator.text(
-        'PaymentMethod:          ${order.PaymentMethod}    ',
-        styles: PosStyles(align: PosAlign.right));
+      'PaymentMethod:          ${order.PaymentMethod}    ',
+      styles: PosStyles(align: PosAlign.right),
+    );
 
     bytes += generator.text(
-        'Tip:                    ${order.tip.toStringAsFixed(2)} JOD',
-        styles: PosStyles(align: PosAlign.right));
+      'Tip:                    ${order.tip.toStringAsFixed(2)} JOD',
+      styles: PosStyles(align: PosAlign.right),
+    );
 
     bytes += generator.feed(3); // Space at the end
     bytes += generator.hr(); // Horizontal line
@@ -390,16 +417,20 @@ class _MainPageState extends State<MainPage> {
 
     bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
 
-    bytes += generator.text('Contact Information:',
-        styles: PosStyles(align: PosAlign.center));
+    bytes += generator.text(
+      'Contact Information:',
+      styles: PosStyles(align: PosAlign.center),
+    );
 
     bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
 
-    bytes += generator.text('Phone Number: +962 7 9702 0297',
-        styles: PosStyles(align: PosAlign.center));
+    bytes += generator.text(
+      'Phone Number: +962 7 9702 0297',
+      styles: PosStyles(align: PosAlign.center),
+    );
 
     bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
-/*
+    /*
     bytes += generator.text('acsolutions.business@gmail.com',
         styles: PosStyles(align: PosAlign.center));
 */
@@ -434,8 +465,8 @@ class _MainPageState extends State<MainPage> {
             child: Theme(
               data: Theme.of(context).copyWith(
                 colorScheme: Theme.of(context).colorScheme.copyWith(
-                      primary: const Color(0xFFB87333), // dark orange
-                    ),
+                  primary: const Color(0xFFB87333), // dark orange
+                ),
                 dialogBackgroundColor: Colors.grey[100],
                 textButtonTheme: TextButtonThemeData(
                   style: TextButton.styleFrom(
@@ -475,8 +506,9 @@ class _MainPageState extends State<MainPage> {
                                 itemBuilder: (ctx, i) {
                                   final device = items[i];
                                   return Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                    ),
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(8),
                                       onTap: () {
@@ -485,11 +517,14 @@ class _MainPageState extends State<MainPage> {
                                       },
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 12, horizontal: 8),
+                                          vertical: 12,
+                                          horizontal: 8,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: ListTile(
                                           contentPadding: EdgeInsets.zero,
@@ -545,15 +580,9 @@ class _MainPageState extends State<MainPage> {
           position: Tween<Offset>(
             begin: const Offset(0, 0.3),
             end: Offset.zero,
-          ).animate(CurvedAnimation(
-            parent: anim1,
-            curve: Curves.easeOut,
-          )),
+          ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOut)),
           child: ScaleTransition(
-            scale: CurvedAnimation(
-              parent: anim1,
-              curve: Curves.easeOutBack,
-            ),
+            scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
             child: child,
           ),
         );
@@ -564,8 +593,9 @@ class _MainPageState extends State<MainPage> {
   void _togglePaymentMethod(bool value) {
     setState(() {
       isCash = value;
-      paymentMethod =
-          isCash ? 'Cash' : 'Visa'; // Toggle between 'Cash' and 'Visa'
+      paymentMethod = isCash
+          ? 'Cash'
+          : 'Visa'; // Toggle between 'Cash' and 'Visa'
     });
   }
 
@@ -635,12 +665,14 @@ class _MainPageState extends State<MainPage> {
       return;
     }
 
-    List<Promocodes> allPromoCodes =
-        await apiHandler.fetchPromoCodes(); // Use instance
+    List<Promocodes> allPromoCodes = await apiHandler
+        .fetchPromoCodes(); // Use instance
 
     List<Promocodes> filteredPromoCodes = allPromoCodes
-        .where((promo) =>
-            promo.PromoCode.toLowerCase().contains(query.toLowerCase()))
+        .where(
+          (promo) =>
+              promo.PromoCode.toLowerCase().contains(query.toLowerCase()),
+        )
         .toList();
 
     if (filteredPromoCodes.isEmpty) {
@@ -672,8 +704,9 @@ class _MainPageState extends State<MainPage> {
     }
     */
 
-      selectedItems[index] = selectedItems[index]
-          .updateQuantity(selectedItems[index].quantity - 1);
+      selectedItems[index] = selectedItems[index].updateQuantity(
+        selectedItems[index].quantity - 1,
+      );
 
       if (selectedItems[index].quantity == 0) {
         productPrices.remove(productId); // Remove price from map
@@ -687,8 +720,9 @@ class _MainPageState extends State<MainPage> {
       print("Invalid index");
     }
     setState(() {
-      selectedItems[index] = selectedItems[index]
-          .updateQuantity(selectedItems[index].quantity + 1);
+      selectedItems[index] = selectedItems[index].updateQuantity(
+        selectedItems[index].quantity + 1,
+      );
     });
   }
 
@@ -697,27 +731,31 @@ class _MainPageState extends State<MainPage> {
   }
 
   void addToOrder(Product product) {
-    setState(() {
-      int index =
-          selectedItems.indexWhere((item) => item.productId == product.id);
+    setState(
+      () {
+        int index = selectedItems.indexWhere(
+          (item) => item.productId == product.id,
+        );
 
-      //if(product.ProductInventory != 0){}
-      if (index != -1) {
-        selectedItems[index] = selectedItems[index]
-            .updateQuantity(selectedItems[index].quantity + 1);
-      } else {
-        selectedItems.add(OrderItemDto(productId: product.id, quantity: 1));
-        productPrices[product.id] = product.SellingPrice; // Store product price
-      }
-    }
-        /*
+        //if(product.ProductInventory != 0){}
+        if (index != -1) {
+          selectedItems[index] = selectedItems[index].updateQuantity(
+            selectedItems[index].quantity + 1,
+          );
+        } else {
+          selectedItems.add(OrderItemDto(productId: product.id, quantity: 1));
+          productPrices[product.id] =
+              product.SellingPrice; // Store product price
+        }
+      },
+
+      /*
    else{
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Product ${product.ProductName} Is Out Of Stock!'))
     );}
    */
-
-        );
+    );
   }
 
   double _calculateGrandTotal(List<OrderItemDto> orderItems) {
@@ -729,12 +767,13 @@ class _MainPageState extends State<MainPage> {
   void submitOrder() async {
     double grandTotal = _calculateGrandTotal(selectedItems);
     OrderDto order = OrderDto(
-        id: 0,
-        orderItems: selectedItems,
-        GrandTotal: grandTotal,
-        PaymentMethod: paymentMethod,
-        //OrderStatus: OrderStatus,
-        tip: tips);
+      id: 0,
+      orderItems: selectedItems,
+      GrandTotal: grandTotal,
+      PaymentMethod: paymentMethod,
+      //OrderStatus: OrderStatus,
+      tip: tips,
+    );
 
     bool success = await ApiHandler().postOrder(order);
 
@@ -755,14 +794,16 @@ class _MainPageState extends State<MainPage> {
     */
 
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Order submitted successfully!')));
+        SnackBar(content: Text('✅ Order submitted successfully!')),
+      );
 
       setState(() {
         selectedItems.clear(); // Clear the list
       });
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('❌ Failed to submit order')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Failed to submit order')));
     }
   }
 
@@ -859,13 +900,16 @@ class _MainPageState extends State<MainPage> {
     }
 
     // Fetch all products (or use a cached list if available)
-    List<Product> allProducts =
-        await apiHandler.searchProductByName(productName: query);
+    List<Product> allProducts = await apiHandler.searchProductByName(
+      productName: query,
+    );
 
     // Filter products locally based on the query
     List<Product> filteredProducts = allProducts
-        .where((product) =>
-            product.ProductName.toLowerCase().contains(query.toLowerCase()))
+        .where(
+          (product) =>
+              product.ProductName.toLowerCase().contains(query.toLowerCase()),
+        )
         .toList();
 
     if (filteredProducts.isEmpty) {
@@ -906,13 +950,14 @@ class _MainPageState extends State<MainPage> {
     debugPrint('Roots: ${_rootCategories.length}');
     for (final r in _rootCategories) {
       debugPrint(
-          ' root -> id=${r.id}, name=${r.categoryName}, main=${r.mainCategoryId}');
+        ' root -> id=${r.id}, name=${r.categoryName}, main=${r.mainCategoryId}',
+      );
     }
   }
 
-// tap handlers used by your UI
+  // tap handlers used by your UI
 
-/*
+  /*
   late List categoryIcons = [
     Icons.category,
     Icons.category,
@@ -970,17 +1015,16 @@ class _MainPageState extends State<MainPage> {
       final prod = products.first;
       setState(() {
         // 2) Find index of an existing OrderItemDto with same productId
-        final idx =
-            selectedItems.indexWhere((item) => item.productId == prod.id);
+        final idx = selectedItems.indexWhere(
+          (item) => item.productId == prod.id,
+        );
 
         if (idx >= 0) {
           // 3a) If found, increment its quantity
           selectedItems[idx].quantity += 1;
         } else {
           // 3b) Otherwise add a brand‐new line
-          selectedItems.add(
-            OrderItemDto(productId: prod.id, quantity: 1),
-          );
+          selectedItems.add(OrderItemDto(productId: prod.id, quantity: 1));
         }
       });
     } else {
@@ -991,9 +1035,7 @@ class _MainPageState extends State<MainPage> {
       );
       if (newProd != null) {
         setState(() {
-          selectedItems.add(
-            OrderItemDto(productId: newProd.id, quantity: 1),
-          );
+          selectedItems.add(OrderItemDto(productId: newProd.id, quantity: 1));
         });
       }
     }
@@ -1048,6 +1090,8 @@ class _MainPageState extends State<MainPage> {
                 child: Icon(isDrawerOpen ? Icons.arrow_back_ios : Icons.menu),
               ),
               actions: [
+                QuickApiSwitcher(),
+                SizedBox(width: 10),
                 ElevatedButton(
                   onPressed: _showPrinterDialog,
                   style: ElevatedButton.styleFrom(
@@ -1055,8 +1099,9 @@ class _MainPageState extends State<MainPage> {
                     padding: EdgeInsets.all(8), // Adjust button padding
                     minimumSize: Size(24, 24), // Set minimum button size
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(20), // Rounded corners
+                      borderRadius: BorderRadius.circular(
+                        20,
+                      ), // Rounded corners
                     ),
                   ),
                   child: Icon(
@@ -1065,9 +1110,7 @@ class _MainPageState extends State<MainPage> {
                     color: Color(0xFFB87333),
                   ),
                 ),
-                SizedBox(
-                  width: 10,
-                ),
+                SizedBox(width: 10),
                 Text(
                   connected ? "Printer Connected" : "Printer Not Connected",
                   style: TextStyle(
@@ -1076,11 +1119,12 @@ class _MainPageState extends State<MainPage> {
                   ),
                 ),
                 IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    onPressed: () {
-                      getData();
-                      categoryData();
-                    }),
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () {
+                    getData();
+                    categoryData();
+                  },
+                ),
               ],
             ),
             body: SingleChildScrollView(
@@ -1102,59 +1146,65 @@ class _MainPageState extends State<MainPage> {
                               link:
                                   _layerLink, // This should be defined as LayerLink _layerLink = LayerLink();
                               child: Padding(
-                                  padding: EdgeInsets.only(
-                                      right: screenWidth * 0.13),
-                                  child: TextField(
-                                    controller: searchController,
-                                    decoration: InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal:
-                                            MediaQuery.of(context).size.width *
-                                                0.02, // Horizontal padding
-                                        vertical:
-                                            MediaQuery.of(context).size.height *
-                                                0.01, // Vertical padding
-                                      ),
-                                      labelText: translation(context).search,
-                                      labelStyle: TextStyle(
-                                          fontSize: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.02),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                            width: 1.0, color: Colors.grey),
-                                      ),
-                                      prefixIcon: Icon(
-                                        Icons.search,
-                                        size:
-                                            MediaQuery.of(context).size.height *
-                                                0.035,
+                                padding: EdgeInsets.only(
+                                  right: screenWidth * 0.13,
+                                ),
+                                child: TextField(
+                                  controller: searchController,
+                                  decoration: InputDecoration(
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal:
+                                          MediaQuery.of(context).size.width *
+                                          0.02, // Horizontal padding
+                                      vertical:
+                                          MediaQuery.of(context).size.height *
+                                          0.01, // Vertical padding
+                                    ),
+                                    labelText: translation(context).search,
+                                    labelStyle: TextStyle(
+                                      fontSize:
+                                          MediaQuery.of(context).size.width *
+                                          0.02,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        width: 1.0,
+                                        color: Colors.grey,
                                       ),
                                     ),
-                                    style: TextStyle(
-                                      fontSize: MediaQuery.of(context)
-                                              .size
-                                              .width *
-                                          0.02, // Set text size to 3.5% of screen width
+                                    prefixIcon: Icon(
+                                      Icons.search,
+                                      size:
+                                          MediaQuery.of(context).size.height *
+                                          0.035,
                                     ),
-                                    onChanged: (query) {
-                                      findProduct(query);
-                                    },
-                                  )),
+                                  ),
+                                  style: TextStyle(
+                                    fontSize:
+                                        MediaQuery.of(context).size.width *
+                                        0.02, // Set text size to 3.5% of screen width
+                                  ),
+                                  onChanged: (query) {
+                                    findProduct(query);
+                                  },
+                                ),
+                              ),
                             ),
                             SizedBox(
-                                height: screenHeight *
-                                    0.01), // Space between the search bar and the grid view
+                              height: screenHeight * 0.01,
+                            ), // Space between the search bar and the grid view
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(AppLocalizations.of(context)!.categories,
-                                    style: TextStyle(
-                                        fontSize: screenWidth * 0.022,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color.fromARGB(197, 0, 0, 0))),
+                                Text(
+                                  AppLocalizations.of(context)!.categories,
+                                  style: TextStyle(
+                                    fontSize: screenWidth * 0.022,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color.fromARGB(197, 0, 0, 0),
+                                  ),
+                                ),
                               ],
                             ),
 
@@ -1167,22 +1217,27 @@ class _MainPageState extends State<MainPage> {
                                 itemCount: _rootCategories.length + 1,
                                 itemBuilder: (context, index) {
                                   final isAll = index == 0;
-                                  final cat =
-                                      isAll ? null : _rootCategories[index - 1];
-                                  final name =
-                                      isAll ? 'All' : cat!.categoryName;
+                                  final cat = isAll
+                                      ? null
+                                      : _rootCategories[index - 1];
+                                  final name = isAll
+                                      ? 'All'
+                                      : cat!.categoryName;
 
                                   return GestureDetector(
                                     onTap: () => _onRootTap(cat),
                                     child: Container(
                                       margin: const EdgeInsets.symmetric(
-                                          horizontal: 6),
+                                        horizontal: 6,
+                                      ),
                                       width: screenWidth * 0.13,
                                       child: Card(
                                         elevation: 3,
                                         shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
                                         child: Center(
                                           child: Text(
                                             name,
@@ -1191,7 +1246,11 @@ class _MainPageState extends State<MainPage> {
                                               fontSize: screenWidth * 0.016,
                                               fontWeight: FontWeight.bold,
                                               color: const Color.fromARGB(
-                                                  166, 0, 0, 0),
+                                                166,
+                                                0,
+                                                0,
+                                                0,
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -1202,7 +1261,7 @@ class _MainPageState extends State<MainPage> {
                               ),
                             ),
 
-// Animated subcategory rail (vertical, compact)
+                            // Animated subcategory rail (vertical, compact)
                             AnimatedSize(
                               duration: const Duration(milliseconds: 250),
                               key: ValueKey(_activeSubs.length),
@@ -1216,13 +1275,16 @@ class _MainPageState extends State<MainPage> {
                                           Container(
                                             width: screenWidth * 0.12,
                                             margin: const EdgeInsets.only(
-                                                left: 4, right: 8),
+                                              left: 4,
+                                              right: 8,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: Colors.white,
                                               borderRadius:
                                                   BorderRadius.circular(14),
                                               border: Border.all(
-                                                  color: Colors.grey.shade200),
+                                                color: Colors.grey.shade200,
+                                              ),
                                             ),
                                             child: Scrollbar(
                                               controller: _subsCtrl,
@@ -1231,8 +1293,9 @@ class _MainPageState extends State<MainPage> {
                                               child: ListView.separated(
                                                 controller: _subsCtrl,
                                                 primary: false,
-                                                padding:
-                                                    const EdgeInsets.all(10),
+                                                padding: const EdgeInsets.all(
+                                                  10,
+                                                ),
                                                 physics:
                                                     const BouncingScrollPhysics(),
                                                 itemCount: _activeSubs.length,
@@ -1242,52 +1305,56 @@ class _MainPageState extends State<MainPage> {
                                                   final sub = _activeSubs[i];
                                                   final selected =
                                                       sub.id == _selectedSubId;
-                                                  final cs = Theme.of(context)
-                                                      .colorScheme;
+                                                  final cs = Theme.of(
+                                                    context,
+                                                  ).colorScheme;
 
                                                   return Material(
                                                     color: selected
                                                         ? cs.primary
-                                                            .withOpacity(0.08)
+                                                              .withOpacity(0.08)
                                                         : Colors.white,
                                                     elevation: selected ? 2 : 0,
                                                     shadowColor: cs.primary
                                                         .withOpacity(0.15),
                                                     borderRadius:
                                                         BorderRadius.circular(
-                                                            12),
+                                                          12,
+                                                        ),
                                                     child: InkWell(
                                                       onTap: () {
-                                                        setState(() =>
-                                                            _selectedSubId =
-                                                                sub.id);
+                                                        setState(
+                                                          () => _selectedSubId =
+                                                              sub.id,
+                                                        );
                                                         _onSubTap(sub);
                                                       },
                                                       borderRadius:
                                                           BorderRadius.circular(
-                                                              12),
+                                                            12,
+                                                          ),
                                                       child: AnimatedContainer(
                                                         duration:
                                                             const Duration(
-                                                                milliseconds:
-                                                                    160),
+                                                              milliseconds: 160,
+                                                            ),
                                                         padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                          vertical: 10,
-                                                          horizontal: 12,
-                                                        ),
-                                                        decoration:
-                                                            BoxDecoration(
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 10,
+                                                              horizontal: 12,
+                                                            ),
+                                                        decoration: BoxDecoration(
                                                           borderRadius:
-                                                              BorderRadius
-                                                                  .circular(12),
+                                                              BorderRadius.circular(
+                                                                12,
+                                                              ),
                                                           border: Border.all(
                                                             color: selected
                                                                 ? cs.primary
                                                                 : Colors.grey
-                                                                    .withOpacity(
-                                                                        0.22),
+                                                                      .withOpacity(
+                                                                        0.22,
+                                                                      ),
                                                             width: selected
                                                                 ? 1.25
                                                                 : 1,
@@ -1300,28 +1367,30 @@ class _MainPageState extends State<MainPage> {
                                                               color: selected
                                                                   ? cs.primary
                                                                   : Colors.grey
-                                                                      .withOpacity(
-                                                                          0.18),
+                                                                        .withOpacity(
+                                                                          0.18,
+                                                                        ),
                                                               duration:
                                                                   const Duration(
-                                                                      milliseconds:
-                                                                          160),
+                                                                    milliseconds:
+                                                                        160,
+                                                                  ),
                                                               width: 28,
                                                               height: 28,
                                                               alignment:
                                                                   Alignment
                                                                       .center,
-                                                              decoration:
-                                                                  BoxDecoration(
+                                                              decoration: BoxDecoration(
                                                                 shape: BoxShape
                                                                     .circle,
                                                                 color: selected
                                                                     ? cs.primary
-                                                                        .withOpacity(
-                                                                            0.18)
+                                                                          .withOpacity(
+                                                                            0.18,
+                                                                          )
                                                                     : Colors
-                                                                        .grey
-                                                                        .shade200,
+                                                                          .grey
+                                                                          .shade200,
                                                               ),
                                                               child: Icon(
                                                                 Icons
@@ -1330,12 +1399,13 @@ class _MainPageState extends State<MainPage> {
                                                                 color: selected
                                                                     ? cs.primary
                                                                     : Colors
-                                                                        .grey
-                                                                        .shade700,
+                                                                          .grey
+                                                                          .shade700,
                                                               ),
                                                             ),
                                                             const SizedBox(
-                                                                width: 10),
+                                                              width: 10,
+                                                            ),
                                                             // name
                                                             Expanded(
                                                               child: Text(
@@ -1344,21 +1414,22 @@ class _MainPageState extends State<MainPage> {
                                                                 overflow:
                                                                     TextOverflow
                                                                         .ellipsis,
-                                                                style:
-                                                                    TextStyle(
+                                                                style: TextStyle(
                                                                   color: const Color(
-                                                                      0xFF36454F),
+                                                                    0xFF36454F,
+                                                                  ),
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .w600,
                                                                   fontSize:
                                                                       screenWidth *
-                                                                          0.011,
+                                                                      0.011,
                                                                 ),
                                                               ),
                                                             ),
                                                             const SizedBox(
-                                                                width: 6),
+                                                              width: 6,
+                                                            ),
                                                             // chevron
                                                             Icon(
                                                               Icons
@@ -1366,8 +1437,9 @@ class _MainPageState extends State<MainPage> {
                                                               size: 18,
                                                               color: selected
                                                                   ? cs.primary
-                                                                  : Colors.grey
-                                                                      .shade600,
+                                                                  : Colors
+                                                                        .grey
+                                                                        .shade600,
                                                             ),
                                                           ],
                                                         ),
@@ -1386,19 +1458,23 @@ class _MainPageState extends State<MainPage> {
                             SizedBox(height: screenHeight * 0.01),
                             Padding(
                               padding: EdgeInsets.only(
-                                  left: 8.0,
-                                  right: 50.0,
-                                  bottom: screenHeight * 0.005,
-                                  top: 8.0),
+                                left: 8.0,
+                                right: 50.0,
+                                bottom: screenHeight * 0.005,
+                                top: 8.0,
+                              ),
                               child: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(AppLocalizations.of(context)!.products,
-                                      style: TextStyle(
-                                          fontSize: screenWidth * 0.022,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color.fromARGB(197, 0, 0, 0))),
+                                  Text(
+                                    AppLocalizations.of(context)!.products,
+                                    style: TextStyle(
+                                      fontSize: screenWidth * 0.022,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromARGB(197, 0, 0, 0),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1407,114 +1483,132 @@ class _MainPageState extends State<MainPage> {
                             Expanded(
                               child: data.isEmpty
                                   ? Center(
-                                      child: Text(translation(context)
-                                          .no_available_products))
-                                  : Builder(builder: (context) {
-                                      final int? selectedSubId =
-                                          _selectedSubId; // if you use subs
-                                      // filter by ID, not by name
-                                      final rootSubIds =
-                                          (selectedRootId == null)
-                                              ? const <int>[]
-                                              : _allCategories
-                                                  .where((c) =>
-                                                      _toInt(c.id) ==
-                                                      _toInt(selectedRootId))
-                                                  .map((c) =>
-                                                      _toInt(c.mainCategoryId)!)
+                                      child: Text(
+                                        translation(
+                                          context,
+                                        ).no_available_products,
+                                      ),
+                                    )
+                                  : Builder(
+                                      builder: (context) {
+                                        final int? selectedSubId =
+                                            _selectedSubId; // if you use subs
+                                        // filter by ID, not by name
+                                        final rootSubIds =
+                                            (selectedRootId == null)
+                                            ? const <int>[]
+                                            : _allCategories
+                                                  .where(
+                                                    (c) =>
+                                                        _toInt(c.id) ==
+                                                        _toInt(selectedRootId),
+                                                  )
+                                                  .map(
+                                                    (c) => _toInt(
+                                                      c.mainCategoryId,
+                                                    )!,
+                                                  )
                                                   .toList();
 
-                                      final filteredProducts = data.where((p) {
-                                        final int? pCatId =
-                                            _toInt(p.ProductCategory);
-                                        if (pCatId == null) return false;
-
-                                        final bool matchesRoot =
-                                            (selectedRootId == null) ||
-                                                pCatId ==
-                                                    _toInt(selectedRootId) ||
-                                                rootSubIds.contains(pCatId);
-
-                                        final bool matchesSub =
-                                            (selectedSubId == null) ||
-                                                (pCatId ==
-                                                    _toInt(selectedSubId));
-
-                                        return matchesRoot && matchesSub;
-                                      }).toList();
-
-                                      return GridView.builder(
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 4,
-                                          crossAxisSpacing: 10,
-                                          mainAxisSpacing: 10,
-                                          childAspectRatio: 1.2,
-                                        ),
-                                        itemCount: filteredProducts
-                                            .length, // use filtered length
-                                        itemBuilder: (context, index) {
-                                          final product =
-                                              filteredProducts[index];
-
-                                          // look up the category name from its id
-                                          final categoryName = _catNameById[
-                                                  product.ProductCategory] ??
-                                              'Uncategorized';
-
-                                          return GestureDetector(
-                                            onTap: () {
-                                              setState(
-                                                  () => addToOrder(product));
-                                            },
-                                            child: Card(
-                                              elevation: 3,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              child: Column(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  // Product Name
-                                                  Text(
-                                                    product.ProductName,
-                                                    style: TextStyle(
-                                                      fontSize:
-                                                          screenWidth * 0.014,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                  // Category Name
-                                                  Text(
-                                                    categoryName,
-                                                    style: TextStyle(
-                                                      fontSize:
-                                                          screenWidth * 0.011,
-                                                      color: Colors.grey,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                  // Price
-                                                  Text(
-                                                    '${product.SellingPrice.toStringAsFixed(2)} JOD',
-                                                    style: TextStyle(
-                                                      fontSize:
-                                                          screenWidth * 0.012,
-                                                      color: Colors.green,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
+                                        final filteredProducts = data.where((
+                                          p,
+                                        ) {
+                                          final int? pCatId = _toInt(
+                                            p.ProductCategory,
                                           );
-                                        },
-                                      );
-                                    }),
+                                          if (pCatId == null) return false;
+
+                                          final bool matchesRoot =
+                                              (selectedRootId == null) ||
+                                              pCatId ==
+                                                  _toInt(selectedRootId) ||
+                                              rootSubIds.contains(pCatId);
+
+                                          final bool matchesSub =
+                                              (selectedSubId == null) ||
+                                              (pCatId == _toInt(selectedSubId));
+
+                                          return matchesRoot && matchesSub;
+                                        }).toList();
+
+                                        return GridView.builder(
+                                          gridDelegate:
+                                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: 4,
+                                                crossAxisSpacing: 10,
+                                                mainAxisSpacing: 10,
+                                                childAspectRatio: 1.2,
+                                              ),
+                                          itemCount: filteredProducts
+                                              .length, // use filtered length
+                                          itemBuilder: (context, index) {
+                                            final product =
+                                                filteredProducts[index];
+
+                                            // look up the category name from its id
+                                            final categoryName =
+                                                _catNameById[product
+                                                    .ProductCategory] ??
+                                                'Uncategorized';
+
+                                            return GestureDetector(
+                                              onTap: () {
+                                                setState(
+                                                  () => addToOrder(product),
+                                                );
+                                              },
+                                              child: Card(
+                                                elevation: 3,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    // Product Name
+                                                    Text(
+                                                      product.ProductName,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth * 0.014,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                    // Category Name
+                                                    Text(
+                                                      categoryName,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth * 0.011,
+                                                        color: Colors.grey,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                    // Price
+                                                    Text(
+                                                      '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth * 0.012,
+                                                        color: Colors.green,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
                             ),
                           ],
                         ),
@@ -1526,16 +1620,18 @@ class _MainPageState extends State<MainPage> {
                           height: screenHeight * 1,
                           child: Container(
                             height: screenHeight * 2.3,
-                            width: screenWidth *
+                            width:
+                                screenWidth *
                                 0.35, // Set a fixed width for the right section
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 8,
-                                    spreadRadius: 4)
+                                  color: Colors.black26,
+                                  blurRadius: 8,
+                                  spreadRadius: 4,
+                                ),
                               ],
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -1545,9 +1641,10 @@ class _MainPageState extends State<MainPage> {
                                 Text(
                                   AppLocalizations.of(context)!.orders,
                                   style: TextStyle(
-                                      fontSize: screenWidth * 0.022,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color.fromARGB(197, 0, 0, 0)),
+                                    fontSize: screenWidth * 0.022,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color.fromARGB(197, 0, 0, 0),
+                                  ),
                                 ),
                                 SizedBox(height: screenHeight * 0.01),
 
@@ -1559,19 +1656,23 @@ class _MainPageState extends State<MainPage> {
                                       itemBuilder: (context, index) {
                                         final selected = selectedItems[index];
                                         // Cast data to List<Product> and fetch the product details
-                                        final product =
-                                            _getProductById(selected.productId);
+                                        final product = _getProductById(
+                                          selected.productId,
+                                        );
                                         return Card(
                                           elevation: 4,
                                           margin: EdgeInsets.only(
-                                              bottom: screenHeight * 0.02),
+                                            bottom: screenHeight * 0.02,
+                                          ),
                                           child: Padding(
                                             padding: EdgeInsets.all(
-                                                screenWidth * 0.0008),
+                                              screenWidth * 0.0008,
+                                            ),
                                             child: Row(
                                               children: [
                                                 SizedBox(
-                                                    width: screenWidth * 0.001),
+                                                  width: screenWidth * 0.001,
+                                                ),
                                                 Expanded(
                                                   child: Column(
                                                     crossAxisAlignment:
@@ -1583,26 +1684,27 @@ class _MainPageState extends State<MainPage> {
                                                         title: Text(
                                                           product.ProductName,
                                                           style: TextStyle(
-                                                              fontSize:
-                                                                  screenWidth *
-                                                                      0.013,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold),
+                                                            fontSize:
+                                                                screenWidth *
+                                                                0.013,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
                                                         ),
                                                         subtitle: Text(
                                                           'Quantity: ${selected.quantity}',
                                                           style: TextStyle(
-                                                              fontSize:
-                                                                  screenWidth *
-                                                                      0.013),
+                                                            fontSize:
+                                                                screenWidth *
+                                                                0.013,
+                                                          ),
                                                         ),
                                                         trailing: Text(
                                                           '${product.SellingPrice.toStringAsFixed(2)} JOD',
                                                           style: TextStyle(
                                                             fontSize:
                                                                 screenWidth *
-                                                                    0.015,
+                                                                0.015,
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             color: Colors.green,
@@ -1616,16 +1718,19 @@ class _MainPageState extends State<MainPage> {
                                                   children: [
                                                     IconButton(
                                                       icon: Icon(
-                                                          Icons.remove_circle,
-                                                          color: Colors.red),
+                                                        Icons.remove_circle,
+                                                        color: Colors.red,
+                                                      ),
                                                       onPressed: () =>
                                                           _removeProductFromOrder(
-                                                              index),
+                                                            index,
+                                                          ),
                                                     ),
                                                     IconButton(
                                                       icon: Icon(
-                                                          Icons.add_circle,
-                                                          color: Colors.green),
+                                                        Icons.add_circle,
+                                                        color: Colors.green,
+                                                      ),
                                                       onPressed: () =>
                                                           _addQuantity(index),
                                                     ),
@@ -1643,7 +1748,8 @@ class _MainPageState extends State<MainPage> {
                                 // Promo Code Section
                                 Padding(
                                   padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01),
+                                    vertical: screenHeight * 0.01,
+                                  ),
                                   child: Row(
                                     children: [
                                       Expanded(
@@ -1651,14 +1757,15 @@ class _MainPageState extends State<MainPage> {
                                           link: _layerLinkpromo,
                                           child: LayoutBuilder(
                                             builder: (context, constraints) {
-                                              double textFieldWidth = constraints
-                                                      .maxWidth *
+                                              double textFieldWidth =
+                                                  constraints.maxWidth *
                                                   0.8; // Adjust width dynamically
-                                              double textSize = screenWidth *
+                                              double textSize =
+                                                  screenWidth *
                                                   0.013; // Adjust font size dynamically
                                               double paddingHorizontal =
                                                   screenWidth *
-                                                      0.02; // Adjust padding dynamically
+                                                  0.02; // Adjust padding dynamically
                                               double paddingVertical =
                                                   screenHeight * 0.015;
 
@@ -1669,22 +1776,25 @@ class _MainPageState extends State<MainPage> {
                                                   controller:
                                                       promoCodeController,
                                                   style: TextStyle(
-                                                      fontSize: textSize),
+                                                    fontSize: textSize,
+                                                  ),
                                                   decoration: InputDecoration(
                                                     labelText:
                                                         AppLocalizations.of(
-                                                                context)!
-                                                            .discount,
+                                                          context,
+                                                        )!.discount,
                                                     labelStyle: TextStyle(
-                                                        fontSize: textSize),
+                                                      fontSize: textSize,
+                                                    ),
                                                     border:
                                                         OutlineInputBorder(),
                                                     contentPadding:
                                                         EdgeInsets.symmetric(
-                                                      horizontal:
-                                                          paddingHorizontal,
-                                                      vertical: paddingVertical,
-                                                    ),
+                                                          horizontal:
+                                                              paddingHorizontal,
+                                                          vertical:
+                                                              paddingVertical,
+                                                        ),
                                                   ),
                                                   onChanged: findPromoCode,
                                                 ),
@@ -1717,29 +1827,37 @@ class _MainPageState extends State<MainPage> {
                                           backgroundColor: Color(0xFFB87333),
                                           foregroundColor: Colors.white,
                                           padding: const EdgeInsets.symmetric(
-                                              vertical: 16, horizontal: 16),
+                                            vertical: 16,
+                                            horizontal: 16,
+                                          ),
                                           shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10)),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
                                         ),
                                         child: Text(
-                                            AppLocalizations.of(context)!.ok),
+                                          AppLocalizations.of(context)!.ok,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                //tips section
 
+                                //tips section
                                 Padding(
                                   padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.001),
+                                    vertical: screenHeight * 0.001,
+                                  ),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: SizedBox(
-                                          width: screenWidth *
+                                          width:
+                                              screenWidth *
                                               0.2, // Adjust width as needed
-                                          height: screenHeight *
+                                          height:
+                                              screenHeight *
                                               0.08, // Adjust height as needed
                                           child: TextField(
                                             controller: _tipController,
@@ -1750,7 +1868,8 @@ class _MainPageState extends State<MainPage> {
                                             ),
                                             onChanged: (value) {
                                               setState(() {
-                                                tips = double.tryParse(value) ??
+                                                tips =
+                                                    double.tryParse(value) ??
                                                     0.0;
                                               });
                                             },
@@ -1763,8 +1882,9 @@ class _MainPageState extends State<MainPage> {
 
                                 // Divider line (for discount section)
                                 Divider(
-                                    height: screenHeight * 0.02,
-                                    color: Colors.black45),
+                                  height: screenHeight * 0.02,
+                                  color: Colors.black45,
+                                ),
                                 /*
                                 Row(
                                   mainAxisAlignment:
@@ -1816,70 +1936,74 @@ class _MainPageState extends State<MainPage> {
                             */
                                 // Discount Section
                                 Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        vertical: screenHeight * 0.01),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          AppLocalizations.of(context)!
-                                              .discount,
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: screenWidth * 0.0115),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: screenHeight * 0.01,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        AppLocalizations.of(context)!.discount,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: screenWidth * 0.0115,
                                         ),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              selectedPromoCode != null
-                                                  ? '${selectedPromoCode!.PromoCode} (%${selectedPromoCode!.Percentage})' // Safe to access since we checked for null
-                                                  : 'No Promo Code', // Default text if no promo code is selected
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.red,
-                                                fontSize: screenWidth * 0.013,
-                                              ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            selectedPromoCode != null
+                                                ? '${selectedPromoCode!.PromoCode} (%${selectedPromoCode!.Percentage})' // Safe to access since we checked for null
+                                                : 'No Promo Code', // Default text if no promo code is selected
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.red,
+                                              fontSize: screenWidth * 0.013,
                                             ),
-                                            // Add the circular "X" button
-                                            if (selectedPromoCode != null)
-                                              GestureDetector(
-                                                onTap: () {
-                                                  setState(() {
-                                                    // Reset discount and selectedPromoCode when the "X" is tapped
-                                                    discount = 0.0;
-                                                    selectedPromoCode = null;
-                                                  });
-                                                },
-                                                child: Container(
-                                                  margin: EdgeInsets.only(
-                                                      left: 8.0),
-                                                  width:
-                                                      24.0, // Set the size of the circle
-                                                  height:
-                                                      24.0, // Set the size of the circle
-                                                  decoration: BoxDecoration(
-                                                    color: Colors
-                                                        .red, // Circle color
-                                                    shape: BoxShape
-                                                        .circle, // Make the container circular
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.close, // The "X" icon
-                                                    color: Colors
-                                                        .white, // Icon color
-                                                    size: 16.0, // Icon size
-                                                  ),
+                                          ),
+                                          // Add the circular "X" button
+                                          if (selectedPromoCode != null)
+                                            GestureDetector(
+                                              onTap: () {
+                                                setState(() {
+                                                  // Reset discount and selectedPromoCode when the "X" is tapped
+                                                  discount = 0.0;
+                                                  selectedPromoCode = null;
+                                                });
+                                              },
+                                              child: Container(
+                                                margin: EdgeInsets.only(
+                                                  left: 8.0,
+                                                ),
+                                                width:
+                                                    24.0, // Set the size of the circle
+                                                height:
+                                                    24.0, // Set the size of the circle
+                                                decoration: BoxDecoration(
+                                                  color: Colors
+                                                      .red, // Circle color
+                                                  shape: BoxShape
+                                                      .circle, // Make the container circular
+                                                ),
+                                                child: Icon(
+                                                  Icons.close, // The "X" icon
+                                                  color: Colors
+                                                      .white, // Icon color
+                                                  size: 16.0, // Icon size
                                                 ),
                                               ),
-                                          ],
-                                        ),
-                                      ],
-                                    )),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
 
                                 Padding(
                                   padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.001),
+                                    vertical: screenHeight * 0.001,
+                                  ),
                                   child: Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
@@ -1888,7 +2012,8 @@ class _MainPageState extends State<MainPage> {
                                         'Payment Method', // You can change this to any localized text
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: screenWidth *
+                                          fontSize:
+                                              screenWidth *
                                               0.0115, // Adjust text size based on screen width
                                         ),
                                       ),
@@ -1897,10 +2022,11 @@ class _MainPageState extends State<MainPage> {
                                           Text(
                                             paymentMethod, // Show the current payment method
                                             style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: screenWidth *
-                                                    0.0115 // Adjust text size based on screen width
-                                                ),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize:
+                                                  screenWidth *
+                                                  0.0115, // Adjust text size based on screen width
+                                            ),
                                           ),
                                           Transform.scale(
                                             scale:
@@ -1924,19 +2050,24 @@ class _MainPageState extends State<MainPage> {
                                 // Subtotal
                                 Padding(
                                   padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01),
+                                    vertical: screenHeight * 0.01,
+                                  ),
                                   child: Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(AppLocalizations.of(context)!.total,
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: screenWidth * 0.0115)),
+                                      Text(
+                                        AppLocalizations.of(context)!.total,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: screenWidth * 0.0115,
+                                        ),
+                                      ),
                                       Text(
                                         '${_calculateSubtotal(selectedItems).toStringAsFixed(2)} JOD',
                                         style: TextStyle(
-                                            fontWeight: FontWeight.bold),
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1945,7 +2076,8 @@ class _MainPageState extends State<MainPage> {
                                 // Taxes
                                 Padding(
                                   padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01),
+                                    vertical: screenHeight * 0.01,
+                                  ),
                                   child: Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
@@ -1960,7 +2092,8 @@ class _MainPageState extends State<MainPage> {
                                       Text(
                                         '${_calculateTaxes(selectedItems).toStringAsFixed(2)}',
                                         style: TextStyle(
-                                            fontWeight: FontWeight.bold),
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1969,23 +2102,26 @@ class _MainPageState extends State<MainPage> {
                                 // Total
                                 Padding(
                                   padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01),
+                                    vertical: screenHeight * 0.01,
+                                  ),
                                   child: Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                          '${AppLocalizations.of(context)!.grandTotal} - %${discount.toStringAsFixed(0)}',
-                                          style: TextStyle(
-                                            fontSize: screenWidth * 0.015,
-                                            fontWeight: FontWeight.bold,
-                                          )),
+                                        '${AppLocalizations.of(context)!.grandTotal} - %${discount.toStringAsFixed(0)}',
+                                        style: TextStyle(
+                                          fontSize: screenWidth * 0.015,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       Text(
                                         '${_calculateTotal(selectedItems).toStringAsFixed(2)} JOD',
                                         style: TextStyle(
-                                            fontSize: screenWidth * 0.016,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green),
+                                          fontSize: screenWidth * 0.016,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -2011,20 +2147,26 @@ class _MainPageState extends State<MainPage> {
                                         backgroundColor: Color(0xFFB87333),
                                         foregroundColor: Colors.white,
                                         minimumSize: Size(
-                                            MediaQuery.of(context).size.width *
-                                                0.01,
-                                            40),
+                                          MediaQuery.of(context).size.width *
+                                              0.01,
+                                          40,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 16, horizontal: 32),
+                                          vertical: 16,
+                                          horizontal: 32,
+                                        ),
                                         shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
                                       ),
                                       child: Text(
-                                          AppLocalizations.of(context)!
-                                              .checkout,
-                                          style: TextStyle(
-                                              fontSize: screenWidth * 0.015)),
+                                        AppLocalizations.of(context)!.checkout,
+                                        style: TextStyle(
+                                          fontSize: screenWidth * 0.015,
+                                        ),
+                                      ),
                                     ),
                                     ElevatedButton(
                                       onPressed: () {},
@@ -2032,20 +2174,28 @@ class _MainPageState extends State<MainPage> {
                                         backgroundColor: Color(0xFF8B5C42),
                                         foregroundColor: Colors.white,
                                         minimumSize: Size(
-                                            MediaQuery.of(context).size.width *
-                                                0.01,
-                                            40),
+                                          MediaQuery.of(context).size.width *
+                                              0.01,
+                                          40,
+                                        ),
                                         padding: const EdgeInsets.symmetric(
-                                            vertical: 16, horizontal: 30),
+                                          vertical: 16,
+                                          horizontal: 30,
+                                        ),
                                         shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
                                       ),
                                       child: Text(
-                                          AppLocalizations.of(context)!
-                                              .printReceipt,
-                                          style: TextStyle(
-                                              fontSize: screenWidth * 0.011)),
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.printReceipt,
+                                        style: TextStyle(
+                                          fontSize: screenWidth * 0.011,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -2075,7 +2225,7 @@ class _MainPageState extends State<MainPage> {
                       ),
                       // In your State class:
 
-// 1) Put this in your widget tree—e.g. at the end of your Stack:
+                      // 1) Put this in your widget tree—e.g. at the end of your Stack:
                       Focus(
                         focusNode: _barcodeFocus,
                         autofocus: true,
@@ -2109,7 +2259,7 @@ class _MainPageState extends State<MainPage> {
       },
     );
   }
-/*  
+  /*  
 void _chargeOrder() async {
   if (selectedItems.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2154,17 +2304,19 @@ void _chargeOrder() async {
       orElse: () {
         // If product isn't found, fetch it from the API (or return a default)
         print(
-            "Product with ID $productId not found in cache, fetching from API...");
+          "Product with ID $productId not found in cache, fetching from API...",
+        );
         return Product(
-            id: 0,
-            OrganizationId: _orgId!.toInt(),
-            ProductCategory: 0,
-            ProductName: 'Unknown Product',
-            ProductDescription: 'No description available',
-            PurchasePrice: 0,
-            SellingPrice: 0,
-            ProductInventory: 0,
-            Barcode: '');
+          id: 0,
+          OrganizationId: _orgId!.toInt(),
+          ProductCategory: 0,
+          ProductName: 'Unknown Product',
+          ProductDescription: 'No description available',
+          PurchasePrice: 0,
+          SellingPrice: 0,
+          ProductInventory: 0,
+          Barcode: '',
+        );
       },
     );
 
@@ -2269,9 +2421,9 @@ class _AddProductDialogState extends State<AddProductDialog>
       final created = Product.fromJson(json.decode(resp.body));
       Navigator.of(context).pop(created);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error creating product')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error creating product')));
     }
   }
 
@@ -2282,8 +2434,8 @@ class _AddProductDialogState extends State<AddProductDialog>
       child: Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
-                primary: const Color(0xFFB87333), // Dark orange focus
-              ),
+            primary: const Color(0xFFB87333), // Dark orange focus
+          ),
           inputDecorationTheme: InputDecorationTheme(
             focusedBorder: OutlineInputBorder(
               borderSide: const BorderSide(color: Color(0xFFB87333)),
@@ -2293,9 +2445,7 @@ class _AddProductDialogState extends State<AddProductDialog>
               borderSide: BorderSide(color: Colors.grey.shade400),
               borderRadius: BorderRadius.circular(8),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
         child: AlertDialog(
@@ -2318,15 +2468,11 @@ class _AddProductDialogState extends State<AddProductDialog>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(
-                      height: 20,
-                    ),
+                    SizedBox(height: 20),
                     // Barcode
                     TextFormField(
                       initialValue: widget.barcode,
-                      decoration: const InputDecoration(
-                        labelText: 'Barcode',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Barcode'),
                       readOnly: true,
                       style: const TextStyle(color: Color(0xFF36454F)),
                     ),
@@ -2396,10 +2542,12 @@ class _AddProductDialogState extends State<AddProductDialog>
                         Expanded(
                           child: DropdownButtonFormField<Category>(
                             items: _categories
-                                .map((c) => DropdownMenuItem(
-                                      value: c,
-                                      child: Text(c.categoryName),
-                                    ))
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c.categoryName),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (c) =>
                                 setState(() => _chosenCategory = c),
@@ -2412,14 +2560,14 @@ class _AddProductDialogState extends State<AddProductDialog>
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add_circle_outline,
-                              color: Color(0xFFB87333)),
+                          icon: const Icon(
+                            Icons.add_circle_outline,
+                            color: Color(0xFFB87333),
+                          ),
                           onPressed: () async {
                             final cat = await Navigator.push<Category>(
                               context,
-                              MaterialPageRoute(
-                                builder: (_) => AddCategory(),
-                              ),
+                              MaterialPageRoute(builder: (_) => AddCategory()),
                             );
                             if (cat != null) {
                               setState(() {
@@ -2428,7 +2576,7 @@ class _AddProductDialogState extends State<AddProductDialog>
                               });
                             }
                           },
-                        )
+                        ),
                       ],
                     ),
                   ],
@@ -2462,10 +2610,7 @@ class _AddProductDialogState extends State<AddProductDialog>
                         strokeWidth: 2,
                       ),
                     )
-                  : const Text(
-                      'Create',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                  : const Text('Create', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),

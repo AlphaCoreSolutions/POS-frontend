@@ -1,4 +1,5 @@
 import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:fixed_pos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
 import 'package:http/http.dart' as http;
@@ -27,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
       errorMessage = null;
     });
 
-    final url = Uri.parse('http://posapi.alphacorecit.com/api/Authentication');
+    final url = Uri.parse(ApiConfig.instance.buildUrl('Authentication'));
     final response = await http.post(
       url.replace(queryParameters: {
         'username': usernameController.text,

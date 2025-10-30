@@ -7,6 +7,7 @@ import 'package:fixed_pos/models/promoCodes_model.dart';
 import 'package:fixed_pos/models/supplier_model.dart';
 import 'package:fixed_pos/models/taxes_model.dart';
 import 'package:fixed_pos/models/user_model.dart';
+import 'package:fixed_pos/utils/api_config.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -16,17 +17,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 //Select * from Orders Where OrderPlaced between N'2025-01-01' AND N'2025-03-31'
 
 class ApiHandler {
-  final String userUri = "http://posapi.alphacorecit.com/api/users";
-  final String productUri = "http://posapi.alphacorecit.com/api/products";
-  final String CategoryUri = "http://posapi.alphacorecit.com/api/Category";
-  final String ordersUri = "http://posapi.alphacorecit.com/api/orders";
-  final String customersUri = "http://posapi.alphacorecit.com/api/customers";
-  final String suppliersUri = "http://posapi.alphacorecit.com/api/suppliers";
-  final String promoCodesUri = "http://posapi.alphacorecit.com/api/promoCodes";
-  final String taxesUri = "http://posapi.alphacorecit.com/api/taxes/1";
-  final String AdvanceSearcUri =
-      "http://posapi.alphacorecit.com/api/Orders/AdvanceSearchWhere";
-  final String OrgUrl = 'http://posapi.alphacorecit.com/api/Organizations';
+  // Dynamic URLs using ApiConfig
+  String get userUri => ApiConfig.instance.buildUrl('users');
+  String get productUri => ApiConfig.instance.buildUrl('products');
+  String get CategoryUri => ApiConfig.instance.buildUrl('Category');
+  String get ordersUri => ApiConfig.instance.buildUrl('orders');
+  String get customersUri => ApiConfig.instance.buildUrl('customers');
+  String get suppliersUri => ApiConfig.instance.buildUrl('suppliers');
+  String get promoCodesUri => ApiConfig.instance.buildUrl('promoCodes');
+  String get taxesUri => ApiConfig.instance.buildUrl('taxes/1');
+  String get AdvanceSearcUri =>
+      ApiConfig.instance.buildUrl('Orders/AdvanceSearchWhere');
+  String get OrgUrl => ApiConfig.instance.buildUrl('Organizations');
 
   Future<User> fetchUserById(int id) async {
     final prefs = await SharedPreferences.getInstance();
@@ -44,9 +46,7 @@ class ApiHandler {
       final jsonMap = json.decode(response.body);
       return User.fromJson(jsonMap);
     } else {
-      throw Exception(
-        'Failed to fetch user (status ${response.statusCode})',
-      );
+      throw Exception('Failed to fetch user (status ${response.statusCode})');
     }
   }
 
@@ -69,7 +69,8 @@ class ApiHandler {
       return Organization.fromJson(jsonDecode(response.body));
     } else {
       throw Exception(
-          'Failed to load organization ($id): ${response.statusCode}');
+        'Failed to load organization ($id): ${response.statusCode}',
+      );
     }
   }
 
@@ -98,7 +99,9 @@ class ApiHandler {
 
   //-----------------------------------ORDER---------------------------------
   Future<List<OrderDto>> searchOrdersByDateRange(
-      DateTime from, DateTime to) async {
+    DateTime from,
+    DateTime to,
+  ) async {
     final formattedFrom = DateFormat('yyyy-MM-dd').format(from);
     final formattedTo = DateFormat('yyyy-MM-dd').format(to);
 
@@ -131,7 +134,9 @@ class ApiHandler {
   }
 
   Future<List<FlSpot>> fetchSalesDataByDateRange(
-      DateTime from, DateTime to) async {
+    DateTime from,
+    DateTime to,
+  ) async {
     final formattedFrom = DateFormat('yyyy-MM-dd').format(from);
     final formattedTo = DateFormat('yyyy-MM-dd').format(to);
 
@@ -151,8 +156,8 @@ class ApiHandler {
       for (var order in data) {
         double total = order['grandTotal']?.toDouble() ?? 0;
         DateTime date = DateTime.parse(order['orderPlaced']);
-        double x =
-            date.millisecondsSinceEpoch.toDouble(); // or convert to day number
+        double x = date.millisecondsSinceEpoch
+            .toDouble(); // or convert to day number
         double y = total;
         spots.add(FlSpot(x, y));
       }
@@ -174,11 +179,7 @@ class ApiHandler {
       print("Request Headers: $headers");
       print("Request Body: $body");
 
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: body,
-      );
+      final response = await http.post(url, headers: headers, body: body);
 
       print("Response Status Code: ${response.statusCode}");
       print("Response Body: ${response.body}");
@@ -214,7 +215,8 @@ class ApiHandler {
         return orders;
       } else {
         print(
-            'Error: Failed to load orders. Status code: ${response.statusCode}');
+          'Error: Failed to load orders. Status code: ${response.statusCode}',
+        );
         throw Exception('Failed to load orders ${response.statusCode}');
       }
     } catch (e) {
@@ -276,10 +278,12 @@ class ApiHandler {
       return orders
           .asMap()
           .entries
-          .map((entry) => FlSpot(
-                entry.key.toDouble(),
-                (entry.value.GrandTotal as num).toDouble(),
-              ))
+          .map(
+            (entry) => FlSpot(
+              entry.key.toDouble(),
+              (entry.value.GrandTotal as num).toDouble(),
+            ),
+          )
           .toList();
     } catch (e) {
       print('Error fetching sales data from orders: $e');
@@ -312,7 +316,7 @@ class ApiHandler {
     return bestSeller;
   }
 
-// --------------------------------- CATEGORY --------------------------------
+  // --------------------------------- CATEGORY --------------------------------
   Future<List<Category>> getCategoryData() async {
     final uri = Uri.parse(CategoryUri);
     try {
@@ -336,8 +340,9 @@ class ApiHandler {
 
       final decoded = json.decode(response.body);
       // Your controller returns a List, but this makes it robust if it ever wraps:
-      final List<dynamic> list =
-          decoded is List ? decoded : (decoded['items'] as List? ?? const []);
+      final List<dynamic> list = decoded is List
+          ? decoded
+          : (decoded['items'] as List? ?? const []);
       debugPrint('Raw API response: $list');
 
       return list
@@ -351,11 +356,13 @@ class ApiHandler {
 
   /// (Optional) server leaf-categories by org, if you want it:
   Future<List<Category>> getLeafCategoriesByOrg(int orgId) async {
-    final uri = Uri.parse('$CategoryUri/GetSubcategoriesByOrganization')
-        .replace(queryParameters: {'orgId': '$orgId'});
-    final resp = await http.get(uri, headers: {
-      'Content-type': 'application/json; charset=UTF-8',
-    });
+    final uri = Uri.parse(
+      '$CategoryUri/GetSubcategoriesByOrganization',
+    ).replace(queryParameters: {'orgId': '$orgId'});
+    final resp = await http.get(
+      uri,
+      headers: {'Content-type': 'application/json; charset=UTF-8'},
+    );
     if (resp.statusCode == 200) {
       final List list = json.decode(resp.body);
       return list.map((e) => Category.fromJson(e)).toList();
@@ -392,7 +399,8 @@ class ApiHandler {
 
       // ── Post-request logs ───────────────────────────────────
       print(
-          '🟢 [AddCategory] Status: ${response.statusCode} (${sw.elapsedMilliseconds} ms)');
+        '🟢 [AddCategory] Status: ${response.statusCode} (${sw.elapsedMilliseconds} ms)',
+      );
       print('🟢 [AddCategory] Response headers: ${response.headers}');
       print('🟢 [AddCategory] Response body: ${response.body}');
 
@@ -403,7 +411,8 @@ class ApiHandler {
     } catch (e, st) {
       sw.stop();
       print(
-          '🔴 [AddCategory] Exception after ${sw.elapsedMilliseconds} ms: $e');
+        '🔴 [AddCategory] Exception after ${sw.elapsedMilliseconds} ms: $e',
+      );
       print('🔴 [AddCategory] Stack: $st');
       return http.Response('Error: $e', 500);
     }
@@ -442,8 +451,10 @@ class ApiHandler {
     final uri = Uri.parse(userUri);
 
     try {
-      final response = await http.get(uri,
-          headers: {'Content-type': 'application/json; charset=UTF-8'});
+      final response = await http.get(
+        uri,
+        headers: {'Content-type': 'application/json; charset=UTF-8'},
+      );
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
         final List<dynamic> jsonData = json.decode(response.body);
@@ -456,8 +467,10 @@ class ApiHandler {
     return data;
   }
 
-  Future<http.Response> updateUser(
-      {required int id, required User user}) async {
+  Future<http.Response> updateUser({
+    required int id,
+    required User user,
+  }) async {
     final uri = Uri.parse("$userUri/$id");
     late http.Response response;
 
@@ -479,8 +492,10 @@ class ApiHandler {
     final uri = Uri.parse(productUri);
 
     try {
-      final response = await http.get(uri,
-          headers: {'Content-type': 'application/json; charset=UTF-8'});
+      final response = await http.get(
+        uri,
+        headers: {'Content-type': 'application/json; charset=UTF-8'},
+      );
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
         final List<dynamic> jsonData = json.decode(response.body);
@@ -493,8 +508,10 @@ class ApiHandler {
     return data;
   }
 
-  Future<http.Response> updateProduct(
-      {required int id, required Product product}) async {
+  Future<http.Response> updateProduct({
+    required int id,
+    required Product product,
+  }) async {
     final uri = Uri.parse("$productUri/$id");
     late http.Response response;
 
@@ -526,12 +543,13 @@ class ApiHandler {
     return response;
   }
 
-// POST a link and get response data
+  // POST a link and get response data
   Future<Map<String, dynamic>> postLinkAndGetData(String searchQuery) async {
     try {
       final response = await http.post(
         Uri.parse(
-            '$productUri/AdvanceSearch?searchQuery=$searchQuery'), // Your API endpoint
+          '$productUri/AdvanceSearch?searchQuery=$searchQuery',
+        ), // Your API endpoint
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -558,8 +576,9 @@ class ApiHandler {
 
   Future<List<Product>> advanceSearchProducts(String filter) async {
     // Build a clean, encoded URI
-    final uri = Uri.parse('$productUri/GetAdvanceSearch')
-        .replace(queryParameters: {'searchQuery': filter});
+    final uri = Uri.parse(
+      '$productUri/GetAdvanceSearch',
+    ).replace(queryParameters: {'searchQuery': filter});
 
     print('🟡 GET $uri'); // <-- inspect the fully‑encoded URL
     print('🔵 Filter body: $filter');
@@ -629,15 +648,17 @@ class ApiHandler {
     }
   }
 
-  Future<List<Product>> searchProductByName(
-      {required String productName}) async {
+  Future<List<Product>> searchProductByName({
+    required String productName,
+  }) async {
     final uri = Uri.parse('$productUri?name=$productName');
     List<Product> products = [];
 
     try {
-      final response = await http.get(uri, headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-      });
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+      );
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
         final List<dynamic> jsonData = json.decode(response.body);
@@ -670,13 +691,14 @@ class ApiHandler {
 
         int? bestSellerId = productUsage.entries.isNotEmpty
             ? productUsage.entries
-                .reduce((a, b) => a.value > b.value ? a : b)
-                .key
+                  .reduce((a, b) => a.value > b.value ? a : b)
+                  .key
             : null;
 
         if (bestSellerId != null) {
-          Map<String, dynamic>? productDetails =
-              await fetchProductDetails(bestSellerId);
+          Map<String, dynamic>? productDetails = await fetchProductDetails(
+            bestSellerId,
+          );
           if (productDetails != null &&
               productDetails.containsKey('productName')) {
             return productDetails['productName'];
@@ -696,8 +718,10 @@ class ApiHandler {
     final uri = Uri.parse(customersUri);
 
     try {
-      final response = await http.get(uri,
-          headers: {'Content-type': 'application/json; charset=UTF-8'});
+      final response = await http.get(
+        uri,
+        headers: {'Content-type': 'application/json; charset=UTF-8'},
+      );
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
         final List<dynamic> jsonData = json.decode(response.body);
@@ -726,8 +750,10 @@ class ApiHandler {
     return response;
   }
 
-  Future<http.Response> updateCustomer(
-      {required int id, required Customer customer}) async {
+  Future<http.Response> updateCustomer({
+    required int id,
+    required Customer customer,
+  }) async {
     final uri = Uri.parse("$customersUri/$id");
     late http.Response response;
 
@@ -764,8 +790,10 @@ class ApiHandler {
     final uri = Uri.parse(suppliersUri);
 
     try {
-      final response = await http.get(uri,
-          headers: {'Content-type': 'application/json; charset=UTF-8'});
+      final response = await http.get(
+        uri,
+        headers: {'Content-type': 'application/json; charset=UTF-8'},
+      );
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
         final List<dynamic> jsonData = json.decode(response.body);
@@ -794,8 +822,10 @@ class ApiHandler {
     return response;
   }
 
-  Future<http.Response> updateSupplier(
-      {required int id, required Supplier supplier}) async {
+  Future<http.Response> updateSupplier({
+    required int id,
+    required Supplier supplier,
+  }) async {
     final uri = Uri.parse("$suppliersUri/$id");
     late http.Response response;
 

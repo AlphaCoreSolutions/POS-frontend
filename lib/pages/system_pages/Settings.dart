@@ -6,6 +6,8 @@ import 'package:fixed_pos/models/promoCodes_model.dart';
 import 'package:fixed_pos/models/taxes_model.dart';
 import 'package:fixed_pos/pages/essential_pages/api_handler.dart';
 import 'package:fixed_pos/utils/session_manager.dart';
+import 'package:fixed_pos/components/api_settings_dialog.dart';
+import 'package:fixed_pos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -56,10 +58,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _updateTaxes() async {
     bool success = await _apiHandler.updateTaxes(inHouseTax, takeOutTax);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-          success ? 'Taxes updated successfully' : 'Failed to update taxes'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success ? 'Taxes updated successfully' : 'Failed to update taxes',
+        ),
+      ),
+    );
   }
 
   void _changeLanguage(Language? language) async {
@@ -205,113 +210,167 @@ class _SettingsPageState extends State<SettingsPage> {
         elevation: 0,
         foregroundColor: Colors.white,
       ),
-      body: LayoutBuilder(builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLocalizations.of(context)!.language,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 10),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    itemCount: languages.length,
-                    itemBuilder: (context, index) {
-                      final language = languages[index];
-                      return GestureDetector(
-                        onTap: () => _changeLanguage(language),
-                        child: AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          margin: EdgeInsets.symmetric(vertical: 8),
-                          padding: EdgeInsets.all(15),
-                          decoration: BoxDecoration(
-                            color: selectedLanguage == language.languageCode
-                                ? Colors.white38
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: selectedLanguage == language.languageCode
-                                  ? Color(0xFFB87333)
-                                  : Colors.grey.shade300,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                language.icon,
-                                color: selectedLanguage == language.languageCode
-                                    ? Color(0xFF8B5C42)
-                                    : Colors.grey,
-                                size: 26,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                language.name,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Spacer(),
-                              AnimatedSwitcher(
-                                duration: Duration(milliseconds: 200),
-                                child: selectedLanguage == language.languageCode
-                                    ? Icon(
-                                        Icons.check_circle,
-                                        color: Color(0xFF8B5C42),
-                                      )
-                                    : SizedBox.shrink(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  Text("Promo Codes Settings",
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 10),
-                  FloatingActionButton.extended(
-                    onPressed: _showAddPromoCodeDialog,
-                    icon: Icon(Icons.add, color: Colors.white),
-                    label: Text(
-                      "Add Promo",
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context)!.language,
                       style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: languages.length,
+                      itemBuilder: (context, index) {
+                        final language = languages[index];
+                        return GestureDetector(
+                          onTap: () => _changeLanguage(language),
+                          child: AnimatedContainer(
+                            duration: Duration(milliseconds: 300),
+                            margin: EdgeInsets.symmetric(vertical: 8),
+                            padding: EdgeInsets.all(15),
+                            decoration: BoxDecoration(
+                              color: selectedLanguage == language.languageCode
+                                  ? Colors.white38
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: selectedLanguage == language.languageCode
+                                    ? Color(0xFFB87333)
+                                    : Colors.grey.shade300,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  language.icon,
+                                  color:
+                                      selectedLanguage == language.languageCode
+                                      ? Color(0xFF8B5C42)
+                                      : Colors.grey,
+                                  size: 26,
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  language.name,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Spacer(),
+                                AnimatedSwitcher(
+                                  duration: Duration(milliseconds: 200),
+                                  child:
+                                      selectedLanguage == language.languageCode
+                                      ? Icon(
+                                          Icons.check_circle,
+                                          color: Color(0xFF8B5C42),
+                                        )
+                                      : SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    SizedBox(height: 30),
+
+                    // API Configuration Section
+                    Text(
+                      "API Configuration",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.settings_ethernet,
+                          color: Color(0xFF8B5C42),
+                        ),
+                        title: Text('API Server Configuration'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Environment: ${ApiConfig.instance.environment}',
+                            ),
+                            Text(
+                              'URL: ${ApiConfig.instance.baseUrl}',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        trailing: Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          showApiSettingsDialog(context);
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "Promo Codes Settings",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    FloatingActionButton.extended(
+                      onPressed: _showAddPromoCodeDialog,
+                      icon: Icon(Icons.add, color: Colors.white),
+                      label: Text(
+                        "Add Promo",
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          color: Colors.white),
+                          color: Colors.white,
+                        ),
+                      ),
+                      backgroundColor: Color(0xFFB87333),
+                      elevation: 6,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
                     ),
-                    backgroundColor: Color(0xFFB87333),
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  ListView.builder(
-                    itemCount: _promoCodes.length,
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    itemBuilder: (context, index) {
-                      return Card(
+                    SizedBox(height: 16),
+                    ListView.builder(
+                      itemCount: _promoCodes.length,
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      itemBuilder: (context, index) {
+                        return Card(
                           elevation: 4,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
@@ -319,9 +378,13 @@ class _SettingsPageState extends State<SettingsPage> {
                           margin: EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 10),
-                            leading: const Icon(Icons.local_offer,
-                                color: Color(0xFFB87333)),
+                              horizontal: 20,
+                              vertical: 10,
+                            ),
+                            leading: const Icon(
+                              Icons.local_offer,
+                              color: Color(0xFFB87333),
+                            ),
                             title: Text(
                               _promoCodes[index].PromoCode,
                               style: const TextStyle(
@@ -334,21 +397,30 @@ class _SettingsPageState extends State<SettingsPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.copy,
-                                      color: Colors.grey),
+                                  icon: const Icon(
+                                    Icons.copy,
+                                    color: Colors.grey,
+                                  ),
                                   onPressed: () {
-                                    Clipboard.setData(ClipboardData(
-                                        text: _promoCodes[index].PromoCode));
+                                    Clipboard.setData(
+                                      ClipboardData(
+                                        text: _promoCodes[index].PromoCode,
+                                      ),
+                                    );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                          content: Text(
-                                              'Promo code copied to clipboard')),
+                                        content: Text(
+                                          'Promo code copied to clipboard',
+                                        ),
+                                      ),
                                     );
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.redAccent),
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.redAccent,
+                                  ),
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
@@ -363,8 +435,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                         ),
                                         content: const Text(
                                           'Are you sure you want to delete this promo code?',
-                                          style:
-                                              TextStyle(color: Colors.black87),
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                          ),
                                         ),
                                         actions: [
                                           TextButton(
@@ -373,7 +446,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                             child: const Text(
                                               'Cancel',
                                               style: TextStyle(
-                                                  color: Color(0xFF36454F)),
+                                                color: Color(0xFF36454F),
+                                              ),
                                             ),
                                           ),
                                           TextButton(
@@ -389,32 +463,38 @@ class _SettingsPageState extends State<SettingsPage> {
                                           ),
                                         ],
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(15),
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
                                         ),
                                       ),
                                     );
 
                                     if (confirm == true) {
-                                      final deleted =
-                                          await _apiHandler.deletePromoCode(
-                                              _promoCodes[index].id!);
+                                      final deleted = await _apiHandler
+                                          .deletePromoCode(
+                                            _promoCodes[index].id!,
+                                          );
                                       if (deleted) {
                                         setState(() {
                                           _promoCodes.removeAt(index);
                                         });
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           const SnackBar(
-                                              content:
-                                                  Text('Promo code deleted')),
+                                            content: Text('Promo code deleted'),
+                                          ),
                                         );
                                       } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           const SnackBar(
-                                              content: Text(
-                                                  'Failed to delete promo code')),
+                                            content: Text(
+                                              'Failed to delete promo code',
+                                            ),
+                                          ),
                                         );
                                       }
                                     }
@@ -422,77 +502,95 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               ],
                             ),
-                          ));
-                    },
-                  ),
-                  SizedBox(height: 20),
-                  Text("Taxes Settings",
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Text(' Tax Rate (%)',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) {
-                            setState(() {
-                              inHouseTax = double.tryParse(value) ?? 0.0;
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Enter tax rate',
-                            hintStyle: TextStyle(color: Colors.grey.shade600),
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
-                            filled: true,
-                            fillColor: Colors.white,
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                  color: Colors.grey.shade300, width: 1.5),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                  color: Color(0xFFB87333), width: 2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                           ),
-                          style: TextStyle(
-                            color: Color(0xFF36454F),
-                            fontWeight: FontWeight.w500,
+                        );
+                      },
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "Taxes Settings",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Text(
+                          ' Tax Rate (%)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) {
+                              setState(() {
+                                inHouseTax = double.tryParse(value) ?? 0.0;
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Enter tax rate',
+                              hintStyle: TextStyle(color: Colors.grey.shade600),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                  width: 1.5,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Color(0xFFB87333),
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: Color(0xFF36454F),
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _updateTaxes,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFFB87333),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding:
-                          EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                      ],
                     ),
-                    child: Text(
-                      'Update Taxes',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _updateTaxes,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFFB87333),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 24,
+                        ),
+                      ),
+                      child: Text(
+                        'Update Taxes',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 }
