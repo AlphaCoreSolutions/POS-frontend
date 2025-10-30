@@ -1,11 +1,11 @@
 {
-    "name": "fixed_pos",
-    "short_name": "fixed_pos",
+    "name": "VisionPOS",
+    "short_name": "VisionPOS",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#36454F",
+    "theme_color": "#B87333",
+    "description": "VisionPOS - A comprehensive Point of Sale system for Vision CIT company",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

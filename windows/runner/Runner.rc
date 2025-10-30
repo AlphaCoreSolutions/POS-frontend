@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "fixed_pos" "\0"
+            VALUE "CompanyName", "Vision CIT Company" "\0"
+            VALUE "FileDescription", "VisionPOS - Point of Sale System" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "fixed_pos" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "fixed_pos.exe" "\0"
-            VALUE "ProductName", "fixed_pos" "\0"
+            VALUE "InternalName", "visionpos" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 Vision CIT Company. All rights reserved." "\0"
+            VALUE "OriginalFilename", "visionpos.exe" "\0"
+            VALUE "ProductName", "VisionPOS" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
