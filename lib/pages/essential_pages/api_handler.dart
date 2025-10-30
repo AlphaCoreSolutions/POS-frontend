@@ -1017,4 +1017,366 @@ class ApiHandler {
       return false;
     }
   }
+
+  // ==================== DASHBOARD APIs ====================
+
+  String get dashboardUri => ApiConfig.instance.buildUrl('Dashboard');
+  String get reportsUri => ApiConfig.instance.buildUrl('POSReports');
+
+  Future<Map<String, dynamic>?> getDashboardSummary(int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/Summary?orgId=$orgId'
+          : '$dashboardUri/Summary';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching dashboard summary: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesTrend(int days, int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/SalesTrend?days=$days&orgId=$orgId'
+          : '$dashboardUri/SalesTrend?days=$days';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching sales trend: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRevenueByHour(
+      DateTime? date, int? orgId) async {
+    try {
+      final dateStr =
+          date?.toIso8601String() ?? DateTime.now().toIso8601String();
+      final url = orgId != null
+          ? '$dashboardUri/RevenueByHour?date=$dateStr&orgId=$orgId'
+          : '$dashboardUri/RevenueByHour?date=$dateStr';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching hourly revenue: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTopProducts(int top, int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/TopProducts?top=$top&orgId=$orgId'
+          : '$dashboardUri/TopProducts?top=$top';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching top products: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTopCategories(
+      int top, int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/TopCategories?top=$top&orgId=$orgId'
+          : '$dashboardUri/TopCategories?top=$top';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching top categories: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRecentOrders(
+      int count, int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/RecentOrders?count=$count&orgId=$orgId'
+          : '$dashboardUri/RecentOrders?count=$count';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching recent orders: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentMethodDistribution(
+      DateTime? startDate, DateTime? endDate, int? orgId) async {
+    try {
+      var url = '$dashboardUri/PaymentMethodDistribution';
+      final params = <String>[];
+
+      if (startDate != null)
+        params.add('startDate=${startDate.toIso8601String()}');
+      if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
+      if (orgId != null) params.add('orgId=$orgId');
+
+      if (params.isNotEmpty) url += '?${params.join('&')}';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching payment distribution: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMonthlyComparison(
+      int months, int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/MonthlyComparison?months=$months&orgId=$orgId'
+          : '$dashboardUri/MonthlyComparison?months=$months';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching monthly comparison: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getLowStockAlert(
+      double threshold, int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/LowStockAlert?threshold=$threshold&orgId=$orgId'
+          : '$dashboardUri/LowStockAlert?threshold=$threshold';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching low stock alert: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getQuickStats(int? orgId) async {
+    try {
+      final url = orgId != null
+          ? '$dashboardUri/QuickStats?orgId=$orgId'
+          : '$dashboardUri/QuickStats';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching quick stats: $e');
+      return null;
+    }
+  }
+
+  // ==================== POS REPORTS APIs ====================
+
+  Future<Map<String, dynamic>?> getSalesByDateRange(
+      DateTime startDate, DateTime endDate, int? orgId) async {
+    try {
+      var url =
+          '$reportsUri/SalesByDateRange?startDate=${startDate.toIso8601String()}&endDate=${endDate.toIso8601String()}';
+      if (orgId != null) url += '&orgId=$orgId';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching sales by date range: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getDailySales(DateTime date, int? orgId) async {
+    try {
+      var url = '$reportsUri/DailySales?date=${date.toIso8601String()}';
+      if (orgId != null) url += '&orgId=$orgId';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching daily sales: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTopSellingProducts(
+      DateTime? startDate, DateTime? endDate, int? orgId, int top) async {
+    try {
+      var url = '$reportsUri/TopSellingProducts?top=$top';
+      if (startDate != null) url += '&startDate=${startDate.toIso8601String()}';
+      if (endDate != null) url += '&endDate=${endDate.toIso8601String()}';
+      if (orgId != null) url += '&orgId=$orgId';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching top selling products: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesByPaymentMethod(
+      DateTime? startDate, DateTime? endDate, int? orgId) async {
+    try {
+      var url = '$reportsUri/SalesByPaymentMethod';
+      final params = <String>[];
+
+      if (startDate != null)
+        params.add('startDate=${startDate.toIso8601String()}');
+      if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
+      if (orgId != null) params.add('orgId=$orgId');
+
+      if (params.isNotEmpty) url += '?${params.join('&')}';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching sales by payment method: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesByCategory(
+      DateTime? startDate, DateTime? endDate, int? orgId) async {
+    try {
+      var url = '$reportsUri/SalesByCategory';
+      final params = <String>[];
+
+      if (startDate != null)
+        params.add('startDate=${startDate.toIso8601String()}');
+      if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
+      if (orgId != null) params.add('orgId=$orgId');
+
+      if (params.isNotEmpty) url += '?${params.join('&')}';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching sales by category: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getInventoryStatus(
+      int? orgId, double? lowStockThreshold) async {
+    try {
+      var url = '$reportsUri/InventoryStatus';
+      final params = <String>[];
+
+      if (orgId != null) params.add('orgId=$orgId');
+      if (lowStockThreshold != null)
+        params.add('lowStockThreshold=$lowStockThreshold');
+
+      if (params.isNotEmpty) url += '?${params.join('&')}';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching inventory status: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getTransactionDetails(int orderId) async {
+    try {
+      final url = '$reportsUri/TransactionDetails/$orderId';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching transaction details: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getProfitAnalysis(
+      DateTime? startDate, DateTime? endDate, int? orgId) async {
+    try {
+      var url = '$reportsUri/ProfitAnalysis';
+      final params = <String>[];
+
+      if (startDate != null)
+        params.add('startDate=${startDate.toIso8601String()}');
+      if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
+      if (orgId != null) params.add('orgId=$orgId');
+
+      if (params.isNotEmpty) url += '?${params.join('&')}';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching profit analysis: $e');
+      return null;
+    }
+  }
 }

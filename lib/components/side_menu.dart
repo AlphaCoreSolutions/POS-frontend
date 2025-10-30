@@ -4,7 +4,8 @@ import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/models/user_model.dart';
 import 'package:visionpos/pages/system_pages/Settings.dart';
 import 'package:visionpos/pages/system_pages/customers.dart';
-import 'package:visionpos/pages/system_pages/dashboard_page.dart';
+import 'package:visionpos/pages/system_pages/enhanced_dashboard.dart';
+import 'package:visionpos/pages/system_pages/reports_page.dart';
 import 'package:visionpos/language_changing/constants.dart';
 import 'package:visionpos/pages/system_pages/products_page.dart';
 import 'package:visionpos/pages/system_pages/profile_page.dart';
@@ -87,7 +88,18 @@ class _DrawerPageState extends State<DrawerPage> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => DashboardPage()),
+                      MaterialPageRoute(
+                          builder: (context) => EnhancedDashboard()),
+                    );
+                  },
+                ),
+                SideBar_Item(
+                  icon: Icons.assessment,
+                  text: 'Reports',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ReportsPage()),
                     );
                   },
                 ),
