@@ -1135,13 +1135,28 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
   void toggleMenu() {
     setState(() {
+      // Responsive drawer offsets based on screen width
+      double screenWidth = MediaQuery.of(context).size.width;
+
       if (isDrawerOpen) {
         xOffset = 0;
         yOffset = 0;
         isDrawerOpen = false;
       } else {
-        xOffset = 290;
-        yOffset = 80;
+        // Adjust drawer offsets for different screen sizes
+        if (screenWidth < 600) {
+          // Mobile: slide more to show drawer
+          xOffset = screenWidth * 0.7; // 70% of screen width
+          yOffset = 60;
+        } else if (screenWidth < 1200) {
+          // Tablet
+          xOffset = 290;
+          yOffset = 80;
+        } else {
+          // Desktop
+          xOffset = 320;
+          yOffset = 80;
+        }
         isDrawerOpen = true;
       }
     });
@@ -1212,13 +1227,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
               child: SizedBox(
                 height: screenHeight * 1.1,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(screenWidth < 600 ? 8.0 : 16.0),
                   child: Row(
                     children: [
                       // Left Section - Main content (Products and Categories)
                       Expanded(
-                        flex:
-                            3, // You can adjust this flex value based on the layout
+                        flex: screenWidth < 900 ? 5 : 3, // More space on mobile
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1616,78 +1630,100 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                           return matchesRoot && matchesSub;
                                         }).toList();
 
-                                        return GridView.builder(
-                                          gridDelegate:
-                                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: 4,
-                                            crossAxisSpacing: 10,
-                                            mainAxisSpacing: 10,
-                                            childAspectRatio: 1.2,
-                                          ),
-                                          itemCount: filteredProducts
-                                              .length, // use filtered length
-                                          itemBuilder: (context, index) {
-                                            final product =
-                                                filteredProducts[index];
+                                        return LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            // Responsive crossAxisCount based on width
+                                            int crossAxisCount =
+                                                constraints.maxWidth < 600
+                                                    ? 2
+                                                    : constraints.maxWidth < 900
+                                                        ? 3
+                                                        : constraints.maxWidth <
+                                                                1200
+                                                            ? 4
+                                                            : 5;
 
-                                            // look up the category name from its id
-                                            final categoryName = _catNameById[
-                                                    product.ProductCategory] ??
-                                                'Uncategorized';
+                                            return GridView.builder(
+                                              gridDelegate:
+                                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: crossAxisCount,
+                                                crossAxisSpacing: 10,
+                                                mainAxisSpacing: 10,
+                                                childAspectRatio: 1.2,
+                                              ),
+                                              itemCount: filteredProducts
+                                                  .length, // use filtered length
+                                              itemBuilder: (context, index) {
+                                                final product =
+                                                    filteredProducts[index];
 
-                                            return GestureDetector(
-                                              onTap: () {
-                                                setState(
-                                                  () => addToOrder(product),
+                                                // look up the category name from its id
+                                                final categoryName =
+                                                    _catNameById[product
+                                                            .ProductCategory] ??
+                                                        'Uncategorized';
+
+                                                return GestureDetector(
+                                                  onTap: () {
+                                                    setState(
+                                                      () => addToOrder(product),
+                                                    );
+                                                  },
+                                                  child: Card(
+                                                    elevation: 3,
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10),
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        // Product Name
+                                                        Text(
+                                                          product.ProductName,
+                                                          style: TextStyle(
+                                                            fontSize:
+                                                                screenWidth *
+                                                                    0.014,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ),
+                                                        // Category Name
+                                                        Text(
+                                                          categoryName,
+                                                          style: TextStyle(
+                                                            fontSize:
+                                                                screenWidth *
+                                                                    0.011,
+                                                            color: Colors.grey,
+                                                          ),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ),
+                                                        // Price
+                                                        Text(
+                                                          '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                                                          style: TextStyle(
+                                                            fontSize:
+                                                                screenWidth *
+                                                                    0.012,
+                                                            color: Colors.green,
+                                                          ),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                                 );
                                               },
-                                              child: Card(
-                                                elevation: 3,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                ),
-                                                child: Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    // Product Name
-                                                    Text(
-                                                      product.ProductName,
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            screenWidth * 0.014,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                    // Category Name
-                                                    Text(
-                                                      categoryName,
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            screenWidth * 0.011,
-                                                        color: Colors.grey,
-                                                      ),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                    // Price
-                                                    Text(
-                                                      '${product.SellingPrice.toStringAsFixed(2)} JOD',
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            screenWidth * 0.012,
-                                                        color: Colors.green,
-                                                      ),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
                                             );
                                           },
                                         );
@@ -1699,272 +1735,284 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                       ),
 
                       // Right Section - Order Details
-                      SingleChildScrollView(
-                        child: SizedBox(
-                          height: screenHeight * 1,
-                          child: Container(
-                            height: screenHeight * 2.3,
-                            width: screenWidth *
-                                0.35, // Set a fixed width for the right section
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 8,
-                                  spreadRadius: 4,
-                                ),
-                              ],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context)!.orders,
-                                  style: TextStyle(
-                                    fontSize: screenWidth * 0.022,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color.fromARGB(197, 0, 0, 0),
+                      Expanded(
+                        flex:
+                            screenWidth < 900 ? 3 : 2, // Adjust flex for mobile
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 20),
+                          child: SingleChildScrollView(
+                            child: Container(
+                              constraints: BoxConstraints(
+                                minHeight: screenHeight * 0.8,
+                                maxHeight: screenHeight * 2.3,
+                              ),
+                              padding:
+                                  EdgeInsets.all(screenWidth < 600 ? 8 : 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                    spreadRadius: 4,
                                   ),
-                                ),
-                                SizedBox(height: screenHeight * 0.01),
+                                ],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    AppLocalizations.of(context)!.orders,
+                                    style: TextStyle(
+                                      fontSize: screenWidth * 0.022,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromARGB(197, 0, 0, 0),
+                                    ),
+                                  ),
+                                  SizedBox(height: screenHeight * 0.01),
 
-                                // Display selected products
-                                if (selectedItems.isNotEmpty)
-                                  Expanded(
-                                    child: ListView.builder(
-                                      itemCount: selectedItems.length,
-                                      itemBuilder: (context, index) {
-                                        final selected = selectedItems[index];
-                                        // Cast data to List<Product> and fetch the product details
-                                        final product = _getProductById(
-                                          selected.productId,
-                                        );
-                                        return Card(
-                                          elevation: 4,
-                                          margin: EdgeInsets.only(
-                                            bottom: screenHeight * 0.02,
-                                          ),
-                                          child: Padding(
-                                            padding: EdgeInsets.all(
-                                              screenWidth * 0.0008,
+                                  // Display selected products
+                                  if (selectedItems.isNotEmpty)
+                                    Expanded(
+                                      child: ListView.builder(
+                                        itemCount: selectedItems.length,
+                                        itemBuilder: (context, index) {
+                                          final selected = selectedItems[index];
+                                          // Cast data to List<Product> and fetch the product details
+                                          final product = _getProductById(
+                                            selected.productId,
+                                          );
+                                          return Card(
+                                            elevation: 4,
+                                            margin: EdgeInsets.only(
+                                              bottom: screenHeight * 0.02,
                                             ),
-                                            child: Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: screenWidth * 0.001,
-                                                ),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
+                                            child: Padding(
+                                              padding: EdgeInsets.all(
+                                                screenWidth * 0.0008,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: screenWidth * 0.001,
+                                                  ),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        // Adding ListTile here
+                                                        ListTile(
+                                                          title: Text(
+                                                            product.ProductName,
+                                                            style: TextStyle(
+                                                              fontSize:
+                                                                  screenWidth *
+                                                                      0.013,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                          subtitle: Text(
+                                                            'Quantity: ${selected.quantity}',
+                                                            style: TextStyle(
+                                                              fontSize:
+                                                                  screenWidth *
+                                                                      0.013,
+                                                            ),
+                                                          ),
+                                                          trailing: Text(
+                                                            '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                                                            style: TextStyle(
+                                                              fontSize:
+                                                                  screenWidth *
+                                                                      0.015,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color:
+                                                                  Colors.green,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Row(
                                                     children: [
-                                                      // Adding ListTile here
-                                                      ListTile(
-                                                        title: Text(
-                                                          product.ProductName,
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.013,
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
+                                                      IconButton(
+                                                        icon: Icon(
+                                                          Icons.remove_circle,
+                                                          color: Colors.red,
                                                         ),
-                                                        subtitle: Text(
-                                                          'Quantity: ${selected.quantity}',
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.013,
-                                                          ),
+                                                        onPressed: () =>
+                                                            _removeProductFromOrder(
+                                                          index,
                                                         ),
-                                                        trailing: Text(
-                                                          '${product.SellingPrice.toStringAsFixed(2)} JOD',
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.015,
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            color: Colors.green,
-                                                          ),
+                                                      ),
+                                                      IconButton(
+                                                        icon: Icon(
+                                                          Icons.add_circle,
+                                                          color: Colors.green,
                                                         ),
+                                                        onPressed: () =>
+                                                            _addQuantity(index),
                                                       ),
                                                     ],
                                                   ),
-                                                ),
-                                                Row(
-                                                  children: [
-                                                    IconButton(
-                                                      icon: Icon(
-                                                        Icons.remove_circle,
-                                                        color: Colors.red,
-                                                      ),
-                                                      onPressed: () =>
-                                                          _removeProductFromOrder(
-                                                        index,
-                                                      ),
-                                                    ),
-                                                    IconButton(
-                                                      icon: Icon(
-                                                        Icons.add_circle,
-                                                        color: Colors.green,
-                                                      ),
-                                                      onPressed: () =>
-                                                          _addQuantity(index),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
-                                // Divider line
-                                Divider(height: 7, color: Colors.black45),
-                                // Promo Code Section
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.01,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: CompositedTransformTarget(
-                                          link: _layerLinkpromo,
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              double textFieldWidth = constraints
-                                                      .maxWidth *
-                                                  0.8; // Adjust width dynamically
-                                              double textSize = screenWidth *
-                                                  0.013; // Adjust font size dynamically
-                                              double paddingHorizontal =
-                                                  screenWidth *
-                                                      0.02; // Adjust padding dynamically
-                                              double paddingVertical =
-                                                  screenHeight * 0.015;
+                                  // Divider line
+                                  Divider(height: 7, color: Colors.black45),
+                                  // Promo Code Section
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.01,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: CompositedTransformTarget(
+                                            link: _layerLinkpromo,
+                                            child: LayoutBuilder(
+                                              builder: (context, constraints) {
+                                                double textFieldWidth = constraints
+                                                        .maxWidth *
+                                                    0.8; // Adjust width dynamically
+                                                double textSize = screenWidth *
+                                                    0.013; // Adjust font size dynamically
+                                                double paddingHorizontal =
+                                                    screenWidth *
+                                                        0.02; // Adjust padding dynamically
+                                                double paddingVertical =
+                                                    screenHeight * 0.015;
 
-                                              return Container(
-                                                width:
-                                                    textFieldWidth, // Ensure it scales dynamically
-                                                child: TextField(
-                                                  controller:
-                                                      promoCodeController,
-                                                  style: TextStyle(
-                                                    fontSize: textSize,
-                                                  ),
-                                                  decoration: InputDecoration(
-                                                    labelText:
-                                                        AppLocalizations.of(
-                                                      context,
-                                                    )!
-                                                            .discount,
-                                                    labelStyle: TextStyle(
+                                                return Container(
+                                                  width:
+                                                      textFieldWidth, // Ensure it scales dynamically
+                                                  child: TextField(
+                                                    controller:
+                                                        promoCodeController,
+                                                    style: TextStyle(
                                                       fontSize: textSize,
                                                     ),
-                                                    border:
-                                                        OutlineInputBorder(),
-                                                    contentPadding:
-                                                        EdgeInsets.symmetric(
-                                                      horizontal:
-                                                          paddingHorizontal,
-                                                      vertical: paddingVertical,
+                                                    decoration: InputDecoration(
+                                                      labelText:
+                                                          AppLocalizations.of(
+                                                        context,
+                                                      )!
+                                                              .discount,
+                                                      labelStyle: TextStyle(
+                                                        fontSize: textSize,
+                                                      ),
+                                                      border:
+                                                          OutlineInputBorder(),
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                        horizontal:
+                                                            paddingHorizontal,
+                                                        vertical:
+                                                            paddingVertical,
+                                                      ),
                                                     ),
+                                                    onChanged: findPromoCode,
                                                   ),
-                                                  onChanged: findPromoCode,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(width: screenWidth * 0.01),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          // Handle promo code validation here
-
-                                          if (selectedPromoCode != null) {
-                                            setState(() {
-                                              // Here you can add your validation logic
-                                              // If valid, update the selectedPromoCode text
-                                              // If not valid, you can show an error or reset the value
-                                            });
-                                          } else {
-                                            // If no promo code selected, you can show an error or message
-                                            setState(() {
-                                              // Optionally show an error if no promo code is selected
-                                              selectedPromoCode =
-                                                  null; // Reset or handle the case where no promo code is selected
-                                            });
-                                          }
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Color(0xFFB87333),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                            horizontal: 16,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
+                                                );
+                                              },
                                             ),
                                           ),
                                         ),
-                                        child: Text(
-                                          AppLocalizations.of(context)!.ok,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                        SizedBox(width: screenWidth * 0.01),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            // Handle promo code validation here
 
-                                //tips section
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.001,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: SizedBox(
-                                          width: screenWidth *
-                                              0.2, // Adjust width as needed
-                                          height: screenHeight *
-                                              0.08, // Adjust height as needed
-                                          child: TextField(
-                                            controller: _tipController,
-                                            keyboardType: TextInputType.number,
-                                            decoration: InputDecoration(
-                                              hintText: 'Enter tip amount',
-                                              border: OutlineInputBorder(),
-                                            ),
-                                            onChanged: (value) {
+                                            if (selectedPromoCode != null) {
                                               setState(() {
-                                                tips = double.tryParse(value) ??
-                                                    0.0;
+                                                // Here you can add your validation logic
+                                                // If valid, update the selectedPromoCode text
+                                                // If not valid, you can show an error or reset the value
                                               });
-                                            },
+                                            } else {
+                                              // If no promo code selected, you can show an error or message
+                                              setState(() {
+                                                // Optionally show an error if no promo code is selected
+                                                selectedPromoCode =
+                                                    null; // Reset or handle the case where no promo code is selected
+                                              });
+                                            }
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Color(0xFFB87333),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 16,
+                                              horizontal: 16,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                10,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            AppLocalizations.of(context)!.ok,
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
 
-                                // Divider line (for discount section)
-                                Divider(
-                                  height: screenHeight * 0.02,
-                                  color: Colors.black45,
-                                ),
-                                /*
+                                  //tips section
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.001,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: SizedBox(
+                                            width: screenWidth *
+                                                0.2, // Adjust width as needed
+                                            height: screenHeight *
+                                                0.08, // Adjust height as needed
+                                            child: TextField(
+                                              controller: _tipController,
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: InputDecoration(
+                                                hintText: 'Enter tip amount',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              onChanged: (value) {
+                                                setState(() {
+                                                  tips =
+                                                      double.tryParse(value) ??
+                                                          0.0;
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Divider line (for discount section)
+                                  Divider(
+                                    height: screenHeight * 0.02,
+                                    color: Colors.black45,
+                                  ),
+                                  /*
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceAround,
@@ -2013,271 +2061,273 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                 ),
 
                             */
-                                // Discount Section
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.01,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        AppLocalizations.of(context)!.discount,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: screenWidth * 0.0115,
-                                        ),
-                                      ),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            selectedPromoCode != null
-                                                ? '${selectedPromoCode!.PromoCode} (%${selectedPromoCode!.Percentage})' // Safe to access since we checked for null
-                                                : 'No Promo Code', // Default text if no promo code is selected
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.red,
-                                              fontSize: screenWidth * 0.013,
-                                            ),
+                                  // Discount Section
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.01,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          AppLocalizations.of(context)!
+                                              .discount,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: screenWidth * 0.0115,
                                           ),
-                                          // Add the circular "X" button
-                                          if (selectedPromoCode != null)
-                                            GestureDetector(
-                                              onTap: () {
-                                                setState(() {
-                                                  // Reset discount and selectedPromoCode when the "X" is tapped
-                                                  discount = 0.0;
-                                                  selectedPromoCode = null;
-                                                });
-                                              },
-                                              child: Container(
-                                                margin: EdgeInsets.only(
-                                                  left: 8.0,
-                                                ),
-                                                width:
-                                                    24.0, // Set the size of the circle
-                                                height:
-                                                    24.0, // Set the size of the circle
-                                                decoration: BoxDecoration(
-                                                  color: Colors
-                                                      .red, // Circle color
-                                                  shape: BoxShape
-                                                      .circle, // Make the container circular
-                                                ),
-                                                child: Icon(
-                                                  Icons.close, // The "X" icon
-                                                  color: Colors
-                                                      .white, // Icon color
-                                                  size: 16.0, // Icon size
-                                                ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              selectedPromoCode != null
+                                                  ? '${selectedPromoCode!.PromoCode} (%${selectedPromoCode!.Percentage})' // Safe to access since we checked for null
+                                                  : 'No Promo Code', // Default text if no promo code is selected
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.red,
+                                                fontSize: screenWidth * 0.013,
                                               ),
                                             ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.001,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Payment Method', // You can change this to any localized text
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: screenWidth *
-                                              0.0115, // Adjust text size based on screen width
+                                            // Add the circular "X" button
+                                            if (selectedPromoCode != null)
+                                              GestureDetector(
+                                                onTap: () {
+                                                  setState(() {
+                                                    // Reset discount and selectedPromoCode when the "X" is tapped
+                                                    discount = 0.0;
+                                                    selectedPromoCode = null;
+                                                  });
+                                                },
+                                                child: Container(
+                                                  margin: EdgeInsets.only(
+                                                    left: 8.0,
+                                                  ),
+                                                  width:
+                                                      24.0, // Set the size of the circle
+                                                  height:
+                                                      24.0, // Set the size of the circle
+                                                  decoration: BoxDecoration(
+                                                    color: Colors
+                                                        .red, // Circle color
+                                                    shape: BoxShape
+                                                        .circle, // Make the container circular
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.close, // The "X" icon
+                                                    color: Colors
+                                                        .white, // Icon color
+                                                    size: 16.0, // Icon size
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                      ),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            paymentMethod, // Show the current payment method
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: screenWidth *
-                                                  0.0115, // Adjust text size based on screen width
+                                      ],
+                                    ),
+                                  ),
+
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.001,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Payment Method', // You can change this to any localized text
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: screenWidth *
+                                                0.0115, // Adjust text size based on screen width
+                                          ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              paymentMethod, // Show the current payment method
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: screenWidth *
+                                                    0.0115, // Adjust text size based on screen width
+                                              ),
+                                            ),
+                                            Transform.scale(
+                                              scale:
+                                                  switchScale, // Adjust the scale to change the switch size
+                                              child: Switch(
+                                                value: isCash, // Toggle value
+                                                onChanged:
+                                                    _togglePaymentMethod, // Update payment method on change
+                                                activeColor: Colors
+                                                    .green, // Color when 'Visa' is selected
+                                                inactiveThumbColor: Colors
+                                                    .blue, // Color when 'Cash' is selected
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Subtotal
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.01,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          AppLocalizations.of(context)!.total,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: screenWidth * 0.0115,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${_calculateSubtotal(selectedItems).toStringAsFixed(2)} JOD',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Taxes
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.01,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${AppLocalizations.of(context)!.tax} (${selectedTaxType == "In-House" ? currentTaxes?.inHouse ?? 0 : currentTaxes?.takeOut ?? 0}%)',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: screenWidth * 0.0115,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${_calculateTaxes(selectedItems).toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Total
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenHeight * 0.01,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${AppLocalizations.of(context)!.grandTotal} - %${discount.toStringAsFixed(0)}',
+                                          style: TextStyle(
+                                            fontSize: screenWidth * 0.015,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${_calculateTotal(selectedItems).toStringAsFixed(2)} JOD',
+                                          style: TextStyle(
+                                            fontSize: screenWidth * 0.016,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Checkout Button
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: () async {
+                                          submitOrder(); // First, submit the order
+                                          // Then, print the receipt
+                                          _printReceipt();
+                                          orderCount++;
+                                          setState(() {
+                                            tips = 0.0;
+                                            _tipController.clear();
+                                          });
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Color(0xFFB87333),
+                                          foregroundColor: Colors.white,
+                                          minimumSize: Size(
+                                            MediaQuery.of(context).size.width *
+                                                0.01,
+                                            40,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                            horizontal: 32,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
                                             ),
                                           ),
-                                          Transform.scale(
-                                            scale:
-                                                switchScale, // Adjust the scale to change the switch size
-                                            child: Switch(
-                                              value: isCash, // Toggle value
-                                              onChanged:
-                                                  _togglePaymentMethod, // Update payment method on change
-                                              activeColor: Colors
-                                                  .green, // Color when 'Visa' is selected
-                                              inactiveThumbColor: Colors
-                                                  .blue, // Color when 'Cash' is selected
+                                        ),
+                                        child: Text(
+                                          AppLocalizations.of(context)!
+                                              .checkout,
+                                          style: TextStyle(
+                                            fontSize: screenWidth * 0.015,
+                                          ),
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {},
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Color(0xFF8B5C42),
+                                          foregroundColor: Colors.white,
+                                          minimumSize: Size(
+                                            MediaQuery.of(context).size.width *
+                                                0.01,
+                                            40,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 16,
+                                            horizontal: 30,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Subtotal
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.01,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        AppLocalizations.of(context)!.total,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: screenWidth * 0.0115,
                                         ),
-                                      ),
-                                      Text(
-                                        '${_calculateSubtotal(selectedItems).toStringAsFixed(2)} JOD',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Taxes
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.01,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '${AppLocalizations.of(context)!.tax} (${selectedTaxType == "In-House" ? currentTaxes?.inHouse ?? 0 : currentTaxes?.takeOut ?? 0}%)',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: screenWidth * 0.0115,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${_calculateTaxes(selectedItems).toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Total
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: screenHeight * 0.01,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '${AppLocalizations.of(context)!.grandTotal} - %${discount.toStringAsFixed(0)}',
-                                        style: TextStyle(
-                                          fontSize: screenWidth * 0.015,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${_calculateTotal(selectedItems).toStringAsFixed(2)} JOD',
-                                        style: TextStyle(
-                                          fontSize: screenWidth * 0.016,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Checkout Button
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: [
-                                    ElevatedButton(
-                                      onPressed: () async {
-                                        submitOrder(); // First, submit the order
-                                        // Then, print the receipt
-                                        _printReceipt();
-                                        orderCount++;
-                                        setState(() {
-                                          tips = 0.0;
-                                          _tipController.clear();
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(0xFFB87333),
-                                        foregroundColor: Colors.white,
-                                        minimumSize: Size(
-                                          MediaQuery.of(context).size.width *
-                                              0.01,
-                                          40,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                          horizontal: 32,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
+                                        child: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!
+                                              .printReceipt,
+                                          style: TextStyle(
+                                            fontSize: screenWidth * 0.011,
                                           ),
                                         ),
                                       ),
-                                      child: Text(
-                                        AppLocalizations.of(context)!.checkout,
-                                        style: TextStyle(
-                                          fontSize: screenWidth * 0.015,
-                                        ),
-                                      ),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () {},
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(0xFF8B5C42),
-                                        foregroundColor: Colors.white,
-                                        minimumSize: Size(
-                                          MediaQuery.of(context).size.width *
-                                              0.01,
-                                          40,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                          horizontal: 30,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        AppLocalizations.of(
-                                          context,
-                                        )!
-                                            .printReceipt,
-                                        style: TextStyle(
-                                          fontSize: screenWidth * 0.011,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                /*
+                                    ],
+                                  ),
+                                  /*
                                       // Charge button
                                       SizedBox(height: screenHeight * 0.03),
                                       Center(
@@ -2296,7 +2346,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                                       ),
                                     ),
                                     */
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -2545,129 +2596,142 @@ class _AddProductDialogState extends State<AddProductDialog>
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: SizedBox(
-            width: 350,
-            child: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: 20),
-                    // Barcode
-                    TextFormField(
-                      initialValue: widget.barcode,
-                      decoration: const InputDecoration(labelText: 'Barcode'),
-                      readOnly: true,
-                      style: const TextStyle(color: Color(0xFF36454F)),
-                    ),
-                    const SizedBox(height: 12),
+          content: LayoutBuilder(
+            builder: (context, constraints) {
+              // Make dialog responsive - use 90% of screen width on small devices
+              final dialogWidth = MediaQuery.of(context).size.width < 400
+                  ? MediaQuery.of(context).size.width * 0.9
+                  : 350.0;
 
-                    // Name
-                    TextFormField(
-                      controller: _nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        fillColor: Colors.white,
-                        filled: true,
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Description
-                    TextFormField(
-                      controller: _descCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Description',
-                        fillColor: Colors.white,
-                        filled: true,
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Price & Inventory
-                    Row(
+              return SizedBox(
+                width: dialogWidth,
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _priceCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Price',
-                              fillColor: Colors.white,
-                              filled: true,
-                            ),
-                            keyboardType: TextInputType.number,
-                            validator: (v) =>
-                                double.tryParse(v!) == null ? 'Invalid' : null,
-                          ),
+                        SizedBox(height: 20),
+                        // Barcode
+                        TextFormField(
+                          initialValue: widget.barcode,
+                          decoration:
+                              const InputDecoration(labelText: 'Barcode'),
+                          readOnly: true,
+                          style: const TextStyle(color: Color(0xFF36454F)),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _inventoryCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Inventory',
-                              fillColor: Colors.white,
-                              filled: true,
-                            ),
-                            keyboardType: TextInputType.number,
-                            validator: (v) =>
-                                double.tryParse(v!) == null ? 'Invalid' : null,
+                        const SizedBox(height: 12),
+
+                        // Name
+                        TextFormField(
+                          controller: _nameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Name',
+                            fillColor: Colors.white,
+                            filled: true,
                           ),
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Description
+                        TextFormField(
+                          controller: _descCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Description',
+                            fillColor: Colors.white,
+                            filled: true,
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Price & Inventory
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _priceCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Price',
+                                  fillColor: Colors.white,
+                                  filled: true,
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (v) => double.tryParse(v!) == null
+                                    ? 'Invalid'
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _inventoryCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Inventory',
+                                  fillColor: Colors.white,
+                                  filled: true,
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (v) => double.tryParse(v!) == null
+                                    ? 'Invalid'
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Category
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<Category>(
+                                items: _categories
+                                    .map(
+                                      (c) => DropdownMenuItem(
+                                        value: c,
+                                        child: Text(c.categoryName),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (c) =>
+                                    setState(() => _chosenCategory = c),
+                                decoration: const InputDecoration(
+                                  labelText: 'Category',
+                                  fillColor: Colors.white,
+                                  filled: true,
+                                ),
+                                validator: (v) => v == null ? 'Pick one' : null,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                color: Color(0xFFB87333),
+                              ),
+                              onPressed: () async {
+                                final cat = await Navigator.push<Category>(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => AddCategory()),
+                                );
+                                if (cat != null) {
+                                  setState(() {
+                                    _categories.add(cat);
+                                    _chosenCategory = cat;
+                                  });
+                                }
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-
-                    // Category
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<Category>(
-                            items: _categories
-                                .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c.categoryName),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (c) =>
-                                setState(() => _chosenCategory = c),
-                            decoration: const InputDecoration(
-                              labelText: 'Category',
-                              fillColor: Colors.white,
-                              filled: true,
-                            ),
-                            validator: (v) => v == null ? 'Pick one' : null,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add_circle_outline,
-                            color: Color(0xFFB87333),
-                          ),
-                          onPressed: () async {
-                            final cat = await Navigator.push<Category>(
-                              context,
-                              MaterialPageRoute(builder: (_) => AddCategory()),
-                            );
-                            if (cat != null) {
-                              setState(() {
-                                _categories.add(cat);
-                                _chosenCategory = cat;
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           actions: [
             TextButton(

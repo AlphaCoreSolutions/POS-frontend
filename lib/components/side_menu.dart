@@ -46,38 +46,55 @@ class _DrawerPageState extends State<DrawerPage> {
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     double screenHeight = MediaQuery.of(context).size.height;
+
+    // Responsive sizing based on screen width
+    double sidebarWidth = screenWidth < 600
+        ? screenWidth * 0.7
+        : screenWidth < 1200
+            ? 290
+            : 320;
+    double topPadding = screenHeight < 600 ? 20 : 35;
+    double leftPadding = screenWidth < 600 ? 20 : 40;
+
     return Container(
+      width: sidebarWidth,
       color: Colors.blueGrey,
       child: Padding(
-        padding: EdgeInsets.only(top: 35, left: 40, bottom: 1),
+        padding: EdgeInsets.only(top: topPadding, left: leftPadding, bottom: 1),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Row(
               children: <Widget>[
                 CircleAvatar(
+                  radius: screenWidth < 600 ? 20 : 30,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius:
+                        BorderRadius.circular(screenWidth < 600 ? 20 : 30),
                     child: Image(
                         fit: BoxFit.cover,
-                        width: screenWidth * 0.15,
-                        height: screenHeight * 0.15,
+                        width: screenWidth < 600 ? 40 : screenWidth * 0.15,
+                        height: screenWidth < 600 ? 40 : screenHeight * 0.15,
                         image: AssetImage("lib/assets/profile photo.jpg")),
                   ),
                 ),
                 SizedBox(
-                  width: screenWidth * 0.015,
+                  width: screenWidth < 600 ? 8 : screenWidth * 0.015,
                 ),
-                data.isNotEmpty
-                    ? Text(
-                        data[0].FullName,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: screenWidth * 0.015,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : CircularProgressIndicator(color: Colors.white),
+                Flexible(
+                  child: data.isNotEmpty
+                      ? Text(
+                          data[0].FullName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize:
+                                screenWidth < 600 ? 12 : screenWidth * 0.015,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : CircularProgressIndicator(color: Colors.white),
+                ),
               ],
             ),
             Column(
@@ -181,17 +198,22 @@ class _DrawerPageState extends State<DrawerPage> {
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
                   children: <Widget>[
-                    const Icon(
+                    Icon(
                       Icons.logout_outlined,
                       color: Colors.white,
+                      size: screenWidth < 600 ? 18 : 24,
                     ),
-                    SizedBox(width: screenWidth * 0.03),
-                    Text(
-                      AppLocalizations.of(context)!.logout,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: screenWidth * 0.017,
+                    SizedBox(width: screenWidth < 600 ? 8 : screenWidth * 0.03),
+                    Flexible(
+                      child: Text(
+                        AppLocalizations.of(context)!.logout,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize:
+                              screenWidth < 600 ? 12 : screenWidth * 0.017,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -226,32 +248,41 @@ class SideBar_Item extends StatelessWidget {
     double screenWidth = MediaQuery.of(context).size.width;
     double screenHeight = MediaQuery.of(context).size.height;
 
+    // Responsive sizing
+    double iconSize = screenWidth < 600 ? 18 : screenWidth * 0.025;
+    double fontSize = screenWidth < 600 ? 12 : screenWidth * 0.017;
+    double spacing = screenWidth < 600 ? 8 : screenWidth * 0.03;
+    double verticalSpacing =
+        screenHeight < 600 ? screenHeight * 0.05 : screenHeight * 0.095;
+
     return GestureDetector(
       onTap: onTap, // Handle tap event
-      child: Row(
-        children: [
-          // Adjusting the icon size based on screen width
-          Icon(
-            icon,
-            color: Colors.white,
-            size: screenWidth * 0.025, // Adjust icon size to 8% of screen width
-          ),
-          SizedBox(
-              width: screenWidth * 0.03), // Adjust space based on screen width
-
-          // Adjusting text size based on screen width
-          Text(
-            text,
-            style: TextStyle(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.005),
+        child: Row(
+          children: [
+            // Adjusting the icon size based on screen width
+            Icon(
+              icon,
               color: Colors.white,
-              fontSize:
-                  screenWidth * 0.017, // Adjust font size to 5% of screen width
+              size: iconSize,
             ),
-          ),
-          SizedBox(
-              height:
-                  screenHeight * 0.095), // Adjust space based on screen height
-        ],
+            SizedBox(width: spacing),
+
+            // Adjusting text size based on screen width
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: fontSize,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            SizedBox(height: verticalSpacing),
+          ],
+        ),
       ),
     );
   }

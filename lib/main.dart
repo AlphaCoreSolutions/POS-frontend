@@ -109,7 +109,12 @@ class _MainState extends State<Main> {
       home: Scaffold(
         body: Stack(
           children: [
-            DrawerPage(), // Your drawer (side menu)
+            Positioned(
+              left: 11,
+              top: 0,
+              bottom: 0,
+              child: DrawerPage(), // Your drawer (side menu)
+            ),
             MainPage(), // Main page remains the same
             if (!_loggedIn)
               Positioned.fill(

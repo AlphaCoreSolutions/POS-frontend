@@ -798,155 +798,164 @@ void _fetchOrdersForSelectedDateRange() async {
 
   /// Recent Orders Table
   Widget _buildRecentOrders(List<OrderDto> orders) {
-    return Container(
-      height: 600,
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 6,
-            spreadRadius: 2,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+            minHeight: 300,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            child: Column(
-              children: [
-                SizedBox(height: 0),
-              ],
-            ),
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                blurRadius: 6,
+                spreadRadius: 2,
+              ),
+            ],
           ),
-          SizedBox(height: 10),
-          Expanded(
-            child: ListView.builder(
-              itemCount: orders.length,
-              itemBuilder: (context, index) {
-                final order = orders[index];
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                child: Column(
+                  children: [
+                    SizedBox(height: 0),
+                  ],
+                ),
+              ),
+              SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final order = orders[index];
 
-                return Card(
-                  margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Order ID and Total
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Column(
+                            // Order ID and Total
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'Order ID: ${order.id}',
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
+                                Column(
+                                  children: [
+                                    Text(
+                                      'Order ID: ${order.id}',
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  children: [
+                                    Text(
+                                      'Total: \$${order.GrandTotal.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green),
+                                    ),
+                                    Text(
+                                      'Tips: ${order.tip.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFE2725B)),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            Column(
+                            SizedBox(height: 4),
+
+                            // Order Placed Date
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'Total: \$${order.GrandTotal.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green),
+                                FutureBuilder(
+                                  future: apiHandler
+                                      .fetchOrderDetailsById(order.id),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return Text('Loading...');
+                                    }
+                                    if (snapshot.hasError) {
+                                      return Text(
+                                          'Error fetching order details');
+                                    }
+                                    if (snapshot.hasData) {
+                                      var orderDetails = snapshot.data;
+                                      String formattedDate =
+                                          DateFormat('yyyy-MM-dd H:mm').format(
+                                        DateTime.parse(
+                                            orderDetails?['orderPlaced']),
+                                      );
+                                      return Text(
+                                        'Placed on: $formattedDate',
+                                        style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[800]),
+                                      );
+                                    }
+                                    return Text('Order not found');
+                                  },
                                 ),
                                 Text(
-                                  'Tips: ${order.tip.toStringAsFixed(2)}',
+                                  'Payment Method: ${order.PaymentMethod}',
                                   style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFFE2725B)),
+                                      color: Colors.grey[700]),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                        SizedBox(height: 4),
+                            SizedBox(height: 8),
 
-                        // Order Placed Date
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            FutureBuilder(
-                              future:
-                                  apiHandler.fetchOrderDetailsById(order.id),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return Text('Loading...');
-                                }
-                                if (snapshot.hasError) {
-                                  return Text('Error fetching order details');
-                                }
-                                if (snapshot.hasData) {
-                                  var orderDetails = snapshot.data;
-                                  String formattedDate =
-                                      DateFormat('yyyy-MM-dd H:mm').format(
-                                    DateTime.parse(
-                                        orderDetails?['orderPlaced']),
-                                  );
-                                  return Text(
-                                    'Placed on: $formattedDate',
-                                    style: TextStyle(
-                                        fontSize: 14, color: Colors.grey[800]),
-                                  );
-                                }
-                                return Text('Order not found');
-                              },
-                            ),
-                            Text(
-                              'Payment Method: ${order.PaymentMethod}',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[700]),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
+                            // Order Items List
+                            Column(
+                              children: order.orderItems.map((item) {
+                                return FutureBuilder(
+                                  future: apiHandler
+                                      .fetchProductDetails(item.productId),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return CircularProgressIndicator(
+                                        color: Color(0xFFB87333),
+                                      );
+                                    }
+                                    if (snapshot.hasError) {
+                                      return Text(
+                                          'Error fetching product details');
+                                    }
+                                    if (snapshot.hasData) {
+                                      var product = snapshot.data;
+                                      ordersList = orders;
 
-                        // Order Items List
-                        Column(
-                          children: order.orderItems.map((item) {
-                            return FutureBuilder(
-                              future: apiHandler
-                                  .fetchProductDetails(item.productId),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return CircularProgressIndicator(
-                                    color: Color(0xFFB87333),
-                                  );
-                                }
-                                if (snapshot.hasError) {
-                                  return Text('Error fetching product details');
-                                }
-                                if (snapshot.hasData) {
-                                  var product = snapshot.data;
-                                  ordersList = orders;
-
-                                  return Card(
-                                    margin: EdgeInsets.symmetric(vertical: 6),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10)),
-                                    elevation: 2,
-                                    child: ListTile(
-                                      /* leading: ClipRRect(
+                                      return Card(
+                                        margin:
+                                            EdgeInsets.symmetric(vertical: 6),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                        elevation: 2,
+                                        child: ListTile(
+                                          /* leading: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: (product?['productPicture'] != null && product?['productPicture'].isNotEmpty)
                                             ? Image.file( // Only display local file path images
@@ -962,81 +971,83 @@ void _fetchOrdersForSelectedDateRange() async {
                                                 fit: BoxFit.cover,
                                               ),
                                       ),*/
-                                      title: Text(
-                                        product?['productName'] ??
-                                            'Unknown Product',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w600),
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                              product?['productCategory'] ??
-                                                  'No Category',
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey)),
-                                          Text(
-                                              '${item.quantity} x \$${product?['sellingPrice'].toStringAsFixed(2)}',
-                                              style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.black)),
-                                        ],
-                                      ),
-                                      trailing: Text(
-                                        '\$${(item.quantity * (product?['sellingPrice'] ?? 0)).toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14),
-                                      ),
-                                    ),
+                                          title: Text(
+                                            product?['productName'] ??
+                                                'Unknown Product',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                  product?['productCategory'] ??
+                                                      'No Category',
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey)),
+                                              Text(
+                                                  '${item.quantity} x \$${product?['sellingPrice'].toStringAsFixed(2)}',
+                                                  style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.black)),
+                                            ],
+                                          ),
+                                          trailing: Text(
+                                            '\$${(item.quantity * (product?['sellingPrice'] ?? 0)).toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return Text('Product not found');
+                                  },
+                                );
+                              }).toList(),
+                            ),
+
+                            Divider(),
+
+                            // View Details Button
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFFE2725B),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: Icon(Icons.arrow_forward,
+                                    size: 18, color: Colors.white),
+                                label: Text(translation(context).viewDetails,
+                                    style: TextStyle(color: Colors.white)),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) =>
+                                            OrdersPage(), // Pass orderId here
+                                        settings:
+                                            RouteSettings(arguments: order.id)),
                                   );
-                                }
-                                return Text('Product not found');
-                              },
-                            );
-                          }).toList(),
-                        ),
-
-                        Divider(),
-
-                        // View Details Button
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFFE2725B),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                },
                               ),
                             ),
-                            icon: Icon(Icons.arrow_forward,
-                                size: 18, color: Colors.white),
-                            label: Text(translation(context).viewDetails,
-                                style: TextStyle(color: Colors.white)),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        OrdersPage(), // Pass orderId here
-                                    settings:
-                                        RouteSettings(arguments: order.id)),
-                              );
-                            },
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

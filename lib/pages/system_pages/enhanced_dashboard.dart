@@ -103,13 +103,27 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
                     const SizedBox(height: 20),
                     _buildSalesTrendChart(),
                     const SizedBox(height: 20),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildRevenueByHourChart()),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildPaymentDistributionChart()),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Stack vertically on mobile, side by side on desktop
+                        if (constraints.maxWidth < 900) {
+                          return Column(
+                            children: [
+                              _buildRevenueByHourChart(),
+                              const SizedBox(height: 16),
+                              _buildPaymentDistributionChart(),
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _buildRevenueByHourChart()),
+                            const SizedBox(width: 16),
+                            Expanded(child: _buildPaymentDistributionChart()),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 20),
                     _buildTopProductsSection(),
@@ -145,59 +159,68 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: [
-            _buildMetricCard(
-              'Today\'s Orders',
-              todayOrders.toString(),
-              Icons.shopping_cart,
-              Colors.blue,
-              context,
-            ),
-            _buildMetricCard(
-              'Today\'s Sales',
-              '\$${todaySales.toStringAsFixed(2)}',
-              Icons.attach_money,
-              Colors.green,
-              context,
-            ),
-            _buildMetricCard(
-              'Total Products',
-              totalProducts.toString(),
-              Icons.inventory,
-              Colors.purple,
-              context,
-            ),
-            _buildMetricCard(
-              'Total Customers',
-              totalCustomers.toString(),
-              Icons.people,
-              Colors.orange,
-              context,
-            ),
-            _buildMetricCard(
-              'Low Stock Alerts',
-              lowStockAlerts.toString(),
-              Icons.warning,
-              Colors.red,
-              context,
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate number of cards per row based on screen width
+            int crossAxisCount = 5; // Default for desktop
+            if (constraints.maxWidth < 600) {
+              crossAxisCount = 1; // Mobile: 1 card per row
+            } else if (constraints.maxWidth < 900) {
+              crossAxisCount = 2; // Tablet portrait: 2 cards per row
+            } else if (constraints.maxWidth < 1200) {
+              crossAxisCount = 3; // Tablet landscape: 3 cards per row
+            }
+
+            return GridView.count(
+              crossAxisCount: crossAxisCount,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: constraints.maxWidth < 600 ? 3 : 1.5,
+              children: [
+                _buildMetricCard(
+                  'Today\'s Orders',
+                  todayOrders.toString(),
+                  Icons.shopping_cart,
+                  Colors.blue,
+                ),
+                _buildMetricCard(
+                  'Today\'s Sales',
+                  '\$${todaySales.toStringAsFixed(2)}',
+                  Icons.attach_money,
+                  Colors.green,
+                ),
+                _buildMetricCard(
+                  'Total Products',
+                  totalProducts.toString(),
+                  Icons.inventory,
+                  Colors.purple,
+                ),
+                _buildMetricCard(
+                  'Total Customers',
+                  totalCustomers.toString(),
+                  Icons.people,
+                  Colors.orange,
+                ),
+                _buildMetricCard(
+                  'Low Stock Alerts',
+                  lowStockAlerts.toString(),
+                  Icons.warning,
+                  Colors.red,
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon,
-      Color color, BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardWidth = (screenWidth - 96) / 5; // 5 cards with spacing
-
+  Widget _buildMetricCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
-      width: cardWidth,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [color.withOpacity(0.7), color],
@@ -260,65 +283,70 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 250,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: true, drawVerticalLine: false),
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 5,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() < _salesTrend.length) {
-                            final date = DateTime.parse(
-                                _salesTrend[value.toInt()]['date']);
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                DateFormat('MM/dd').format(date),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final chartHeight = constraints.maxWidth < 600 ? 200.0 : 250.0;
+                return SizedBox(
+                  height: chartHeight,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: true, drawVerticalLine: false),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: 5,
+                            getTitlesWidget: (value, meta) {
+                              if (value.toInt() < _salesTrend.length) {
+                                final date = DateTime.parse(
+                                    _salesTrend[value.toInt()]['date']);
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    DateFormat('MM/dd').format(date),
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 50,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '\$${value.toInt()}',
                                 style: const TextStyle(fontSize: 10),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: const Color(0xFFB87333),
+                          barWidth: 3,
+                          dotData: FlDotData(show: true),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: const Color(0xFFB87333).withOpacity(0.2),
+                          ),
+                        ),
+                      ],
                     ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 50,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            '\$${value.toInt()}',
-                            style: const TextStyle(fontSize: 10),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      color: const Color(0xFFB87333),
-                      barWidth: 3,
-                      dotData: FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: const Color(0xFFB87333).withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -342,63 +370,68 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 200,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _revenueByHour.isNotEmpty
-                      ? ((_revenueByHour
-                                      .map((h) => h['totalRevenue'] ?? 0)
-                                      .reduce((a, b) => a > b ? a : b) ??
-                                  0) as num)
-                              .toDouble() *
-                          1.2
-                      : 100,
-                  barTouchData: BarTouchData(enabled: true),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 4,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            '${value.toInt()}h',
-                            style: const TextStyle(fontSize: 10),
-                          );
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles:
-                          SideTitles(showTitles: true, reservedSize: 40),
-                    ),
-                    topTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: _revenueByHour.map((hour) {
-                    final h = hour['hour'] ?? 0;
-                    final revenue =
-                        ((hour['totalRevenue'] ?? 0) as num).toDouble();
-                    return BarChartGroupData(
-                      x: h,
-                      barRods: [
-                        BarChartRodData(
-                          toY: revenue,
-                          color: const Color(0xFF36454F),
-                          width: 12,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(4)),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final chartHeight = constraints.maxWidth < 600 ? 180.0 : 200.0;
+                return SizedBox(
+                  height: chartHeight,
+                  child: BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: _revenueByHour.isNotEmpty
+                          ? ((_revenueByHour
+                                          .map((h) => h['totalRevenue'] ?? 0)
+                                          .reduce((a, b) => a > b ? a : b) ??
+                                      0) as num)
+                                  .toDouble() *
+                              1.2
+                          : 100,
+                      barTouchData: BarTouchData(enabled: true),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            interval: 4,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '${value.toInt()}h',
+                                style: const TextStyle(fontSize: 10),
+                              );
+                            },
+                          ),
                         ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
+                        leftTitles: AxisTitles(
+                          sideTitles:
+                              SideTitles(showTitles: true, reservedSize: 40),
+                        ),
+                        topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      barGroups: _revenueByHour.map((hour) {
+                        final h = hour['hour'] ?? 0;
+                        final revenue =
+                            ((hour['totalRevenue'] ?? 0) as num).toDouble();
+                        return BarChartGroupData(
+                          x: h,
+                          barRods: [
+                            BarChartRodData(
+                              toY: revenue,
+                              color: const Color(0xFF36454F),
+                              width: 12,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4)),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -422,30 +455,35 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sections: _paymentDistribution.map((item) {
-                    final percentage =
-                        ((item['percentage'] ?? 0) as num).toDouble();
-                    final method = item['paymentMethod'] ?? 'Unknown';
-                    return PieChartSectionData(
-                      value: percentage,
-                      title: '${percentage.toStringAsFixed(1)}%',
-                      radius: 80,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      color: _getColorForPaymentMethod(method),
-                    );
-                  }).toList(),
-                  sectionsSpace: 2,
-                  centerSpaceRadius: 30,
-                ),
-              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final chartHeight = constraints.maxWidth < 600 ? 180.0 : 200.0;
+                return SizedBox(
+                  height: chartHeight,
+                  child: PieChart(
+                    PieChartData(
+                      sections: _paymentDistribution.map((item) {
+                        final percentage =
+                            ((item['percentage'] ?? 0) as num).toDouble();
+                        final method = item['paymentMethod'] ?? 'Unknown';
+                        return PieChartSectionData(
+                          value: percentage,
+                          title: '${percentage.toStringAsFixed(1)}%',
+                          radius: 80,
+                          titleStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          color: _getColorForPaymentMethod(method),
+                        );
+                      }).toList(),
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 30,
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 16),
             ..._paymentDistribution.map((item) {
@@ -588,85 +626,91 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 250,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _topCategories.isNotEmpty
-                      ? ((_topCategories.first['totalRevenue'] ?? 0) as num)
-                              .toDouble() *
-                          1.2
-                      : 100,
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final category = _topCategories[group.x.toInt()];
-                        return BarTooltipItem(
-                          '${category['categoryName']}\n\$${rod.toY.toStringAsFixed(2)}',
-                          const TextStyle(color: Colors.white),
-                        );
-                      },
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() < _topCategories.length) {
-                            final name = _topCategories[value.toInt()]
-                                    ['categoryName'] ??
-                                '';
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                name.length > 8
-                                    ? '${name.substring(0, 8)}...'
-                                    : name,
-                                style: const TextStyle(fontSize: 10),
-                              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final chartHeight = constraints.maxWidth < 600 ? 200.0 : 250.0;
+                return SizedBox(
+                  height: chartHeight,
+                  child: BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: _topCategories.isNotEmpty
+                          ? ((_topCategories.first['totalRevenue'] ?? 0) as num)
+                                  .toDouble() *
+                              1.2
+                          : 100,
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            final category = _topCategories[group.x.toInt()];
+                            return BarTooltipItem(
+                              '${category['categoryName']}\n\$${rod.toY.toStringAsFixed(2)}',
+                              const TextStyle(color: Colors.white),
                             );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles:
-                          SideTitles(showTitles: true, reservedSize: 50),
-                    ),
-                    topTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: _topCategories.asMap().entries.map((entry) {
-                    final revenue =
-                        ((entry.value['totalRevenue'] ?? 0) as num).toDouble();
-                    return BarChartGroupData(
-                      x: entry.key,
-                      barRods: [
-                        BarChartRodData(
-                          toY: revenue,
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFFB87333),
-                              const Color(0xFFD4A574),
-                            ],
-                          ),
-                          width: 30,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(8)),
+                          },
                         ),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              if (value.toInt() < _topCategories.length) {
+                                final name = _topCategories[value.toInt()]
+                                        ['categoryName'] ??
+                                    '';
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    name.length > 8
+                                        ? '${name.substring(0, 8)}...'
+                                        : name,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles:
+                              SideTitles(showTitles: true, reservedSize: 50),
+                        ),
+                        topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      barGroups: _topCategories.asMap().entries.map((entry) {
+                        final revenue =
+                            ((entry.value['totalRevenue'] ?? 0) as num)
+                                .toDouble();
+                        return BarChartGroupData(
+                          x: entry.key,
+                          barRods: [
+                            BarChartRodData(
+                              toY: revenue,
+                              gradient: LinearGradient(
+                                colors: [
+                                  const Color(0xFFB87333),
+                                  const Color(0xFFD4A574),
+                                ],
+                              ),
+                              width: 30,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(8)),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -690,61 +734,69 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 250,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: true, drawVerticalLine: false),
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() < _monthlyComparison.length) {
-                            final monthName = _monthlyComparison[value.toInt()]
-                                    ['monthName'] ??
-                                '';
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                monthName,
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final chartHeight = constraints.maxWidth < 600 ? 200.0 : 250.0;
+                return SizedBox(
+                  height: chartHeight,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: true, drawVerticalLine: false),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              if (value.toInt() < _monthlyComparison.length) {
+                                final monthName =
+                                    _monthlyComparison[value.toInt()]
+                                            ['monthName'] ??
+                                        '';
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    monthName,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles:
+                              SideTitles(showTitles: true, reservedSize: 50),
+                        ),
+                        topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots:
+                              _monthlyComparison.asMap().entries.map((entry) {
+                            final sales =
+                                ((entry.value['totalSales'] ?? 0) as num)
+                                    .toDouble();
+                            return FlSpot(entry.key.toDouble(), sales);
+                          }).toList(),
+                          isCurved: true,
+                          color: const Color(0xFF36454F),
+                          barWidth: 3,
+                          dotData: FlDotData(show: true),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: const Color(0xFF36454F).withOpacity(0.2),
+                          ),
+                        ),
+                      ],
                     ),
-                    leftTitles: AxisTitles(
-                      sideTitles:
-                          SideTitles(showTitles: true, reservedSize: 50),
-                    ),
-                    topTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles:
-                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: _monthlyComparison.asMap().entries.map((entry) {
-                        final sales = ((entry.value['totalSales'] ?? 0) as num)
-                            .toDouble();
-                        return FlSpot(entry.key.toDouble(), sales);
-                      }).toList(),
-                      isCurved: true,
-                      color: const Color(0xFF36454F),
-                      barWidth: 3,
-                      dotData: FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: const Color(0xFF36454F).withOpacity(0.2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),

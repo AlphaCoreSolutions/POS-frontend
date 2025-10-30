@@ -221,66 +221,74 @@ class _ReportsPageState extends State<ReportsPage>
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          Container(
-            height: 300,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: _topSellingProducts.isNotEmpty
-                    ? (_topSellingProducts.first['totalQuantitySold'] ?? 0)
-                            .toDouble() *
-                        1.2
-                    : 100,
-                barTouchData: BarTouchData(enabled: true),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 &&
-                            value.toInt() < _topSellingProducts.length) {
-                          final product = _topSellingProducts[value.toInt()];
-                          final name = product['productName'] ?? '';
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              name.length > 10
-                                  ? '${name.substring(0, 10)}...'
-                                  : name,
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          );
-                        }
-                        return const Text('');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-                  ),
-                  topTitles:
-                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles:
-                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: _topSellingProducts.asMap().entries.map((entry) {
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: (entry.value['totalQuantitySold'] ?? 0).toDouble(),
-                        color: Color(0xFFB87333),
-                        width: 20,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(4)),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
+              return Container(
+                height: chartHeight,
+                child: BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: _topSellingProducts.isNotEmpty
+                        ? (_topSellingProducts.first['totalQuantitySold'] ?? 0)
+                                .toDouble() *
+                            1.2
+                        : 100,
+                    barTouchData: BarTouchData(enabled: true),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            if (value.toInt() >= 0 &&
+                                value.toInt() < _topSellingProducts.length) {
+                              final product =
+                                  _topSellingProducts[value.toInt()];
+                              final name = product['productName'] ?? '';
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  name.length > 10
+                                      ? '${name.substring(0, 10)}...'
+                                      : name,
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              );
+                            }
+                            return const Text('');
+                          },
+                        ),
                       ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
+                      leftTitles: AxisTitles(
+                        sideTitles:
+                            SideTitles(showTitles: true, reservedSize: 40),
+                      ),
+                      topTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    barGroups: _topSellingProducts.asMap().entries.map((entry) {
+                      return BarChartGroupData(
+                        x: entry.key,
+                        barRods: [
+                          BarChartRodData(
+                            toY: (entry.value['totalQuantitySold'] ?? 0)
+                                .toDouble(),
+                            color: Color(0xFFB87333),
+                            width: 20,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4)),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 20),
           _buildProductsList(),
@@ -311,30 +319,36 @@ class _ReportsPageState extends State<ReportsPage>
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          Container(
-            height: 300,
-            child: PieChart(
-              PieChartData(
-                sections: _salesByPaymentMethod.map((item) {
-                  final amount = ((item['totalAmount'] ?? 0) as num).toDouble();
-                  final percentage = total > 0 ? (amount / total * 100) : 0;
-                  return PieChartSectionData(
-                    value: amount,
-                    title: '${percentage.toStringAsFixed(1)}%',
-                    radius: 100,
-                    titleStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    color:
-                        _getColorForPaymentMethod(item['paymentMethod'] ?? ''),
-                  );
-                }).toList(),
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-              ),
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
+              return Container(
+                height: chartHeight,
+                child: PieChart(
+                  PieChartData(
+                    sections: _salesByPaymentMethod.map((item) {
+                      final amount =
+                          ((item['totalAmount'] ?? 0) as num).toDouble();
+                      final percentage = total > 0 ? (amount / total * 100) : 0;
+                      return PieChartSectionData(
+                        value: amount,
+                        title: '${percentage.toStringAsFixed(1)}%',
+                        radius: 100,
+                        titleStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        color: _getColorForPaymentMethod(
+                            item['paymentMethod'] ?? ''),
+                      );
+                    }).toList(),
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 40,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 20),
           ..._salesByPaymentMethod.map((item) {
@@ -383,67 +397,73 @@ class _ReportsPageState extends State<ReportsPage>
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          Container(
-            height: 300,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: _salesByCategory.isNotEmpty
-                    ? ((_salesByCategory.first['totalRevenue'] ?? 0) as num)
-                            .toDouble() *
-                        1.2
-                    : 100,
-                barTouchData: BarTouchData(enabled: true),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 &&
-                            value.toInt() < _salesByCategory.length) {
-                          final category = _salesByCategory[value.toInt()];
-                          final name = category['categoryName'] ?? '';
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              name.length > 10
-                                  ? '${name.substring(0, 10)}...'
-                                  : name,
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          );
-                        }
-                        return const Text('');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 50),
-                  ),
-                  topTitles:
-                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles:
-                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: _salesByCategory.asMap().entries.map((entry) {
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: ((entry.value['totalRevenue'] ?? 0) as num)
-                            .toDouble(),
-                        color: const Color(0xFF36454F),
-                        width: 20,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(4)),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
+              return Container(
+                height: chartHeight,
+                child: BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: _salesByCategory.isNotEmpty
+                        ? ((_salesByCategory.first['totalRevenue'] ?? 0) as num)
+                                .toDouble() *
+                            1.2
+                        : 100,
+                    barTouchData: BarTouchData(enabled: true),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            if (value.toInt() >= 0 &&
+                                value.toInt() < _salesByCategory.length) {
+                              final category = _salesByCategory[value.toInt()];
+                              final name = category['categoryName'] ?? '';
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  name.length > 10
+                                      ? '${name.substring(0, 10)}...'
+                                      : name,
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              );
+                            }
+                            return const Text('');
+                          },
+                        ),
                       ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
+                      leftTitles: AxisTitles(
+                        sideTitles:
+                            SideTitles(showTitles: true, reservedSize: 50),
+                      ),
+                      topTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles:
+                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    barGroups: _salesByCategory.asMap().entries.map((entry) {
+                      return BarChartGroupData(
+                        x: entry.key,
+                        barRods: [
+                          BarChartRodData(
+                            toY: ((entry.value['totalRevenue'] ?? 0) as num)
+                                .toDouble(),
+                            color: const Color(0xFF36454F),
+                            width: 20,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4)),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 20),
           ..._salesByCategory.map((item) {
