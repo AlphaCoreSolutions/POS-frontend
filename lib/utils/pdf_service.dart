@@ -703,7 +703,8 @@ class PdfService {
           pw.Column(
             children: [
               pw.Text('Revenue',
-                  style: pw.TextStyle(color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
+                  style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
               pw.SizedBox(height: 5),
               pw.Text('\$${revenue.toStringAsFixed(2)}',
                   style: pw.TextStyle(
@@ -715,7 +716,8 @@ class PdfService {
           pw.Column(
             children: [
               pw.Text('Cost',
-                  style: pw.TextStyle(color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
+                  style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
               pw.SizedBox(height: 5),
               pw.Text('\$${cost.toStringAsFixed(2)}',
                   style: pw.TextStyle(
@@ -727,7 +729,8 @@ class PdfService {
           pw.Column(
             children: [
               pw.Text('Profit',
-                  style: pw.TextStyle(color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
+                  style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
               pw.SizedBox(height: 5),
               pw.Text('\$${profit.toStringAsFixed(2)}',
                   style: pw.TextStyle(
@@ -739,7 +742,8 @@ class PdfService {
           pw.Column(
             children: [
               pw.Text('Margin',
-                  style: pw.TextStyle(color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
+                  style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xB3FFFFFF), fontSize: 12)),
               pw.SizedBox(height: 5),
               pw.Text('${margin.toStringAsFixed(1)}%',
                   style: pw.TextStyle(
