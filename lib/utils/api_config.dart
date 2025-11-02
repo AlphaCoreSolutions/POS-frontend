@@ -4,7 +4,7 @@ class ApiConfig {
   // Default base URLs for different environments
   static const String _localBaseUrl = "https://localhost:5001/api";
   static const String _productionBaseUrl = "http://posapi.alphacorecit.com/api";
-  static const String _stagingBaseUrl = "https://staging.alphacorecit.com/api";
+  static const String _stagingBaseUrl = "http://192.168.100.19/api";
 
   // Preference key for storing selected base URL
   static const String _baseUrlKey = 'api_base_url';
@@ -69,8 +69,8 @@ class ApiConfig {
     String formattedUrl = customUrl.endsWith('/api')
         ? customUrl
         : customUrl.endsWith('/')
-        ? '${customUrl}api'
-        : '$customUrl/api';
+            ? '${customUrl}api'
+            : '$customUrl/api';
 
     await _saveBaseUrl(formattedUrl);
     _currentBaseUrl = formattedUrl;
@@ -79,18 +79,18 @@ class ApiConfig {
 
   /// Get available environments
   static List<String> get availableEnvironments => [
-    LOCAL,
-    PRODUCTION,
-    STAGING,
-    CUSTOM,
-  ];
+        LOCAL,
+        PRODUCTION,
+        STAGING,
+        CUSTOM,
+      ];
 
   /// Get predefined URLs map
   static Map<String, String> get predefinedUrls => {
-    LOCAL: _localBaseUrl,
-    PRODUCTION: _productionBaseUrl,
-    STAGING: _stagingBaseUrl,
-  };
+        LOCAL: _localBaseUrl,
+        PRODUCTION: _productionBaseUrl,
+        STAGING: _stagingBaseUrl,
+      };
 
   /// Build full endpoint URL
   String buildUrl(String endpoint) {

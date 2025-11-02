@@ -12,7 +12,7 @@ This Flutter POS application now supports dynamic API base URL configuration tha
 ### 🌐 Predefined Environments
 - **Local Development**: `https://localhost:5001/api`
 - **Production**: `http://posapi.alphacorecit.com/api`
-- **Staging**: `https://staging.alphacorecit.com/api`
+- **Staging**: `http://192.168.100.19/api`
 - **Custom URL**: Set any custom API endpoint
 
 ## How to Use
@@ -57,7 +57,7 @@ String currentEnv = ApiConfig.instance.environment;
 |-------------|----------|----------|
 | Local | `https://localhost:5001/api` | Development & Testing |
 | Production | `http://posapi.alphacorecit.com/api` | Live Application |
-| Staging | `https://staging.alphacorecit.com/api` | Pre-production Testing |
+| Staging | `http://192.168.100.19/api` | Pre-production Testing |
 | Custom | User-defined | Special configurations |
 
 ## Technical Details
