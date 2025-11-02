@@ -39,7 +39,7 @@ class Main extends StatefulWidget {
     print("Setting new locale: $newLocale");
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _MainState? state = context.findAncestorStateOfType<_MainState>();
-      state.setLocale(newLocale);
+      state?.setLocale(newLocale);
     });
   }
 }
