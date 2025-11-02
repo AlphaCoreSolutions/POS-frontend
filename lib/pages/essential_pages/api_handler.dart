@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/customer_model.dart';
+import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/models/org_model.dart';
 import 'package:visionpos/models/product_model.dart';
-import 'package:visionpos/models/promoCodes_model.dart';
+import 'package:visionpos/models/promocodes_model.dart';
 import 'package:visionpos/models/supplier_model.dart';
 import 'package:visionpos/models/taxes_model.dart';
 import 'package:visionpos/models/user_model.dart';
@@ -1136,8 +1137,9 @@ class ApiHandler {
       var url = '$dashboardUri/PaymentMethodDistribution';
       final params = <String>[];
 
-      if (startDate != null)
+      if (startDate != null) {
         params.add('startDate=${startDate.toIso8601String()}');
+      }
       if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
       if (orgId != null) params.add('orgId=$orgId');
 
@@ -1272,8 +1274,9 @@ class ApiHandler {
       var url = '$reportsUri/SalesByPaymentMethod';
       final params = <String>[];
 
-      if (startDate != null)
+      if (startDate != null) {
         params.add('startDate=${startDate.toIso8601String()}');
+      }
       if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
       if (orgId != null) params.add('orgId=$orgId');
 
@@ -1297,8 +1300,9 @@ class ApiHandler {
       var url = '$reportsUri/SalesByCategory';
       final params = <String>[];
 
-      if (startDate != null)
+      if (startDate != null) {
         params.add('startDate=${startDate.toIso8601String()}');
+      }
       if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
       if (orgId != null) params.add('orgId=$orgId');
 
@@ -1323,8 +1327,9 @@ class ApiHandler {
       final params = <String>[];
 
       if (orgId != null) params.add('orgId=$orgId');
-      if (lowStockThreshold != null)
+      if (lowStockThreshold != null) {
         params.add('lowStockThreshold=$lowStockThreshold');
+      }
 
       if (params.isNotEmpty) url += '?${params.join('&')}';
 
@@ -1361,8 +1366,9 @@ class ApiHandler {
       var url = '$reportsUri/ProfitAnalysis';
       final params = <String>[];
 
-      if (startDate != null)
+      if (startDate != null) {
         params.add('startDate=${startDate.toIso8601String()}');
+      }
       if (endDate != null) params.add('endDate=${endDate.toIso8601String()}');
       if (orgId != null) params.add('orgId=$orgId');
 

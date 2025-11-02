@@ -2,7 +2,7 @@ import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/main.dart';
 import 'package:visionpos/language_changing/constants.dart';
 import 'package:visionpos/language_changing/languages.dart';
-import 'package:visionpos/models/promoCodes_model.dart';
+import 'package:visionpos/models/promocodes_model.dart';
 import 'package:visionpos/models/taxes_model.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/utils/session_manager.dart';
@@ -12,6 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
@@ -72,8 +74,8 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         selectedLanguage = language.languageCode;
       });
-      Locale _locale = await setLocale(language.languageCode);
-      Main.setLocale(context, _locale);
+      Locale locale = await setLocale(language.languageCode);
+      Main.setLocale(context, locale);
     }
   }
 
@@ -96,8 +98,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _showAddPromoCodeDialog() async {
-    final TextEditingController _promoCodeController = TextEditingController();
-    final TextEditingController _discountPercentageController =
+    final TextEditingController promoCodeController = TextEditingController();
+    final TextEditingController discountPercentageController =
         TextEditingController(); // New controller for percentage
     final orgId = await SessionManager.getOrganizationId();
 
@@ -120,7 +122,7 @@ class _SettingsPageState extends State<SettingsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                controller: _promoCodeController,
+                controller: promoCodeController,
                 decoration: InputDecoration(
                   hintText: 'Enter promo code',
                   focusedBorder: OutlineInputBorder(
@@ -131,7 +133,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: _discountPercentageController,
+                controller: discountPercentageController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   hintText: 'Enter discount percentage',
@@ -153,8 +155,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             TextButton(
               onPressed: () async {
-                String promoCode = _promoCodeController.text;
-                String discountText = _discountPercentageController.text;
+                String promoCode = promoCodeController.text;
+                String discountText = discountPercentageController.text;
                 double discountPercentage = 0.0;
 
                 if (promoCode.isNotEmpty && discountText.isNotEmpty) {
@@ -265,8 +267,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                   language.icon,
                                   color:
                                       selectedLanguage == language.languageCode
-                                      ? Color(0xFF8B5C42)
-                                      : Colors.grey,
+                                          ? Color(0xFF8B5C42)
+                                          : Colors.grey,
                                   size: 26,
                                 ),
                                 SizedBox(width: 12),
@@ -282,11 +284,11 @@ class _SettingsPageState extends State<SettingsPage> {
                                   duration: Duration(milliseconds: 200),
                                   child:
                                       selectedLanguage == language.languageCode
-                                      ? Icon(
-                                          Icons.check_circle,
-                                          color: Color(0xFF8B5C42),
-                                        )
-                                      : SizedBox.shrink(),
+                                          ? Icon(
+                                              Icons.check_circle,
+                                              color: Color(0xFF8B5C42),
+                                            )
+                                          : SizedBox.shrink(),
                                 ),
                               ],
                             ),
@@ -471,10 +473,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                     );
 
                                     if (confirm == true) {
-                                      final deleted = await _apiHandler
-                                          .deletePromoCode(
-                                            _promoCodes[index].id!,
-                                          );
+                                      final deleted =
+                                          await _apiHandler.deletePromoCode(
+                                        _promoCodes[index].id!,
+                                      );
                                       if (deleted) {
                                         setState(() {
                                           _promoCodes.removeAt(index);

@@ -2,7 +2,7 @@ import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 
 class ApiSettingsDialog extends StatefulWidget {
-  const ApiSettingsDialog({Key? key}) : super(key: key);
+  const ApiSettingsDialog({super.key});
 
   @override
   State<ApiSettingsDialog> createState() => _ApiSettingsDialogState();

@@ -5,6 +5,8 @@ import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 
 class CustomersPage extends StatefulWidget {
+  const CustomersPage({super.key});
+
   @override
   _CustomersPageState createState() => _CustomersPageState();
 }
@@ -225,9 +227,9 @@ class _CustomersPageState extends State<CustomersPage> {
                     child: ListTile(
                       leading: CircleAvatar(
                         radius: avatarRadius,
+                        backgroundColor: Colors.orange,
                         child: Text(customer.Name[0],
                             style: TextStyle(fontSize: titleFontSize)),
-                        backgroundColor: Colors.orange,
                       ),
                       title: Text(customer.Name,
                           style: TextStyle(

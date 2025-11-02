@@ -543,7 +543,7 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -640,7 +640,7 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -943,7 +943,7 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),

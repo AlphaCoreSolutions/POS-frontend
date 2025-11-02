@@ -1,5 +1,6 @@
 import 'dart:async';
 //import 'dart:io';
+import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/models/product_model.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/language_changing/constants.dart';
@@ -10,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart'; // For formatting dates
 
 class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
   @override
   _DashboardPageState createState() => _DashboardPageState();
 }

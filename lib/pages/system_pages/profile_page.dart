@@ -5,6 +5,8 @@ import 'package:visionpos/pages/edit_pages/edit_page.dart';
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+
   @override
   _ProfilePageState createState() => _ProfilePageState();
 }

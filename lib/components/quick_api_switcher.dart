@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 class QuickApiSwitcher extends StatelessWidget {
   final VoidCallback? onEnvironmentChanged;
 
-  const QuickApiSwitcher({Key? key, this.onEnvironmentChanged})
-      : super(key: key);
+  const QuickApiSwitcher({super.key, this.onEnvironmentChanged});
 
   @override
   Widget build(BuildContext context) {

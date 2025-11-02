@@ -408,7 +408,7 @@ class PdfService {
               _buildTableCell('${item['orderCount'] ?? 0}'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -450,7 +450,7 @@ class PdfService {
                   '\$${(item['totalRevenue'] ?? 0).toStringAsFixed(2)}'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -480,7 +480,7 @@ class PdfService {
                   '\$${(item['totalRevenue'] ?? 0).toStringAsFixed(2)}'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -516,7 +516,7 @@ class PdfService {
                   '\$${(item['grandTotal'] ?? 0).toStringAsFixed(2)}'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -551,7 +551,7 @@ class PdfService {
               _buildTableCell('\$${avg.toStringAsFixed(2)}'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -584,7 +584,7 @@ class PdfService {
                   '${(item['percentage'] ?? 0).toStringAsFixed(1)}%'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -646,7 +646,7 @@ class PdfService {
               _buildTableCell('⚠️ LOW'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -679,7 +679,7 @@ class PdfService {
               _buildTableCell('\$${value.toStringAsFixed(2)}'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -788,7 +788,7 @@ class PdfService {
               _buildTableCell('${margin.toStringAsFixed(1)}%'),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }

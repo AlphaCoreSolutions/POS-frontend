@@ -7,7 +7,8 @@ import 'package:visionpos/pages/essential_pages/MyHttpOverrides.dart';
 import 'package:visionpos/pages/system_pages/login_page.dart';
 import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
-//import 'package:provider/provider.dart';
+import 'package:provider/provider.dart';
+import 'package:visionpos/providers/pos_provider.dart' as pos_provider;
 //import 'package:visionpos/providers/locale_provider.dart'; // Import the provider for managing locale
 //import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:visionpos/components/side_menu.dart'; // Assuming side_menu.dart exists
@@ -48,7 +49,7 @@ class _MainState extends State<Main> {
   Locale? _locale;
   bool _loggedIn = false;
 
-  setLocale(Locale locale) {
+  void setLocale(Locale locale) {
     setState(() {
       _locale = locale;
     });
@@ -101,26 +102,31 @@ class _MainState extends State<Main> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      locale: _locale,
-      home: Scaffold(
-        body: Stack(
-          children: [
-            Positioned(
-              left: 11,
-              top: 0,
-              bottom: 0,
-              child: DrawerPage(), // Your drawer (side menu)
-            ),
-            MainPage(), // Main page remains the same
-            if (!_loggedIn)
-              Positioned.fill(
-                child: LoginScreen(onLoginSuccess: handleLoginSuccess),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => pos_provider.PosProvider()),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: _locale,
+        home: Scaffold(
+          body: Stack(
+            children: [
+              Positioned(
+                left: 11,
+                top: 0,
+                bottom: 0,
+                child: DrawerPage(), // Your drawer (side menu)
               ),
-          ],
+              MainPage(), // Main page remains the same
+              if (!_loggedIn)
+                Positioned.fill(
+                  child: LoginScreen(onLoginSuccess: handleLoginSuccess),
+                ),
+            ],
+          ),
         ),
       ),
     );

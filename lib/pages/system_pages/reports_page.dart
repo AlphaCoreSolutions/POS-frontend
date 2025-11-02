@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
@@ -100,8 +102,8 @@ class _ReportsPageState extends State<ReportsPage>
   Future<void> _exportCurrentTab() async {
     try {
       final currentTab = _tabController.index;
-      late final pdfBytes;
-      late final fileName;
+      late final Uint8List pdfBytes;
+      late final String fileName;
 
       switch (currentTab) {
         case 0: // Sales Overview
@@ -365,7 +367,7 @@ class _ReportsPageState extends State<ReportsPage>
           LayoutBuilder(
             builder: (context, constraints) {
               final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
-              return Container(
+              return SizedBox(
                 height: chartHeight,
                 child: BarChart(
                   BarChartData(
@@ -463,7 +465,7 @@ class _ReportsPageState extends State<ReportsPage>
           LayoutBuilder(
             builder: (context, constraints) {
               final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
-              return Container(
+              return SizedBox(
                 height: chartHeight,
                 child: PieChart(
                   PieChartData(
@@ -515,7 +517,7 @@ class _ReportsPageState extends State<ReportsPage>
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -541,7 +543,7 @@ class _ReportsPageState extends State<ReportsPage>
           LayoutBuilder(
             builder: (context, constraints) {
               final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
-              return Container(
+              return SizedBox(
                 height: chartHeight,
                 child: BarChart(
                   BarChartData(
@@ -628,7 +630,7 @@ class _ReportsPageState extends State<ReportsPage>
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -736,7 +738,7 @@ class _ReportsPageState extends State<ReportsPage>
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -795,7 +797,7 @@ class _ReportsPageState extends State<ReportsPage>
             Colors.purple,
           ),
           const SizedBox(height: 30),
-          Container(
+          SizedBox(
             height: 200,
             child: PieChart(
               PieChartData(

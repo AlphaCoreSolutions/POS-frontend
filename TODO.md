@@ -1,16 +1,38 @@
-# TODO: Make Non-Responsive Pages Responsive
+# Main Page Refactoring TODO
 
-## Steps to Complete
+## Phase 1: Preparation
+- [x] Create constants.dart for colors, sizes, and strings
+- [x] Create pos_provider.dart for state management using Provider
+- [x] Create services/ directory for business logic separation
 
-- [x] Update login_page.dart: Wrap main content in LayoutBuilder, make card width responsive (maxWidth based on screen width, e.g., <600: 90% width, else fixed 400), adjust padding dynamically.
-- [x] Update orderDetails_page.dart: Use LayoutBuilder for padding and card margins, adjust font sizes with MediaQuery.
-- [x] Update customers.dart: Implement adaptive list/grid layout using LayoutBuilder (list on mobile, grid on larger screens), adjust card sizes.
-- [x] Update profile_page.dart: Wrap in LayoutBuilder, adjust padding and avatar size based on screen width, use MediaQuery for font sizes.
-- [x] Update suppliers.dart: Similar to customers.dart, adaptive list/grid layout.
-- [x] Update support_page.dart: Use LayoutBuilder for padding and expansion tile sizes, adjust text sizes with MediaQuery.
-- [x] Test changes: Run Flutter app in web mode and verify responsiveness on different screen sizes using browser tools.
+## Phase 2: Extract Widgets
+- [ ] Create components/product_grid.dart
+- [ ] Create components/order_summary.dart
+- [ ] Create components/category_selector.dart
+- [ ] Create components/promo_code_section.dart
+- [ ] Create components/payment_section.dart
+- [ ] Create components/printer_section.dart
 
-## Notes
-- Use breakpoints: <600 mobile, 600-1200 tablet, >1200 desktop.
-- Ensure no hardcoded values; use proportional sizing.
-- After edits, run `flutter run --web` and use browser to resize window to test.
+## Phase 3: Business Logic Separation
+- [x] Create services/order_service.dart for order calculations
+- [x] Create services/print_service.dart for printing logic
+- [x] Create services/barcode_service.dart for barcode handling
+
+## Phase 4: Refactor Main Page
+- [x] Create components/product_grid.dart for product display
+- [x] Create components/order_summary.dart for order display
+- [x] Create components/category_selector.dart for category selection
+- [x] Create components/promo_code_section.dart for promo code input
+- [x] Create components/payment_section.dart for payment method toggle
+- [x] Create components/printer_section.dart for printer controls
+- [x] Remove unused code and variables from main_page.dart
+- [x] Integrate Provider for state management
+- [x] Add welcome message to order summary when no items selected
+- [ ] Replace large build method with smaller components
+- [ ] Add proper error handling and loading states
+
+## Phase 5: Testing and Cleanup
+- [ ] Test all functionalities (product selection, ordering, printing, barcode)
+- [ ] Verify responsiveness on different screen sizes
+- [ ] Ensure data reloading and lifecycle management work correctly
+- [ ] Clean up imports and dependencies

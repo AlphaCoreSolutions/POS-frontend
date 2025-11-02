@@ -185,7 +185,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 SizedBox(
                   height: 10,
                 ),
-                Container(
+                SizedBox(
                   height: 150,
                   child: categories.isEmpty
                       ? Center(
@@ -348,7 +348,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 SizedBox(
                   height: 10,
                 ),
-                Container(
+                SizedBox(
                   height: screenHeight * 0.65,
                   width: screenWidth * 0.9,
                   child: data.isEmpty

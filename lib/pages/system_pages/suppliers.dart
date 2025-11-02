@@ -5,6 +5,8 @@ import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 
 class SupplierPage extends StatefulWidget {
+  const SupplierPage({super.key});
+
   @override
   _SupplierPageState createState() => _SupplierPageState();
 }
@@ -187,15 +189,18 @@ class _SupplierPageState extends State<SupplierPage> {
           return FutureBuilder<List<Supplier>>(
             future: futureSuppliers,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
                     child: CircularProgressIndicator(
                   color: Color(0xFFB87333),
                 ));
-              if (snapshot.hasError)
+              }
+              if (snapshot.hasError) {
                 return Center(child: Text('Error: ${snapshot.error}'));
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return Center(child: Text('No suppliers found'));
+              }
 
               return ListView.builder(
                 itemCount: snapshot.data!.length,
@@ -208,9 +213,9 @@ class _SupplierPageState extends State<SupplierPage> {
                     child: ListTile(
                       leading: CircleAvatar(
                         radius: avatarRadius,
+                        backgroundColor: Colors.orange,
                         child: Text(supplier.Name[0],
                             style: TextStyle(fontSize: titleFontSize)),
-                        backgroundColor: Colors.orange,
                       ),
                       title: Text(supplier.Name,
                           style: TextStyle(

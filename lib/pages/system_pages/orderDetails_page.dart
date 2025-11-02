@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 class OrdersPage extends StatelessWidget {
   final ApiHandler apiHandler = ApiHandler();
 
+  OrdersPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     final int? orderId = ModalRoute.of(context)?.settings.arguments as int?;
@@ -73,7 +75,7 @@ class OrdersPage extends StatelessWidget {
                         trailing: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Tip: ${tip}'),
+                            Text('Tip: $tip'),
                             SizedBox(height: 5),
                             Text('Payment Method: $paymentMethod'),
                           ],
@@ -117,7 +119,7 @@ class OrdersPage extends StatelessWidget {
                           ),
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 );
               },

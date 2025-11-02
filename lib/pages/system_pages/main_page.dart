@@ -3,19 +3,29 @@ import 'dart:convert';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/language_changing/constants.dart';
-import 'package:visionpos/models/promoCodes_model.dart';
+import 'package:visionpos/models/promocodes_model.dart';
 import 'package:visionpos/models/taxes_model.dart';
 import 'package:visionpos/pages/add_pages/add_category.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/models/order_item_dto.dart';
+import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/utils/session_manager.dart';
 import 'package:visionpos/components/quick_api_switcher.dart';
+import 'package:visionpos/components/product_grid.dart';
+import 'package:visionpos/components/order_summary.dart';
+import 'package:visionpos/components/category_selector.dart';
+import 'package:visionpos/components/promo_code_section.dart';
+import 'package:visionpos/components/payment_section.dart';
+import 'package:visionpos/components/printer_section.dart';
+import 'package:visionpos/providers/pos_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -25,22 +35,15 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
+  late PosProvider _posProvider;
   final _barcodeController = TextEditingController();
   final _barcodeFocus = FocusNode();
-  String _barcodeBuffer = '';
-  late List<dynamic> data = [];
-  Product? selectedProduct;
-  List<Product> products = [];
-  bool isLoading = false;
-  List<Product> searchResults = [];
-  Product? productSearch;
+  final String _barcodeBuffer = '';
   OverlayEntry? overlayEntry;
   int userId = 1;
   int ordeId = 0;
   int? _orgId = 0;
-  // ignore: unused_field
-  List<Category> _categories = [];
-  bool _hasBeenInitialized = false;
+  final bool _hasBeenInitialized = false;
 
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
@@ -50,7 +53,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   Future<void> _loadCategories() async {
     if (_orgId != null) {
       final cats = await ApiHandler().getLeafCategoriesByOrg(_orgId!);
-      setState(() => _categories = cats);
       print(
           '📂 Main page loaded ${cats.length} categories for organization $_orgId');
     } else {
@@ -61,9 +63,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   // Method to reload all data when returning to main page
   Future<void> _reloadAllData() async {
     print('🔄 Reloading all data on main page...');
-    setState(() {
-      isLoading = true;
-    });
 
     try {
       // Reload products data
@@ -83,10 +82,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
       print('✅ Data reload completed');
     } catch (e) {
       print('❌ Error reloading data: $e');
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -114,31 +109,20 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     }
   }
 
-  //---------------------------------------------------------------
-  Category? selectedCategory;
-  List<Category> _all = [];
-  List<Category> _rootCategories = [];
-  List<Category> _activeSubs = [];
-  // ignore: unused_field
-  Category? _selectedRoot;
-  int? _selectedSubId;
   late final ScrollController _subsCtrl;
+  List<Category> _all = [];
   Map<int, String> get _catNameById => {
         for (final c in _all) c.id: c.categoryName,
       }; // _all: List<Category>
 
-  //--------------------------------------------------------------
+  //---------------------------------------------------------------
   ApiHandler apiHandler = ApiHandler();
   TextEditingController searchController = TextEditingController();
   final LayerLink _layerLink = LayerLink();
   //---------------------------------------------------------------
   List<OrderItemDto> selectedItems = [];
-  double subtotal = 0.0;
-  double taxes = 0.0;
-  double total = 0.0;
   Map<int, double> productPrices = {};
   double tips = 0.0;
-  //String orderStatus = '';
   String paymentMethod = 'Cash'; // Default payment method
   bool isCash = true; // Initially set to 'Cash'
   double switchScale = 0.8;
@@ -154,6 +138,11 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     return p == null || p == 0;
   }
 
+  Category? selectedCategory;
+  List<Category> _rootCategories = [];
+  List<Category> _activeSubs = [];
+  Category? _selectedRoot;
+  int? _selectedSubId;
   int? get selectedRootId => selectedCategory?.id;
   int? get selectedSubId => _selectedSubId;
   //---------------------------------------------------------------
@@ -164,7 +153,6 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   List<Promocodes> searchResultspromo = [];
   Promocodes? selectedPromoCode;
   double discount = 0.0;
-  double discountPercentage = 0.0;
   int orderCount = 0;
   //---------------------------------------------------------------
   Taxes? currentTaxes;
@@ -195,6 +183,9 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   String formattedTime = DateFormat('hh:mm a').format(DateTime.now());
 
   List<Category> _allCategories = [];
+  List<Product> data = [];
+  List<Product> searchResults = [];
+  Product? productSearch;
 
   // ignore: unused_element
   Future<void> _loadCats() async {
@@ -219,14 +210,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     for (final c in all) {
       _catById[c.id] = c;
       final parent = c.id;
-      if (parent != null) {
-        (_subIdsByRoot[parent] ??= <int>[]).add(c.id);
-      }
+      (_subIdsByRoot[parent] ??= <int>[]).add(c.id);
     }
   }
 
-  Map<int, Category> _catById = {};
-  Map<int, List<int>> _subIdsByRoot = {};
+  final Map<int, Category> _catById = {};
+  final Map<int, List<int>> _subIdsByRoot = {};
 
   void _onRootTap(Category? cat) {
     setState(() {
@@ -392,7 +381,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     );
 
     bytes += generator.text(
-      'Time: ${formattedTime}',
+      'Time: $formattedTime',
       styles: PosStyles(align: PosAlign.center, bold: true),
     );
 
@@ -413,7 +402,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     // Iterate over order items and fetch product info
     for (var item in order.orderItems) {
       // Fetch product details
-      Product product = await _getProductById(item.productId);
+      Product product = _getProductById(item.productId);
 
       // ignore: unnecessary_null_comparison
       if (product != null) {
@@ -530,12 +519,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
                 colorScheme: Theme.of(context).colorScheme.copyWith(
                       primary: const Color(0xFFB87333), // dark orange
                     ),
-                dialogBackgroundColor: Colors.grey[100],
                 textButtonTheme: TextButtonThemeData(
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF8B5C42), // brown
                   ),
                 ),
+                dialogTheme: DialogThemeData(backgroundColor: Colors.grey[100]),
               ),
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -1048,22 +1037,12 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
     // Add lifecycle observer for app state changes
     WidgetsBinding.instance.addObserver(this);
 
-    getData();
+    _posProvider = Provider.of<PosProvider>(context, listen: false);
+    _posProvider.initialize();
+
     _subsCtrl = ScrollController();
 
-    // Load organization ID first, then categories
-    _loadOrganizationId().then((_) {
-      _loadCategories();
-      categoryData();
-      // Mark initialization as complete
-      setState(() {
-        _hasBeenInitialized = true;
-      });
-    });
-
     requestPermissions();
-    apiHandler.fetchPromoCodes();
-    _fetchTaxes();
     getBluetoothDevices().then((_) {
       if (items.isNotEmpty) {
         Future.delayed(Duration.zero, () {
@@ -1100,7 +1079,8 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
         if (idx >= 0) {
           // 3a) If found, increment its quantity
-          selectedItems[idx].quantity += 1;
+          selectedItems[idx] = selectedItems[idx]
+              .updateQuantity(selectedItems[idx].quantity + 1);
         } else {
           // 3b) Otherwise add a brand‐new line
           selectedItems.add(OrderItemDto(productId: prod.id, quantity: 1));
@@ -1164,1230 +1144,156 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        double screenWidth = constraints.maxWidth;
-        double screenHeight = constraints.maxHeight;
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          transform: Matrix4.translationValues(xOffset, yOffset, 0)
-            ..scale(isDrawerOpen ? 0.85 : 1.0),
-          child: Scaffold(
-            appBar: AppBar(
-              title: Text(
-                AppLocalizations.of(context)!.welcomeMessage,
-                style: TextStyle(fontSize: screenWidth * 0.017),
-              ),
-              centerTitle: true,
-              backgroundColor: Color(0xFF36454F),
-              foregroundColor: Colors.white,
-              leading: GestureDetector(
-                onTap: toggleMenu,
-                child: Icon(isDrawerOpen ? Icons.arrow_back_ios : Icons.menu),
-              ),
-              actions: [
-                QuickApiSwitcher(),
-                SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: _showPrinterDialog,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: EdgeInsets.all(8), // Adjust button padding
-                    minimumSize: Size(24, 24), // Set minimum button size
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        20,
-                      ), // Rounded corners
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.print,
-                    size: 15, // Adjust icon size
-                    color: Color(0xFFB87333),
-                  ),
-                ),
-                SizedBox(width: 10),
-                Text(
-                  connected ? "Printer Connected" : "Printer Not Connected",
-                  style: TextStyle(
-                    color: connected ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  onPressed: () {
-                    _reloadAllData();
-                  },
-                ),
-              ],
-            ),
-            body: SingleChildScrollView(
-              child: SizedBox(
-                height: screenHeight * 1.1,
-                child: Padding(
-                  padding: EdgeInsets.all(screenWidth < 600 ? 8.0 : 16.0),
-                  child: Row(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('POS System'),
+        backgroundColor: const Color(0xFFB87333),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: toggleMenu,
+        ),
+      ),
+      body: Stack(
+        children: [
+          // Main content
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            transform: Matrix4.translationValues(xOffset, yOffset, 0)
+              ..scale(isDrawerOpen ? 0.85 : 1.0),
+            child: Row(
+              children: [
+                // Left side: Categories and Products
+                Expanded(
+                  flex: 2,
+                  child: Column(
                     children: [
-                      // Left Section - Main content (Products and Categories)
-                      Expanded(
-                        flex: screenWidth < 900 ? 5 : 3, // More space on mobile
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Search Bar
-                            CompositedTransformTarget(
-                              link:
-                                  _layerLink, // This should be defined as LayerLink _layerLink = LayerLink();
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  right: screenWidth * 0.13,
-                                ),
-                                child: TextField(
-                                  controller: searchController,
-                                  decoration: InputDecoration(
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal:
-                                          MediaQuery.of(context).size.width *
-                                              0.02, // Horizontal padding
-                                      vertical:
-                                          MediaQuery.of(context).size.height *
-                                              0.01, // Vertical padding
-                                    ),
-                                    labelText: translation(context).search,
-                                    labelStyle: TextStyle(
-                                      fontSize:
-                                          MediaQuery.of(context).size.width *
-                                              0.02,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        width: 1.0,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    prefixIcon: Icon(
-                                      Icons.search,
-                                      size: MediaQuery.of(context).size.height *
-                                          0.035,
-                                    ),
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: MediaQuery.of(context)
-                                            .size
-                                            .width *
-                                        0.02, // Set text size to 3.5% of screen width
-                                  ),
-                                  onChanged: (query) {
-                                    findProduct(query);
-                                  },
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              height: screenHeight * 0.01,
-                            ), // Space between the search bar and the grid view
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context)!.categories,
-                                  style: TextStyle(
-                                    fontSize: screenWidth * 0.022,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color.fromARGB(197, 0, 0, 0),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            // Category Grid View
-                            // Main category row (horizontal)
-                            SizedBox(
-                              height: screenHeight * 0.18,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _rootCategories.length + 1,
-                                itemBuilder: (context, index) {
-                                  final isAll = index == 0;
-                                  final cat =
-                                      isAll ? null : _rootCategories[index - 1];
-                                  final name =
-                                      isAll ? 'All' : cat!.categoryName;
-
-                                  return GestureDetector(
-                                    onTap: () => _onRootTap(cat),
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                      ),
-                                      width: screenWidth * 0.13,
-                                      child: Card(
-                                        elevation: 3,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            name,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: screenWidth * 0.016,
-                                              fontWeight: FontWeight.bold,
-                                              color: const Color.fromARGB(
-                                                166,
-                                                0,
-                                                0,
-                                                0,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-
-                            // Animated subcategory rail (vertical, compact)
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 250),
-                              key: ValueKey(_activeSubs.length),
-                              curve: Curves.easeOut,
-                              child: _activeSubs.isEmpty
-                                  ? const SizedBox.shrink()
-                                  : SizedBox(
-                                      height: screenHeight * 0.16,
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: screenWidth * 0.12,
-                                            margin: const EdgeInsets.only(
-                                              left: 4,
-                                              right: 8,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              border: Border.all(
-                                                color: Colors.grey.shade200,
-                                              ),
-                                            ),
-                                            child: Scrollbar(
-                                              controller: _subsCtrl,
-                                              thumbVisibility: true,
-                                              interactive: true,
-                                              child: ListView.separated(
-                                                controller: _subsCtrl,
-                                                primary: false,
-                                                padding: const EdgeInsets.all(
-                                                  10,
-                                                ),
-                                                physics:
-                                                    const BouncingScrollPhysics(),
-                                                itemCount: _activeSubs.length,
-                                                separatorBuilder: (_, __) =>
-                                                    const SizedBox(height: 8),
-                                                itemBuilder: (context, i) {
-                                                  final sub = _activeSubs[i];
-                                                  final selected =
-                                                      sub.id == _selectedSubId;
-                                                  final cs = Theme.of(
-                                                    context,
-                                                  ).colorScheme;
-
-                                                  return Material(
-                                                    color: selected
-                                                        ? cs.primary
-                                                            .withOpacity(0.08)
-                                                        : Colors.white,
-                                                    elevation: selected ? 2 : 0,
-                                                    shadowColor: cs.primary
-                                                        .withOpacity(0.15),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                      12,
-                                                    ),
-                                                    child: InkWell(
-                                                      onTap: () {
-                                                        setState(
-                                                          () => _selectedSubId =
-                                                              sub.id,
-                                                        );
-                                                        _onSubTap(sub);
-                                                      },
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                        12,
-                                                      ),
-                                                      child: AnimatedContainer(
-                                                        duration:
-                                                            const Duration(
-                                                          milliseconds: 160,
-                                                        ),
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                          vertical: 10,
-                                                          horizontal: 12,
-                                                        ),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(
-                                                            12,
-                                                          ),
-                                                          border: Border.all(
-                                                            color: selected
-                                                                ? cs.primary
-                                                                : Colors.grey
-                                                                    .withOpacity(
-                                                                    0.22,
-                                                                  ),
-                                                            width: selected
-                                                                ? 1.25
-                                                                : 1,
-                                                          ),
-                                                        ),
-                                                        child: Row(
-                                                          children: [
-                                                            // circular icon chip
-                                                            AnimatedContainer(
-                                                              color: selected
-                                                                  ? cs.primary
-                                                                  : Colors.grey
-                                                                      .withOpacity(
-                                                                      0.18,
-                                                                    ),
-                                                              duration:
-                                                                  const Duration(
-                                                                milliseconds:
-                                                                    160,
-                                                              ),
-                                                              width: 28,
-                                                              height: 28,
-                                                              alignment:
-                                                                  Alignment
-                                                                      .center,
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                shape: BoxShape
-                                                                    .circle,
-                                                                color: selected
-                                                                    ? cs.primary
-                                                                        .withOpacity(
-                                                                        0.18,
-                                                                      )
-                                                                    : Colors
-                                                                        .grey
-                                                                        .shade200,
-                                                              ),
-                                                              child: Icon(
-                                                                Icons
-                                                                    .label_rounded,
-                                                                size: 16,
-                                                                color: selected
-                                                                    ? cs.primary
-                                                                    : Colors
-                                                                        .grey
-                                                                        .shade700,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 10,
-                                                            ),
-                                                            // name
-                                                            Expanded(
-                                                              child: Text(
-                                                                sub.categoryName,
-                                                                maxLines: 1,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style:
-                                                                    TextStyle(
-                                                                  color:
-                                                                      const Color(
-                                                                    0xFF36454F,
-                                                                  ),
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                  fontSize:
-                                                                      screenWidth *
-                                                                          0.011,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 6,
-                                                            ),
-                                                            // chevron
-                                                            Icon(
-                                                              Icons
-                                                                  .chevron_right_rounded,
-                                                              size: 18,
-                                                              color: selected
-                                                                  ? cs.primary
-                                                                  : Colors.grey
-                                                                      .shade600,
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-
-                            SizedBox(height: screenHeight * 0.01),
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: 8.0,
-                                right: 50.0,
-                                bottom: screenHeight * 0.005,
-                                top: 8.0,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    AppLocalizations.of(context)!.products,
-                                    style: TextStyle(
-                                      fontSize: screenWidth * 0.022,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color.fromARGB(197, 0, 0, 0),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Product Grid View
-                            Expanded(
-                              child: data.isEmpty
-                                  ? Center(
-                                      child: Text(
-                                        translation(
-                                          context,
-                                        ).no_available_products,
-                                      ),
-                                    )
-                                  : Builder(
-                                      builder: (context) {
-                                        final int? selectedSubId =
-                                            _selectedSubId; // if you use subs
-                                        // filter by ID, not by name
-                                        final rootSubIds = (selectedRootId ==
-                                                null)
-                                            ? const <int>[]
-                                            : _allCategories
-                                                .where(
-                                                  (c) =>
-                                                      _toInt(c.id) ==
-                                                      _toInt(selectedRootId),
-                                                )
-                                                .map(
-                                                  (c) => _toInt(
-                                                    c.mainCategoryId,
-                                                  )!,
-                                                )
-                                                .toList();
-
-                                        final filteredProducts = data.where((
-                                          p,
-                                        ) {
-                                          final int? pCatId = _toInt(
-                                            p.ProductCategory,
-                                          );
-                                          if (pCatId == null) return false;
-
-                                          final bool matchesRoot =
-                                              (selectedRootId == null) ||
-                                                  pCatId ==
-                                                      _toInt(selectedRootId) ||
-                                                  rootSubIds.contains(pCatId);
-
-                                          final bool matchesSub =
-                                              (selectedSubId == null) ||
-                                                  (pCatId ==
-                                                      _toInt(selectedSubId));
-
-                                          return matchesRoot && matchesSub;
-                                        }).toList();
-
-                                        return LayoutBuilder(
-                                          builder: (context, constraints) {
-                                            // Responsive crossAxisCount based on width
-                                            int crossAxisCount =
-                                                constraints.maxWidth < 600
-                                                    ? 2
-                                                    : constraints.maxWidth < 900
-                                                        ? 3
-                                                        : constraints.maxWidth <
-                                                                1200
-                                                            ? 4
-                                                            : 5;
-
-                                            return GridView.builder(
-                                              gridDelegate:
-                                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: crossAxisCount,
-                                                crossAxisSpacing: 10,
-                                                mainAxisSpacing: 10,
-                                                childAspectRatio: 1.2,
-                                              ),
-                                              itemCount: filteredProducts
-                                                  .length, // use filtered length
-                                              itemBuilder: (context, index) {
-                                                final product =
-                                                    filteredProducts[index];
-
-                                                // look up the category name from its id
-                                                final categoryName =
-                                                    _catNameById[product
-                                                            .ProductCategory] ??
-                                                        'Uncategorized';
-
-                                                return GestureDetector(
-                                                  onTap: () {
-                                                    setState(
-                                                      () => addToOrder(product),
-                                                    );
-                                                  },
-                                                  child: Card(
-                                                    elevation: 3,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              10),
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        // Product Name
-                                                        Text(
-                                                          product.ProductName,
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.014,
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                        ),
-                                                        // Category Name
-                                                        Text(
-                                                          categoryName,
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.011,
-                                                            color: Colors.grey,
-                                                          ),
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                        ),
-                                                        // Price
-                                                        Text(
-                                                          '${product.SellingPrice.toStringAsFixed(2)} JOD',
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.012,
-                                                            color: Colors.green,
-                                                          ),
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
-                                        );
-                                      },
-                                    ),
-                            ),
-                          ],
-                        ),
+                      // Category Selector
+                      CategorySelector(
+                        rootCategories: _posProvider.rootCategories,
+                        activeSubs: _posProvider.activeSubs,
+                        selectedCategory: _posProvider.selectedCategory,
+                        selectedSubId: _posProvider.selectedSubId,
+                        onRootTap: _posProvider.selectRootCategory,
+                        onSubTap: _posProvider.selectSubCategory,
                       ),
-
-                      // Right Section - Order Details
+                      // Product Grid
                       Expanded(
-                        flex:
-                            screenWidth < 900 ? 3 : 2, // Adjust flex for mobile
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 20),
-                          child: SingleChildScrollView(
-                            child: Container(
-                              constraints: BoxConstraints(
-                                minHeight: screenHeight * 0.8,
-                                maxHeight: screenHeight * 2.3,
-                              ),
-                              padding:
-                                  EdgeInsets.all(screenWidth < 600 ? 8 : 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 8,
-                                    spreadRadius: 4,
-                                  ),
-                                ],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    AppLocalizations.of(context)!.orders,
-                                    style: TextStyle(
-                                      fontSize: screenWidth * 0.022,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color.fromARGB(197, 0, 0, 0),
-                                    ),
-                                  ),
-                                  SizedBox(height: screenHeight * 0.01),
-
-                                  // Display selected products
-                                  if (selectedItems.isNotEmpty)
-                                    Expanded(
-                                      child: ListView.builder(
-                                        itemCount: selectedItems.length,
-                                        itemBuilder: (context, index) {
-                                          final selected = selectedItems[index];
-                                          // Cast data to List<Product> and fetch the product details
-                                          final product = _getProductById(
-                                            selected.productId,
-                                          );
-                                          return Card(
-                                            elevation: 4,
-                                            margin: EdgeInsets.only(
-                                              bottom: screenHeight * 0.02,
-                                            ),
-                                            child: Padding(
-                                              padding: EdgeInsets.all(
-                                                screenWidth * 0.0008,
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  SizedBox(
-                                                    width: screenWidth * 0.001,
-                                                  ),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        // Adding ListTile here
-                                                        ListTile(
-                                                          title: Text(
-                                                            product.ProductName,
-                                                            style: TextStyle(
-                                                              fontSize:
-                                                                  screenWidth *
-                                                                      0.013,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            ),
-                                                          ),
-                                                          subtitle: Text(
-                                                            'Quantity: ${selected.quantity}',
-                                                            style: TextStyle(
-                                                              fontSize:
-                                                                  screenWidth *
-                                                                      0.013,
-                                                            ),
-                                                          ),
-                                                          trailing: Text(
-                                                            '${product.SellingPrice.toStringAsFixed(2)} JOD',
-                                                            style: TextStyle(
-                                                              fontSize:
-                                                                  screenWidth *
-                                                                      0.015,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color:
-                                                                  Colors.green,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Row(
-                                                    children: [
-                                                      IconButton(
-                                                        icon: Icon(
-                                                          Icons.remove_circle,
-                                                          color: Colors.red,
-                                                        ),
-                                                        onPressed: () =>
-                                                            _removeProductFromOrder(
-                                                          index,
-                                                        ),
-                                                      ),
-                                                      IconButton(
-                                                        icon: Icon(
-                                                          Icons.add_circle,
-                                                          color: Colors.green,
-                                                        ),
-                                                        onPressed: () =>
-                                                            _addQuantity(index),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  // Divider line
-                                  Divider(height: 7, color: Colors.black45),
-                                  // Promo Code Section
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: CompositedTransformTarget(
-                                            link: _layerLinkpromo,
-                                            child: LayoutBuilder(
-                                              builder: (context, constraints) {
-                                                double textFieldWidth = constraints
-                                                        .maxWidth *
-                                                    0.8; // Adjust width dynamically
-                                                double textSize = screenWidth *
-                                                    0.013; // Adjust font size dynamically
-                                                double paddingHorizontal =
-                                                    screenWidth *
-                                                        0.02; // Adjust padding dynamically
-                                                double paddingVertical =
-                                                    screenHeight * 0.015;
-
-                                                return Container(
-                                                  width:
-                                                      textFieldWidth, // Ensure it scales dynamically
-                                                  child: TextField(
-                                                    controller:
-                                                        promoCodeController,
-                                                    style: TextStyle(
-                                                      fontSize: textSize,
-                                                    ),
-                                                    decoration: InputDecoration(
-                                                      labelText:
-                                                          AppLocalizations.of(
-                                                        context,
-                                                      )!
-                                                              .discount,
-                                                      labelStyle: TextStyle(
-                                                        fontSize: textSize,
-                                                      ),
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                      contentPadding:
-                                                          EdgeInsets.symmetric(
-                                                        horizontal:
-                                                            paddingHorizontal,
-                                                        vertical:
-                                                            paddingVertical,
-                                                      ),
-                                                    ),
-                                                    onChanged: findPromoCode,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: screenWidth * 0.01),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            // Handle promo code validation here
-
-                                            if (selectedPromoCode != null) {
-                                              setState(() {
-                                                // Here you can add your validation logic
-                                                // If valid, update the selectedPromoCode text
-                                                // If not valid, you can show an error or reset the value
-                                              });
-                                            } else {
-                                              // If no promo code selected, you can show an error or message
-                                              setState(() {
-                                                // Optionally show an error if no promo code is selected
-                                                selectedPromoCode =
-                                                    null; // Reset or handle the case where no promo code is selected
-                                              });
-                                            }
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Color(0xFFB87333),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 16,
-                                              horizontal: 16,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                10,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            AppLocalizations.of(context)!.ok,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  //tips section
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.001,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: SizedBox(
-                                            width: screenWidth *
-                                                0.2, // Adjust width as needed
-                                            height: screenHeight *
-                                                0.08, // Adjust height as needed
-                                            child: TextField(
-                                              controller: _tipController,
-                                              keyboardType:
-                                                  TextInputType.number,
-                                              decoration: InputDecoration(
-                                                hintText: 'Enter tip amount',
-                                                border: OutlineInputBorder(),
-                                              ),
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  tips =
-                                                      double.tryParse(value) ??
-                                                          0.0;
-                                                });
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Divider line (for discount section)
-                                  Divider(
-                                    height: screenHeight * 0.02,
-                                    color: Colors.black45,
-                                  ),
-                                  /*
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: [
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          selectedTaxType =
-                                              'In-House'; // Switch to In-House tax
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(0xFFB87333),
-                                        foregroundColor: Colors.white,
-                                        padding: EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12), // Reduce padding
-                                        minimumSize:
-                                            Size(100, 45), // Adjust button size
-                                        textStyle: TextStyle(
-                                            fontSize: 14), // Make text smaller
-                                      ),
-                                      child: Text('In-House Tax'),
-                                    ),
-                                    SizedBox(
-                                        height:
-                                            8), // Reduce spacing between buttons
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          selectedTaxType =
-                                              'Takeout'; // Switch to Takeout tax
-                                        });
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color(0xFFB87333),
-                                        foregroundColor: Colors.white,
-                                        padding: EdgeInsets.symmetric(
-                                            vertical: 8, horizontal: 12),
-                                        minimumSize: Size(100, 45),
-                                        textStyle: TextStyle(fontSize: 14),
-                                      ),
-                                      child: Text('Takeout Tax'),
-                                    ),
-                                  ],
-                                ),
-
-                            */
-                                  // Discount Section
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          AppLocalizations.of(context)!
-                                              .discount,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: screenWidth * 0.0115,
-                                          ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              selectedPromoCode != null
-                                                  ? '${selectedPromoCode!.PromoCode} (%${selectedPromoCode!.Percentage})' // Safe to access since we checked for null
-                                                  : 'No Promo Code', // Default text if no promo code is selected
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.red,
-                                                fontSize: screenWidth * 0.013,
-                                              ),
-                                            ),
-                                            // Add the circular "X" button
-                                            if (selectedPromoCode != null)
-                                              GestureDetector(
-                                                onTap: () {
-                                                  setState(() {
-                                                    // Reset discount and selectedPromoCode when the "X" is tapped
-                                                    discount = 0.0;
-                                                    selectedPromoCode = null;
-                                                  });
-                                                },
-                                                child: Container(
-                                                  margin: EdgeInsets.only(
-                                                    left: 8.0,
-                                                  ),
-                                                  width:
-                                                      24.0, // Set the size of the circle
-                                                  height:
-                                                      24.0, // Set the size of the circle
-                                                  decoration: BoxDecoration(
-                                                    color: Colors
-                                                        .red, // Circle color
-                                                    shape: BoxShape
-                                                        .circle, // Make the container circular
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.close, // The "X" icon
-                                                    color: Colors
-                                                        .white, // Icon color
-                                                    size: 16.0, // Icon size
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.001,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Payment Method', // You can change this to any localized text
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: screenWidth *
-                                                0.0115, // Adjust text size based on screen width
-                                          ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              paymentMethod, // Show the current payment method
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: screenWidth *
-                                                    0.0115, // Adjust text size based on screen width
-                                              ),
-                                            ),
-                                            Transform.scale(
-                                              scale:
-                                                  switchScale, // Adjust the scale to change the switch size
-                                              child: Switch(
-                                                value: isCash, // Toggle value
-                                                onChanged:
-                                                    _togglePaymentMethod, // Update payment method on change
-                                                activeColor: Colors
-                                                    .green, // Color when 'Visa' is selected
-                                                inactiveThumbColor: Colors
-                                                    .blue, // Color when 'Cash' is selected
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Subtotal
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          AppLocalizations.of(context)!.total,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: screenWidth * 0.0115,
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_calculateSubtotal(selectedItems).toStringAsFixed(2)} JOD',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Taxes
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${AppLocalizations.of(context)!.tax} (${selectedTaxType == "In-House" ? currentTaxes?.inHouse ?? 0 : currentTaxes?.takeOut ?? 0}%)',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: screenWidth * 0.0115,
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_calculateTaxes(selectedItems).toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Total
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: screenHeight * 0.01,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${AppLocalizations.of(context)!.grandTotal} - %${discount.toStringAsFixed(0)}',
-                                          style: TextStyle(
-                                            fontSize: screenWidth * 0.015,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Text(
-                                          '${_calculateTotal(selectedItems).toStringAsFixed(2)} JOD',
-                                          style: TextStyle(
-                                            fontSize: screenWidth * 0.016,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Checkout Button
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceAround,
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: () async {
-                                          submitOrder(); // First, submit the order
-                                          // Then, print the receipt
-                                          _printReceipt();
-                                          orderCount++;
-                                          setState(() {
-                                            tips = 0.0;
-                                            _tipController.clear();
-                                          });
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Color(0xFFB87333),
-                                          foregroundColor: Colors.white,
-                                          minimumSize: Size(
-                                            MediaQuery.of(context).size.width *
-                                                0.01,
-                                            40,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                            horizontal: 32,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          AppLocalizations.of(context)!
-                                              .checkout,
-                                          style: TextStyle(
-                                            fontSize: screenWidth * 0.015,
-                                          ),
-                                        ),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () {},
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Color(0xFF8B5C42),
-                                          foregroundColor: Colors.white,
-                                          minimumSize: Size(
-                                            MediaQuery.of(context).size.width *
-                                                0.01,
-                                            40,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                            horizontal: 30,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          AppLocalizations.of(
-                                            context,
-                                          )!
-                                              .printReceipt,
-                                          style: TextStyle(
-                                            fontSize: screenWidth * 0.011,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  /*
-                                      // Charge button
-                                      SizedBox(height: screenHeight * 0.03),
-                                      Center(
-                                      child: ElevatedButton(
-                                        onPressed:_chargeOrder,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          foregroundColor: Colors.white,
-                                          minimumSize: Size(MediaQuery.of(context).size.width * 0.1, 50),
-                                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 70),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        ),
-                                        child: selectedItems.isNotEmpty
-                                            ? Text('Charge \$${_calculateTotal(selectedItems).toStringAsFixed(2)}', style: TextStyle(fontSize: screenWidth * 0.0165))
-                                            : Text(AppLocalizations.of(context)!.noData,textAlign: TextAlign.center ,style: TextStyle(fontSize: screenWidth * 0.0165, color: Colors.white,)),
-                                      ),
-                                    ),
-                                    */
-                                ],
-                              ),
-                            ),
-                          ),
+                        child: ProductGrid(
+                          products: _posProvider.products,
+                          allCategories: _posProvider.categories,
+                          selectedRootId: _posProvider.selectedRootId,
+                          selectedSubId: _posProvider.selectedSubId,
+                          onProductTap: _posProvider.addToOrder,
                         ),
-                      ),
-                      // In your State class:
-
-                      // 1) Put this in your widget tree—e.g. at the end of your Stack:
-                      Focus(
-                        focusNode: _barcodeFocus,
-                        autofocus: true,
-                        onKey: (FocusNode node, RawKeyEvent event) {
-                          // 1) When keys come down, accumulate their characters
-                          if (event is RawKeyDownEvent &&
-                              event.character != null &&
-                              event.character!.isNotEmpty) {
-                            _barcodeBuffer += event.character!;
-                            return KeyEventResult.handled;
-                          }
-                          // 2) On key-up of ENTER, submit the whole buffer once
-                          if (event.logicalKey == LogicalKeyboardKey.enter &&
-                              event is RawKeyUpEvent) {
-                            _onBarcodeSubmitted(_barcodeBuffer);
-                            _barcodeBuffer = '';
-                            return KeyEventResult.handled;
-                          }
-                          return KeyEventResult.ignored;
-                        },
-                        child:
-                            const SizedBox.shrink(), // zero footprint, no IME
                       ),
                     ],
                   ),
                 ),
+                // Right side: Order Summary and Controls
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    children: [
+                      // Order Summary
+                      Expanded(
+                        flex: 2,
+                        child: OrderSummary(
+                          selectedItems: _posProvider.selectedItems,
+                          products: _posProvider.products,
+                          onRemoveProduct: _posProvider.removeFromOrder,
+                          onAddQuantity: _posProvider.addQuantity,
+                        ),
+                      ),
+                      // Promo Code Section
+                      PromoCodeSection(
+                        promoCodeController: promoCodeController,
+                        layerLink: _layerLinkpromo,
+                        onFindPromoCode: findPromoCode,
+                        onValidatePromoCode: () {},
+                        selectedPromoCode: _posProvider.selectedPromoCode,
+                        onRemovePromoCode: _posProvider.removePromoCode,
+                      ),
+                      // Payment Section
+                      PaymentSection(
+                        paymentMethod: _posProvider.paymentMethod,
+                        isCash: _posProvider.isCash,
+                        onTogglePaymentMethod: (value) =>
+                            _posProvider.togglePaymentMethod(),
+                      ),
+                      // Printer Section
+                      PrinterSection(
+                        connected: connected,
+                        onShowPrinterDialog: _showPrinterDialog,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Hidden barcode scanner field
+          Positioned(
+            left: -1000,
+            top: -1000,
+            child: SizedBox(
+              width: 1,
+              height: 1,
+              child: TextField(
+                controller: _barcodeController,
+                focusNode: _barcodeFocus,
+                onSubmitted: _onBarcodeSubmitted,
+                decoration: const InputDecoration(border: InputBorder.none),
               ),
             ),
           ),
-        );
-      },
+          // Drawer overlay
+          if (isDrawerOpen)
+            GestureDetector(
+              onTap: toggleMenu,
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+              ),
+            ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Color(0xFFB87333),
+              ),
+              child: Text(
+                'Menu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Home'),
+              onTap: () {
+                // Handle home
+                toggleMenu();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              onTap: () {
+                // Handle settings
+                toggleMenu();
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
+
   /*  
 void _chargeOrder() async {
   if (selectedItems.isEmpty) {
@@ -2428,7 +1334,7 @@ void _chargeOrder() async {
     print("Looking up product with ID: $productId");
 
     // Cast the data list to a List<Product> and search for the product by its ID
-    var product = (data as List<Product>).firstWhere(
+    var product = (data).firstWhere(
       (product) => product.id == productId,
       orElse: () {
         // If product isn't found, fetch it from the API (or return a default)
@@ -2462,7 +1368,7 @@ void _chargeOrder() async {
 
 class AddProductDialog extends StatefulWidget {
   final String barcode;
-  const AddProductDialog({required this.barcode});
+  const AddProductDialog({super.key, required this.barcode});
 
   @override
   State<AddProductDialog> createState() => _AddProductDialogState();
