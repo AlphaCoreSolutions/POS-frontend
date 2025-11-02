@@ -57,77 +57,138 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      body: isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-              color: Color(0xFFB87333),
-            )) // Show loading spinner
-          : hasError || data.isEmpty
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          final isTablet =
+              constraints.maxWidth >= 600 && constraints.maxWidth < 1200;
+          final headerPadding = isMobile
+              ? 20.0
+              : isTablet
+                  ? 30.0
+                  : 40.0;
+          final avatarRadius = isMobile
+              ? 40.0
+              : isTablet
+                  ? 50.0
+                  : 60.0;
+          final nameFontSize = isMobile
+              ? 20.0
+              : isTablet
+                  ? 24.0
+                  : 28.0;
+          final roleFontSize = isMobile ? 14.0 : 16.0;
+          final itemPaddingHorizontal = isMobile
+              ? 20.0
+              : isTablet
+                  ? 30.0
+                  : 40.0;
+          final itemPaddingVertical = isMobile ? 10.0 : 15.0;
+          final titleFontSize = isMobile ? 16.0 : 18.0;
+          final subtitleFontSize = isMobile ? 14.0 : 16.0;
+
+          return isLoading
               ? Center(
-                  child: Text(
-                    translation(context).failed_profile_load,
-                    style: TextStyle(color: Colors.red),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Color(0xFF36454F),
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(20),
-                            bottomRight: Radius.circular(20),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                                radius: 50,
-                                backgroundImage:
-                                    AssetImage("lib/assets/profile photo.jpg")),
-                            SizedBox(height: 10),
-                            Text(
-                              data[0].FullName,
-                              style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                            SizedBox(height: 5),
-                            Text(
-                              data[0].Role,
-                              style: TextStyle(
-                                  fontSize: 16, color: Colors.white70),
-                            ),
-                          ],
-                        ),
+                  child: CircularProgressIndicator(
+                  color: Color(0xFFB87333),
+                )) // Show loading spinner
+              : hasError || data.isEmpty
+                  ? Center(
+                      child: Text(
+                        translation(context).failed_profile_load,
+                        style: TextStyle(color: Colors.red),
                       ),
-                      SizedBox(height: 20),
-                      _buildProfileItem(Icons.person,
-                          translation(context).username, data[0].UserName),
-                      _buildProfileItem(Icons.person,
-                          translation(context).email, data[0].Email),
-                      _buildProfileItem(
-                          Icons.phone_enabled,
-                          translation(context).phone_number,
-                          data[0].PhoneNumber),
-                      _buildProfileItem(
-                          Icons.person,
-                          translation(context).employee_id,
-                          data[0].id.toString()),
-                      SizedBox(height: 20),
-                    ],
-                  ),
-                ),
+                    )
+                  : SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(headerPadding),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF36454F),
+                              borderRadius: BorderRadius.only(
+                                bottomLeft: Radius.circular(20),
+                                bottomRight: Radius.circular(20),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                CircleAvatar(
+                                    radius: avatarRadius,
+                                    backgroundImage: AssetImage(
+                                        "lib/assets/profile photo.jpg")),
+                                SizedBox(height: 10),
+                                Text(
+                                  data[0].FullName,
+                                  style: TextStyle(
+                                      fontSize: nameFontSize,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white),
+                                ),
+                                SizedBox(height: 5),
+                                Text(
+                                  data[0].Role,
+                                  style: TextStyle(
+                                      fontSize: roleFontSize,
+                                      color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          _buildProfileItem(
+                              Icons.person,
+                              translation(context).username,
+                              data[0].UserName,
+                              titleFontSize,
+                              subtitleFontSize,
+                              itemPaddingHorizontal,
+                              itemPaddingVertical),
+                          _buildProfileItem(
+                              Icons.person,
+                              translation(context).email,
+                              data[0].Email,
+                              titleFontSize,
+                              subtitleFontSize,
+                              itemPaddingHorizontal,
+                              itemPaddingVertical),
+                          _buildProfileItem(
+                              Icons.phone_enabled,
+                              translation(context).phone_number,
+                              data[0].PhoneNumber,
+                              titleFontSize,
+                              subtitleFontSize,
+                              itemPaddingHorizontal,
+                              itemPaddingVertical),
+                          _buildProfileItem(
+                              Icons.person,
+                              translation(context).employee_id,
+                              data[0].id.toString(),
+                              titleFontSize,
+                              subtitleFontSize,
+                              itemPaddingHorizontal,
+                              itemPaddingVertical),
+                          SizedBox(height: 20),
+                        ],
+                      ),
+                    );
+        },
+      ),
     );
   }
 
-  Widget _buildProfileItem(IconData icon, String title, String value) {
+  Widget _buildProfileItem(
+      IconData icon,
+      String title,
+      String value,
+      double titleFontSize,
+      double subtitleFontSize,
+      double horizontalPadding,
+      double verticalPadding) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding, vertical: verticalPadding),
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -143,8 +204,10 @@ class _ProfilePageState extends State<ProfilePage> {
             }
           },
           leading: Icon(icon, color: Colors.grey),
-          title: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(value, style: TextStyle(fontSize: 16)),
+          title: Text(title,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: titleFontSize)),
+          subtitle: Text(value, style: TextStyle(fontSize: subtitleFontSize)),
           trailing: Icon(Icons.edit),
         ),
       ),

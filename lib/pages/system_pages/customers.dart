@@ -182,61 +182,91 @@ class _CustomersPageState extends State<CustomersPage> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Customer>>(
-        future: customersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-                child: CircularProgressIndicator(
-              color: Color(0xFFB87333),
-            ));
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error loading customers'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No customers found'));
-          }
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          final isTablet =
+              constraints.maxWidth >= 600 && constraints.maxWidth < 1200;
+          final horizontalMargin = isMobile
+              ? 16.0
+              : isTablet
+                  ? 24.0
+                  : 32.0;
+          final verticalMargin = isMobile ? 8.0 : 12.0;
+          final avatarRadius = isMobile ? 20.0 : 24.0;
+          final titleFontSize = isMobile ? 16.0 : 18.0;
+          final subtitleFontSize = isMobile ? 14.0 : 16.0;
+          final iconSize = isMobile ? 20.0 : 24.0;
 
-          List<Customer> customers = snapshot.data!;
+          return FutureBuilder<List<Customer>>(
+            future: customersFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                    child: CircularProgressIndicator(
+                  color: Color(0xFFB87333),
+                ));
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Error loading customers'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(child: Text('No customers found'));
+              }
 
-          return ListView.builder(
-            itemCount: customers.length,
-            itemBuilder: (context, index) {
-              final customer = customers[index];
-              return Card(
-                elevation: 4,
-                margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Text(customer.Name[0]),
-                    backgroundColor: Colors.orange,
-                  ),
-                  title: Text(customer.Name),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          '${translation(context).customerEmail}: ${customer.Email}'),
-                      Text(
-                          '${translation(context).customerPhone}: ${customer.Phone}'),
-                      Text(
-                          '${translation(context).customerAddress}: ${customer.Address}'),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () =>
-                            _showCustomerDialog(customer: customer),
+              List<Customer> customers = snapshot.data!;
+
+              return ListView.builder(
+                itemCount: customers.length,
+                itemBuilder: (context, index) {
+                  final customer = customers[index];
+                  return Card(
+                    elevation: 4,
+                    margin: EdgeInsets.symmetric(
+                        vertical: verticalMargin, horizontal: horizontalMargin),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        radius: avatarRadius,
+                        child: Text(customer.Name[0],
+                            style: TextStyle(fontSize: titleFontSize)),
+                        backgroundColor: Colors.orange,
                       ),
-                      IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteCustomer(customer.CustomerId),
+                      title: Text(customer.Name,
+                          style: TextStyle(
+                              fontSize: titleFontSize,
+                              fontWeight: FontWeight.bold)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              '${translation(context).customerEmail}: ${customer.Email}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                          Text(
+                              '${translation(context).customerPhone}: ${customer.Phone}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                          Text(
+                              '${translation(context).customerAddress}: ${customer.Address}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit,
+                                color: Colors.blue, size: iconSize),
+                            onPressed: () =>
+                                _showCustomerDialog(customer: customer),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete,
+                                color: Colors.red, size: iconSize),
+                            onPressed: () =>
+                                _deleteCustomer(customer.CustomerId),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
             },
           );

@@ -119,160 +119,175 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Welcome Back!',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: darkCharcoal,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // API Environment Indicator
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _currentEnvironment == ApiConfig.LOCAL
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.blue.withOpacity(0.1),
-                  border: Border.all(
-                    color: _currentEnvironment == ApiConfig.LOCAL
-                        ? Colors.green
-                        : Colors.blue,
-                    width: 1,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          final cardWidth = isMobile ? constraints.maxWidth * 0.9 : 400.0;
+          final horizontalPadding = isMobile ? 16.0 : 24.0;
+          final verticalPadding = isMobile ? 32.0 : 48.0;
+          final titleFontSize = isMobile ? 28.0 : 32.0;
+
+          return Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding, vertical: verticalPadding),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: cardWidth),
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: _currentEnvironment == ApiConfig.LOCAL
-                          ? Colors.green
-                          : Colors.blue,
-                    ),
-                    const SizedBox(width: 6),
                     Text(
-                      'API: ${_getEnvironmentDisplayName(_currentEnvironment)}',
+                      'Welcome Back!',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: darkCharcoal,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // API Environment Indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
                         color: _currentEnvironment == ApiConfig.LOCAL
-                            ? Colors.green.shade700
-                            : Colors.blue.shade700,
-                        fontWeight: FontWeight.w500,
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.blue.withOpacity(0.1),
+                        border: Border.all(
+                          color: _currentEnvironment == ApiConfig.LOCAL
+                              ? Colors.green
+                              : Colors.blue,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.circle,
+                            size: 8,
+                            color: _currentEnvironment == ApiConfig.LOCAL
+                                ? Colors.green
+                                : Colors.blue,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'API: ${_getEnvironmentDisplayName(_currentEnvironment)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _currentEnvironment == ApiConfig.LOCAL
+                                  ? Colors.green.shade700
+                                  : Colors.blue.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      color: Colors.white,
+                      elevation: 8,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 32),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            children: [
+                              // Username
+                              TextFormField(
+                                controller: usernameController,
+                                decoration: InputDecoration(
+                                  labelText: 'Username',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Username is required'
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+                              // Password
+                              TextFormField(
+                                controller: passwordController,
+                                obscureText: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty
+                                    ? 'Password is required'
+                                    : null,
+                              ),
+                              if (errorMessage != null) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  errorMessage!,
+                                  style: TextStyle(color: Colors.red[700]),
+                                ),
+                              ],
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: isLoading ? null : login,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: copper,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 4,
+                                  ),
+                                  child: isLoading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Login',
+                                          style: TextStyle(fontSize: 16),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () {
+                                  // optionally handle "Forgot password?"
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: brown,
+                                ),
+                                child: const Text('Forgot password?'),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Card(
-                color: Colors.white,
-                elevation: 8,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        // Username
-                        TextFormField(
-                          controller: usernameController,
-                          decoration: InputDecoration(
-                            labelText: 'Username',
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'Username is required'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        // Password
-                        TextFormField(
-                          controller: passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'Password is required'
-                              : null,
-                        ),
-                        if (errorMessage != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            errorMessage!,
-                            style: TextStyle(color: Colors.red[700]),
-                          ),
-                        ],
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: isLoading ? null : login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: copper,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 4,
-                            ),
-                            child: isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Login',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () {
-                            // optionally handle “Forgot password?”
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: brown,
-                          ),
-                          child: const Text('Forgot password?'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
       // Apply the same input theme globally on this page
       // so focused borders turn copper:
       // (could also be set in your MaterialApp theme)
-      floatingActionButton: Theme(
+      bottomNavigationBar: Theme(
         data: Theme.of(context).copyWith(
           colorScheme: Theme.of(context).colorScheme.copyWith(
                 primary: copper,

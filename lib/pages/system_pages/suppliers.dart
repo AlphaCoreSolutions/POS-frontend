@@ -168,58 +168,91 @@ class _SupplierPageState extends State<SupplierPage> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Supplier>>(
-        future: futureSuppliers,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return Center(
-                child: CircularProgressIndicator(
-              color: Color(0xFFB87333),
-            ));
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
-          if (!snapshot.hasData || snapshot.data!.isEmpty)
-            return Center(child: Text('No suppliers found'));
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          final isTablet =
+              constraints.maxWidth >= 600 && constraints.maxWidth < 1200;
+          final horizontalMargin = isMobile
+              ? 16.0
+              : isTablet
+                  ? 24.0
+                  : 32.0;
+          final verticalMargin = isMobile ? 8.0 : 12.0;
+          final avatarRadius = isMobile ? 20.0 : 24.0;
+          final titleFontSize = isMobile ? 16.0 : 18.0;
+          final subtitleFontSize = isMobile ? 14.0 : 16.0;
+          final iconSize = isMobile ? 20.0 : 24.0;
 
-          return ListView.builder(
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              Supplier supplier = snapshot.data![index];
-              return Card(
-                elevation: 4,
-                margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Text(supplier.Name[0]),
-                    backgroundColor: Colors.orange,
-                  ),
-                  title: Text(supplier.Name),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          '${translation(context).company_name}: ${supplier.CompanyName}'),
-                      Text('${translation(context).email}: ${supplier.Email}'),
-                      Text(
-                          '${translation(context).phone_number}: ${supplier.Phone}'),
-                      Text(
-                          '${translation(context).address}: ${supplier.Address}'),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () => showSupplierDialog(supplier: supplier),
+          return FutureBuilder<List<Supplier>>(
+            future: futureSuppliers,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return Center(
+                    child: CircularProgressIndicator(
+                  color: Color(0xFFB87333),
+                ));
+              if (snapshot.hasError)
+                return Center(child: Text('Error: ${snapshot.error}'));
+              if (!snapshot.hasData || snapshot.data!.isEmpty)
+                return Center(child: Text('No suppliers found'));
+
+              return ListView.builder(
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  Supplier supplier = snapshot.data![index];
+                  return Card(
+                    elevation: 4,
+                    margin: EdgeInsets.symmetric(
+                        vertical: verticalMargin, horizontal: horizontalMargin),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        radius: avatarRadius,
+                        child: Text(supplier.Name[0],
+                            style: TextStyle(fontSize: titleFontSize)),
+                        backgroundColor: Colors.orange,
                       ),
-                      IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteSupplier(supplier.SupplierId),
+                      title: Text(supplier.Name,
+                          style: TextStyle(
+                              fontSize: titleFontSize,
+                              fontWeight: FontWeight.bold)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              '${translation(context).company_name}: ${supplier.CompanyName}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                          Text(
+                              '${translation(context).email}: ${supplier.Email}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                          Text(
+                              '${translation(context).phone_number}: ${supplier.Phone}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                          Text(
+                              '${translation(context).address}: ${supplier.Address}',
+                              style: TextStyle(fontSize: subtitleFontSize)),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit,
+                                color: Colors.blue, size: iconSize),
+                            onPressed: () =>
+                                showSupplierDialog(supplier: supplier),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete,
+                                color: Colors.red, size: iconSize),
+                            onPressed: () =>
+                                _deleteSupplier(supplier.SupplierId),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
             },
           );
