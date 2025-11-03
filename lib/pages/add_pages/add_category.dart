@@ -57,7 +57,8 @@ class _AddCategoryState extends State<AddCategory> {
         _all = await _api.getLeafCategoriesByOrg(_orgId!);
       } else {
         // Fallback to getting all categories and filter locally
-        final all = await _api.getCategoryData();
+        final org = await SessionManager.getOrganizationId();
+        final all = await _api.getCategoriesForOrg(org ?? 0);
         _all = all;
       }
       _filteredCategories = _all;

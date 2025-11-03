@@ -62,7 +62,6 @@ class _DrawerPageState extends State<DrawerPage> {
       child: Padding(
         padding: EdgeInsets.only(top: topPadding, left: leftPadding, bottom: 1),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Row(
               children: <Widget>[
@@ -97,90 +96,93 @@ class _DrawerPageState extends State<DrawerPage> {
                 ),
               ],
             ),
-            Column(
-              children: <Widget>[
-                SideBar_Item(
-                  icon: Icons.money,
-                  text: translation(context).balanceSheet,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => EnhancedDashboard()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.assessment,
-                  text: 'Reports',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ReportsPage()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.person_outline,
-                  text: AppLocalizations.of(context)!.profile,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfilePage()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.file_present,
-                  text: AppLocalizations.of(context)!.products,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProductsPage()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.support_agent,
-                  text: AppLocalizations.of(context)!.support,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SupportPage()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.error_outline,
-                  text: AppLocalizations.of(context)!.settings,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SettingsPage()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.person,
-                  text: translation(context).customers,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => CustomersPage()),
-                    );
-                  },
-                ),
-                SideBar_Item(
-                  icon: Icons.construction,
-                  text: translation(context).suppliers,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SupplierPage()),
-                    );
-                  },
-                ),
-              ],
+            Expanded(
+              child: ListView(
+                children: <Widget>[
+                  SideBar_Item(
+                    icon: Icons.money,
+                    text: translation(context).balanceSheet,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => EnhancedDashboard()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.assessment,
+                    text: 'Reports',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ReportsPage()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.person_outline,
+                    text: AppLocalizations.of(context)!.profile,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ProfilePage()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.file_present,
+                    text: AppLocalizations.of(context)!.products,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ProductsPage()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.support_agent,
+                    text: AppLocalizations.of(context)!.support,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SupportPage()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.error_outline,
+                    text: AppLocalizations.of(context)!.settings,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SettingsPage()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.person,
+                    text: translation(context).customers,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => CustomersPage()),
+                      );
+                    },
+                  ),
+                  SideBar_Item(
+                    icon: Icons.construction,
+                    text: translation(context).suppliers,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SupplierPage()),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
             GestureDetector(
               onTap: () async {

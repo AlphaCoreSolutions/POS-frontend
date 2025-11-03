@@ -52,7 +52,8 @@ class _AddProductsState extends State<AddProducts> {
       });
     } else {
       // Fallback to getting all categories if no org ID
-      final fetchedCategories = await apiHandler.getCategoryData();
+      final org = await SessionManager.getOrganizationId();
+      final fetchedCategories = await apiHandler.getCategoriesForOrg(org ?? 0);
       setState(() {
         categories = fetchedCategories;
         filteredCategories = fetchedCategories;

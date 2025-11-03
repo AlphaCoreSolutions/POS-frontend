@@ -49,7 +49,8 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> _loadCategories() async {
-    final cats = await ApiHandler().getCategoryData();
+    final org = await SessionManager.getOrganizationId();
+    final cats = await ApiHandler().getCategoriesForOrg(org ?? 0);
     setState(() => _categories = cats);
   }
 
@@ -935,7 +936,8 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> categoryData() async {
-    final result = await apiHandler.getCategoryData();
+    final org = await SessionManager.getOrganizationId();
+    final result = await apiHandler.getCategoriesForOrg(org ?? 0);
     if (!mounted) return;
 
     // derive roots & clear subs

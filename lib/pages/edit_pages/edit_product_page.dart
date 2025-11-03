@@ -43,7 +43,8 @@ class _UpdateProductState extends State<UpdateProduct> {
         categories = await _api.getLeafCategoriesByOrg(orgId!);
       } else {
         // Fallback to getting all categories
-        categories = await _api.getCategoryData();
+        final org = await SessionManager.getOrganizationId();
+        categories = await _api.getCategoriesForOrg(org ?? 0);
       }
 
       setState(() {
