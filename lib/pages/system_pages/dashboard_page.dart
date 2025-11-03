@@ -34,6 +34,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Timer? _debounce;
 
+  String _getPaymentMethodName(int methodCode) {
+    switch (methodCode) {
+      case 1:
+        return 'Cash';
+      case 2:
+        return 'Visa';
+      case 3:
+        return 'Credit Card';
+      case 4:
+        return 'Debit Card';
+      default:
+        return 'Unknown';
+    }
+  }
+
   Future<void> fetchBestSeller() async {
     String? bestSellerName = await apiHandler.fetchBestSellingProduct();
 
@@ -918,7 +933,7 @@ void _fetchOrdersForSelectedDateRange() async {
                                   },
                                 ),
                                 Text(
-                                  'Payment Method: ${order.paymentMethod}',
+                                  'Payment Method: ${_getPaymentMethodName(order.paymentMethod)}',
                                   style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
