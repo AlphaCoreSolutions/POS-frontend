@@ -33,30 +33,30 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  form_builder_validators:
+  form_builder_validators: ^11.0.0
   flutter_localizations:
     sdk: flutter
-  flutter_form_builder:
-  shared_preferences:
-  cupertino_icons: 
+  flutter_form_builder: ^10.0.0
+  shared_preferences: ^2.2.2
+  cupertino_icons: ^1.0.2
   google_fonts: ^6.3.2 # For modern typography
-  fl_chart: ^1.1.1 # For charts 
-  intl:
-  #bluetooth_print: ^4.3.0 
-  print_bluetooth_thermal: 
-  esc_pos_utils: 
-  permission_handler: ^12.0.1 
-  flutter_blue_plus: ^2.0.0 
-  http:
+  fl_chart: ^1.1.1 # For charts
+  intl: ^0.20.2
+  #bluetooth_print: ^4.3.0
+  print_bluetooth_thermal: ^1.1.7
+  esc_pos_utils: ^1.0.0
+  permission_handler: ^12.0.1
+  flutter_blue_plus: ^2.0.0
+  http: ^1.2.0
   provider: ^6.1.5
   translator: ^1.0.4
   equatable: ^2.0.5
   image_picker: ^1.1.2
   jwt_decode: ^0.3.1
-  url_launcher:
+  url_launcher: ^6.2.2
   pdf: ^3.8.4
-  path_provider: ^2.0.15
-  
+  path_provider: ^2.1.5
+
 
 dev_dependencies:
   flutter_test:
