@@ -50,7 +50,7 @@ class QuickApiSwitcher extends StatelessWidget {
           child: ListTile(
             leading: Icon(Icons.cloud, color: Colors.blue),
             title: Text('Production'),
-            subtitle: Text('posapi.alphacorecit.com'),
+            subtitle: Text('posi.visioncit.com'),
             trailing: ApiConfig.instance.environment == ApiConfig.PRODUCTION
                 ? Icon(Icons.check, color: Colors.green)
                 : null,

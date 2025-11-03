@@ -59,7 +59,7 @@ flutter run -d chrome   # For Web
 VisionPOS supports dynamic API configuration for different environments:
 
 - **Local Development**: `https://localhost:5001/api`
-- **Production**: `http://posapi.alphacorecit.com/api`
+- **Production**: `https://posi.visioncit.com/api`
 - **Staging**: `http://192.168.100.19/api`
 - **Custom**: User-defined endpoints
 
