@@ -398,7 +398,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                           ),
                                           // Name of the product
                                           Text(
-                                            data[index].ProductName,
+                                            data[index].productName,
                                             style: TextStyle(
                                                 fontSize: screenWidth * 0.015,
                                                 fontWeight: FontWeight.bold),
@@ -407,7 +407,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                           // Category of the product
                                           FutureBuilder<String>(
                                             future: _categoryNameFor(
-                                                data[index].ProductCategory),
+                                                data[index].categoryId),
                                             builder: (_, snap) => Text(
                                               snap.connectionState ==
                                                       ConnectionState.done
@@ -422,7 +422,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                           ),
 
                                           Text(
-                                            'Stock: ${data[index].ProductInventory.toStringAsFixed(0)}', // Display the price formatted to 2 decimal places
+                                            'Stock: ${data[index].productInventory?.toStringAsFixed(0) ?? '0'}', // Display the price formatted to 2 decimal places
                                             style: TextStyle(
                                                 fontSize: screenWidth * 0.015,
                                                 color: Colors.green),
@@ -435,7 +435,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                 MainAxisAlignment.spaceAround,
                                             children: [
                                               Text(
-                                                'Selling: ${data[index].SellingPrice.toStringAsFixed(2)} JOD', // Display the price formatted to 2 decimal places
+                                                'Selling: ${data[index].sellingPrice.toStringAsFixed(2)} JOD', // Display the price formatted to 2 decimal places
                                                 style: TextStyle(
                                                     fontSize:
                                                         screenWidth * 0.01,
@@ -443,7 +443,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                 textAlign: TextAlign.center,
                                               ),
                                               Text(
-                                                'Purchase: ${data[index].PurchasePrice.toStringAsFixed(2)} JOD', // Display the price formatted to 2 decimal places
+                                                'Purchase: ${data[index].purchasePrice.toStringAsFixed(2)} JOD', // Display the price formatted to 2 decimal places
                                                 style: TextStyle(
                                                     fontSize:
                                                         screenWidth * 0.01,
@@ -490,7 +490,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                             onPressed: () {
                                                               deleteProduct(data[
                                                                       index]
-                                                                  .id); // Call delete function
+                                                                  .productId); // Call delete function
                                                               Navigator.of(
                                                                       context)
                                                                   .pop(); // Close the dialog after deletion

@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
         'Accept': 'application/json',
       },
       body: json.encode({
-        'username': usernameController.text,
+        'userName': usernameController.text,
         'password': passwordController.text,
       }),
     );

@@ -5,7 +5,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/utils/session_manager.dart';
 import 'package:visionpos/utils/pdf_service.dart';
-import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 class ReportsPage extends StatefulWidget {
@@ -24,8 +23,9 @@ class _ReportsPageState extends State<ReportsPage>
   late TabController _tabController;
 
   // Date filters
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
-  DateTime _endDate = DateTime.now();
+  DateTime _startDate =
+      DateTime(2000); // Include all historical data by default
+  DateTime _endDate = DateTime.now().add(const Duration(days: 1));
 
   // Data holders
   Map<String, dynamic>? _salesByDateRange;
@@ -107,12 +107,13 @@ class _ReportsPageState extends State<ReportsPage>
 
       switch (currentTab) {
         case 0: // Sales Overview
-          final dailySales = (_salesByDateRange?['dailySales'] as List?)
+          final dailySales = (_salesByDateRange?['orders'] as List?)
                   ?.cast<Map<String, dynamic>>() ??
               [];
           final totalRevenue =
-              (_salesByDateRange?['totalRevenue'] ?? 0).toDouble();
-          final totalOrders = _salesByDateRange?['totalOrders'] ?? 0;
+              ((_salesByDateRange?['totalSales'] ?? 0) as num).toDouble();
+          final totalOrders =
+              ((_salesByDateRange?['totalOrders'] ?? 0) as num).toInt();
 
           pdfBytes = await PdfService.generateSalesReport(
             startDate: _startDate,
@@ -128,17 +129,18 @@ class _ReportsPageState extends State<ReportsPage>
           break;
 
         case 1: // Top Products
-          final dailySales = (_salesByDateRange?['dailySales'] as List?)
+          final dailySales = (_salesByDateRange?['orders'] as List?)
                   ?.cast<Map<String, dynamic>>() ??
               [];
           final totalRevenue =
-              (_salesByDateRange?['totalRevenue'] ?? 0).toDouble();
-          final totalOrders = _salesByDateRange?['totalOrders'] ?? 0;
+              ((_salesByDateRange?['totalSales'] ?? 0) as num).toDouble();
+          final totalOrders =
+              ((_salesByDateRange?['totalOrders'] ?? 0) as num).toInt();
 
           pdfBytes = await PdfService.generateSalesReport(
             startDate: _startDate,
             endDate: _endDate,
-            dailySales: [],
+            dailySales: dailySales,
             topProducts: _topSellingProducts,
             paymentMethods: [],
             totalRevenue: totalRevenue,
@@ -152,11 +154,13 @@ class _ReportsPageState extends State<ReportsPage>
           final inventory = (_inventoryStatus?['products'] as List?)
                   ?.cast<Map<String, dynamic>>() ??
               [];
-          final lowStock = (_inventoryStatus?['lowStock'] as List?)
+          final lowStock = (_inventoryStatus?['products'] as List?)
                   ?.cast<Map<String, dynamic>>() ??
               [];
-          final totalProducts = _inventoryStatus?['totalProducts'] ?? 0;
-          final totalValue = (_inventoryStatus?['totalValue'] ?? 0).toDouble();
+          final totalProducts =
+              ((_inventoryStatus?['totalProducts'] ?? 0) as num).toInt();
+          final totalValue =
+              ((_inventoryStatus?['totalStockValue'] ?? 0) as num).toDouble();
 
           pdfBytes = await PdfService.generateInventoryReport(
             inventory: inventory,
@@ -173,11 +177,13 @@ class _ReportsPageState extends State<ReportsPage>
                   ?.cast<Map<String, dynamic>>() ??
               [];
           final totalRevenue =
-              (_profitAnalysis?['totalRevenue'] ?? 0).toDouble();
-          final totalCost = (_profitAnalysis?['totalCost'] ?? 0).toDouble();
-          final totalProfit = (_profitAnalysis?['totalProfit'] ?? 0).toDouble();
+              ((_profitAnalysis?['totalRevenue'] ?? 0) as num).toDouble();
+          final totalCost =
+              ((_profitAnalysis?['totalCost'] ?? 0) as num).toDouble();
+          final totalProfit =
+              ((_profitAnalysis?['totalProfit'] ?? 0) as num).toDouble();
           final profitMargin =
-              (_profitAnalysis?['profitMargin'] ?? 0).toDouble();
+              ((_profitAnalysis?['profitMargin'] ?? 0) as num).toDouble();
 
           pdfBytes = await PdfService.generateProfitReport(
             startDate: _startDate,
@@ -194,12 +200,13 @@ class _ReportsPageState extends State<ReportsPage>
 
         default:
           // For other tabs, use sales report
-          final dailySales = (_salesByDateRange?['dailySales'] as List?)
+          final dailySales = (_salesByDateRange?['orders'] as List?)
                   ?.cast<Map<String, dynamic>>() ??
               [];
           final totalRevenue =
-              (_salesByDateRange?['totalRevenue'] ?? 0).toDouble();
-          final totalOrders = _salesByDateRange?['totalOrders'] ?? 0;
+              ((_salesByDateRange?['totalSales'] ?? 0) as num).toDouble();
+          final totalOrders =
+              ((_salesByDateRange?['totalOrders'] ?? 0) as num).toInt();
 
           pdfBytes = await PdfService.generateSalesReport(
             startDate: _startDate,
@@ -295,10 +302,12 @@ class _ReportsPageState extends State<ReportsPage>
       return const Center(child: Text('No data available'));
     }
 
-    final totalOrders = _salesByDateRange!['totalOrders'] ?? 0;
-    final totalSales = (_salesByDateRange!['totalSales'] ?? 0).toDouble();
+    final totalOrders =
+        ((_salesByDateRange!['totalOrders'] ?? 0) as num).toInt();
+    final totalSales =
+        ((_salesByDateRange!['totalSales'] ?? 0) as num).toDouble();
     final avgOrderValue =
-        (_salesByDateRange!['averageOrderValue'] ?? 0).toDouble();
+        ((_salesByDateRange!['averageOrderValue'] ?? 0) as num).toDouble();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -373,8 +382,9 @@ class _ReportsPageState extends State<ReportsPage>
                   BarChartData(
                     alignment: BarChartAlignment.spaceAround,
                     maxY: _topSellingProducts.isNotEmpty
-                        ? (_topSellingProducts.first['totalQuantitySold'] ?? 0)
-                                .toDouble() *
+                        ? (((_topSellingProducts.first['totalQuantitySold'] ??
+                                    0) as num)
+                                .toDouble()) *
                             1.2
                         : 100,
                     barTouchData: BarTouchData(enabled: true),
@@ -388,7 +398,8 @@ class _ReportsPageState extends State<ReportsPage>
                                 value.toInt() < _topSellingProducts.length) {
                               final product =
                                   _topSellingProducts[value.toInt()];
-                              final name = product['productName'] ?? '';
+                              final name =
+                                  (product['productName'] ?? '').toString();
                               return Padding(
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Text(
@@ -418,8 +429,9 @@ class _ReportsPageState extends State<ReportsPage>
                         x: entry.key,
                         barRods: [
                           BarChartRodData(
-                            toY: (entry.value['totalQuantitySold'] ?? 0)
-                                .toDouble(),
+                            toY:
+                                ((entry.value['totalQuantitySold'] ?? 0) as num)
+                                    .toDouble(),
                             color: Color(0xFFB87333),
                             width: 20,
                             borderRadius: const BorderRadius.vertical(
@@ -495,8 +507,8 @@ class _ReportsPageState extends State<ReportsPage>
           ),
           const SizedBox(height: 20),
           ..._salesByPaymentMethod.map((item) {
-            final method = item['paymentMethod'] ?? 'Unknown';
-            final count = item['totalOrders'] ?? 0;
+            final method = (item['paymentMethod'] ?? 'Unknown').toString();
+            final count = ((item['totalOrders'] ?? 0) as num).toInt();
             final amount = ((item['totalAmount'] ?? 0) as num).toDouble();
 
             return Card(
@@ -610,10 +622,10 @@ class _ReportsPageState extends State<ReportsPage>
           ),
           const SizedBox(height: 20),
           ..._salesByCategory.map((item) {
-            final name = item['categoryName'] ?? 'Unknown';
-            final quantity = item['totalQuantitySold'] ?? 0;
+            final name = (item['categoryName'] ?? 'Unknown').toString();
+            final quantity = ((item['totalQuantitySold'] ?? 0) as num).toInt();
             final revenue = ((item['totalRevenue'] ?? 0) as num).toDouble();
-            final productCount = item['productCount'] ?? 0;
+            final productCount = ((item['productCount'] ?? 0) as num).toInt();
 
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
@@ -641,11 +653,14 @@ class _ReportsPageState extends State<ReportsPage>
       return const Center(child: Text('No inventory data available'));
     }
 
-    final totalProducts = _inventoryStatus!['totalProducts'] ?? 0;
+    final totalProducts =
+        ((_inventoryStatus!['totalProducts'] ?? 0) as num).toInt();
     final totalStockValue =
         ((_inventoryStatus!['totalStockValue'] ?? 0) as num).toDouble();
-    final lowStockCount = _inventoryStatus!['lowStockCount'] ?? 0;
-    final outOfStockCount = _inventoryStatus!['outOfStockCount'] ?? 0;
+    final lowStockCount =
+        ((_inventoryStatus!['lowStockCount'] ?? 0) as num).toInt();
+    final outOfStockCount =
+        ((_inventoryStatus!['outOfStockCount'] ?? 0) as num).toInt();
     final products = (_inventoryStatus!['products'] as List?) ?? [];
 
     return SingleChildScrollView(
@@ -910,11 +925,11 @@ class _ReportsPageState extends State<ReportsPage>
 
     return Column(
       children: orders.take(5).map<Widget>((order) {
-        final orderId = order['orderId'] ?? 0;
+        final orderId = ((order['orderId'] ?? 0) as num).toInt();
         final orderPlaced = DateTime.parse(
-            order['orderPlaced'] ?? DateTime.now().toIso8601String());
+            order['orderDate'] ?? DateTime.now().toIso8601String());
         final grandTotal = ((order['grandTotal'] ?? 0) as num).toDouble();
-        final itemCount = order['itemCount'] ?? 0;
+        final itemCount = ((order['itemCount'] ?? 0) as num).toInt();
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -946,7 +961,7 @@ class _ReportsPageState extends State<ReportsPage>
     return Column(
       children: _topSellingProducts.map<Widget>((product) {
         final name = product['productName'] ?? 'Unknown';
-        final quantity = product['totalQuantitySold'] ?? 0;
+        final quantity = ((product['totalQuantitySold'] ?? 0) as num).toInt();
         final revenue = ((product['totalRevenue'] ?? 0) as num).toDouble();
         final unitPrice = ((product['unitPrice'] ?? 0) as num).toDouble();
 

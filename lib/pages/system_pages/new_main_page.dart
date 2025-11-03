@@ -273,7 +273,10 @@ class _NewMainPageState extends State<NewMainPage> {
                                       ),
                                       // Payment section
                                       PaymentSection(
-                                        paymentMethod: provider.paymentMethod,
+                                        paymentMethod:
+                                            provider.paymentMethod == 1
+                                                ? 'Cash'
+                                                : 'Visa',
                                         isCash: provider.isCash,
                                         onTogglePaymentMethod: (_) =>
                                             provider.togglePaymentMethod(),
@@ -482,7 +485,9 @@ class _NewMainPageState extends State<NewMainPage> {
                             Container(
                               padding: const EdgeInsets.all(16),
                               child: PaymentSection(
-                                paymentMethod: provider.paymentMethod,
+                                paymentMethod: provider.paymentMethod == 1
+                                    ? 'Cash'
+                                    : 'Visa',
                                 isCash: provider.isCash,
                                 onTogglePaymentMethod: (_) =>
                                     provider.togglePaymentMethod(),

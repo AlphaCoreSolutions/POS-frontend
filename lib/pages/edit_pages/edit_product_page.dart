@@ -25,7 +25,6 @@ class _UpdateProductState extends State<UpdateProduct> {
   List<Category> _filteredCategories = [];
   final TextEditingController _categorySearchController =
       TextEditingController();
-  Category? _selectedCategory;
   late http.Response response;
 
   @override
@@ -112,22 +111,22 @@ class _UpdateProductState extends State<UpdateProduct> {
     final catId = data['ProductCategory'] as int? ?? 0;
 
     final product = Product(
-      id: widget.product.id,
+      productId: widget.product.productId,
       organizationId: (_orgId ?? 0),
-      ProductCategory: catId,
-      ProductName: data['ProductName'],
-      ProductDescription: data['ProductDescription'],
+      categoryId: catId,
+      productName: data['ProductName'],
+      productDescription: data['ProductDescription'],
       // match keys you set in initialValue:
-      SellingPrice: double.tryParse(data['SellingPrice'].toString()) ?? 0.0,
-      PurchasePrice: double.tryParse(data['purchasePrice'].toString()) ?? 0.0,
-      ProductInventory:
+      sellingPrice: double.tryParse(data['SellingPrice'].toString()) ?? 0.0,
+      purchasePrice: double.tryParse(data['purchasePrice'].toString()) ?? 0.0,
+      productInventory:
           double.tryParse(data['ProductInventory'].toString()) ?? 0.0,
-      Barcode: data['Barcode'],
+      barcode: data['Barcode'],
     );
 
     try {
-      response =
-          await _api.updateProduct(id: widget.product.id, product: product);
+      response = await _api.updateProduct(
+          id: widget.product.productId, product: product);
       if (!mounted) return;
       // Return success result to indicate product was updated
       Navigator.pop(context, true);
@@ -142,9 +141,8 @@ class _UpdateProductState extends State<UpdateProduct> {
 
   @override
   Widget build(BuildContext context) {
-    final catExists =
-        _categories.any((c) => c.id == widget.product.ProductCategory);
-    final initialCatId = catExists ? widget.product.ProductCategory : null;
+    final catExists = _categories.any((c) => c.id == widget.product.categoryId);
+    final initialCatId = catExists ? widget.product.categoryId : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -173,13 +171,13 @@ class _UpdateProductState extends State<UpdateProduct> {
                     key: _formKey,
                     initialValue: {
                       // don't put category here; we set its initialValue on the field itself
-                      'ProductName': widget.product.ProductName,
-                      'ProductDescription': widget.product.ProductDescription,
-                      'purchasePrice': widget.product.PurchasePrice.toString(),
-                      'SellingPrice': widget.product.SellingPrice.toString(),
+                      'ProductName': widget.product.productName,
+                      'ProductDescription': widget.product.productDescription,
+                      'purchasePrice': widget.product.purchasePrice.toString(),
+                      'SellingPrice': widget.product.sellingPrice.toString(),
                       'ProductInventory':
-                          widget.product.ProductInventory.toString(),
-                      'Barcode': widget.product.Barcode,
+                          widget.product.productInventory.toString(),
+                      'Barcode': widget.product.barcode,
                     },
                     child: Column(
                       children: [
@@ -224,13 +222,7 @@ class _UpdateProductState extends State<UpdateProduct> {
                             )
                           ],
                           onChanged: (value) {
-                            setState(() {
-                              _selectedCategory =
-                                  _filteredCategories.firstWhere(
-                                (category) => category.id == value,
-                                orElse: () => _filteredCategories.first,
-                              );
-                            });
+                            // Category selected
                           },
                         ),
                         const SizedBox(height: 14),

@@ -358,10 +358,10 @@ class _MainPageState extends State<MainPage> {
 
       // ignore: unnecessary_null_comparison
       if (product != null) {
-        double totalPrice = item.quantity * product.SellingPrice;
+        double totalPrice = item.quantity * product.sellingPrice;
 
         // Ensure proper spacing
-        String productName = product.ProductName.padRight(
+        String productName = product.productName.padRight(
           12,
         ); // 20-character width
         String quantity = 'x${item.quantity}'.padLeft(
@@ -701,9 +701,9 @@ class _MainPageState extends State<MainPage> {
       //var product = _getProductById(productId);
       /*
     // Restore the product quantity
-    if (product.id != 0) {
-      if(product.ProductInventory != 0){
-        product.ProductInventory += 1;  // Increase quantity back
+    if (product.productId != 0) {
+      if(product.productInventory != 0){
+        product.productInventory += 1;  // Increase quantity back
       }
     }
     */
@@ -738,25 +738,26 @@ class _MainPageState extends State<MainPage> {
     setState(
       () {
         int index = selectedItems.indexWhere(
-          (item) => item.productId == product.id,
+          (item) => item.productId == product.productId,
         );
 
-        //if(product.ProductInventory != 0){}
+        //if(product.productInventory != 0){}
         if (index != -1) {
           selectedItems[index] = selectedItems[index].updateQuantity(
             selectedItems[index].quantity + 1,
           );
         } else {
-          selectedItems.add(OrderItemDto(productId: product.id, quantity: 1));
-          productPrices[product.id] =
-              product.SellingPrice; // Store product price
+          selectedItems
+              .add(OrderItemDto(productId: product.productId, quantity: 1));
+          productPrices[product.productId] =
+              product.sellingPrice; // Store product price
         }
       },
 
       /*
    else{
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Product ${product.ProductName} Is Out Of Stock!'))
+      SnackBar(content: Text('Product ${product.productName} Is Out Of Stock!'))
     );}
    */
     );
@@ -788,10 +789,10 @@ class _MainPageState extends State<MainPage> {
     for (var item in selectedItems) {
       Product product = _getProductById(item.productId);
       
-      if (product.id != 0) {
+      if (product.productId != 0) {
         // Deduct the quantity and update in DB
-        product.ProductInventory -= item.quantity;
-        print("🔄 Updating inventory for ${product.ProductName}: ${product.ProductInventory}");
+        product.productInventory -= item.quantity;
+        print("🔄 Updating inventory for ${product.productName}: ${product.productInventory}");
         
         await ApiHandler().updateProductInventoryInDatabase(product);
       }
@@ -874,13 +875,13 @@ class _MainPageState extends State<MainPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: searchResults.map((Product) {
                   return ListTile(
-                    title: Text(Product.ProductName),
+                    title: Text(Product.productName),
                     onTap: () {
                       setState(() {
                         productSearch =
                             Product; // Set the selected product for search
                         searchController.text =
-                            Product.ProductName; // Update the search bar text
+                            Product.productName; // Update the search bar text
                         searchResults = []; // Clear the search results
                         addToOrder(Product);
                       });
@@ -913,7 +914,7 @@ class _MainPageState extends State<MainPage> {
     List<Product> filteredProducts = allProducts
         .where(
           (product) =>
-              product.ProductName.toLowerCase().contains(query.toLowerCase()),
+              product.productName.toLowerCase().contains(query.toLowerCase()),
         )
         .toList();
 
@@ -1022,7 +1023,7 @@ class _MainPageState extends State<MainPage> {
       setState(() {
         // 2) Find index of an existing OrderItemDto with same productId
         final idx = selectedItems.indexWhere(
-          (item) => item.productId == prod.id,
+          (item) => item.productId == prod.productId,
         );
 
         if (idx >= 0) {
@@ -1031,7 +1032,8 @@ class _MainPageState extends State<MainPage> {
               .updateQuantity(selectedItems[idx].quantity + 1);
         } else {
           // 3b) Otherwise add a brand‐new line
-          selectedItems.add(OrderItemDto(productId: prod.id, quantity: 1));
+          selectedItems
+              .add(OrderItemDto(productId: prod.productId, quantity: 1));
         }
       });
     } else {
@@ -1042,7 +1044,8 @@ class _MainPageState extends State<MainPage> {
       );
       if (newProd != null) {
         setState(() {
-          selectedItems.add(OrderItemDto(productId: newProd.id, quantity: 1));
+          selectedItems
+              .add(OrderItemDto(productId: newProd.productId, quantity: 1));
         });
       }
     }
@@ -1524,7 +1527,7 @@ class _MainPageState extends State<MainPage> {
                                           p,
                                         ) {
                                           final int? pCatId = _toInt(
-                                            p.ProductCategory,
+                                            p.categoryId,
                                           );
                                           if (pCatId == null) return false;
 
@@ -1558,7 +1561,7 @@ class _MainPageState extends State<MainPage> {
 
                                             // look up the category name from its id
                                             final categoryName = _catNameById[
-                                                    product.ProductCategory] ??
+                                                    product.categoryId] ??
                                                 'Uncategorized';
 
                                             return GestureDetector(
@@ -1579,7 +1582,7 @@ class _MainPageState extends State<MainPage> {
                                                   children: [
                                                     // Product Name
                                                     Text(
-                                                      product.ProductName,
+                                                      product.productName,
                                                       style: TextStyle(
                                                         fontSize:
                                                             screenWidth * 0.014,
@@ -1602,7 +1605,7 @@ class _MainPageState extends State<MainPage> {
                                                     ),
                                                     // Price
                                                     Text(
-                                                      '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                                                      '${product.sellingPrice.toStringAsFixed(2)} JOD',
                                                       style: TextStyle(
                                                         fontSize:
                                                             screenWidth * 0.012,
@@ -1691,7 +1694,7 @@ class _MainPageState extends State<MainPage> {
                                                       // Adding ListTile here
                                                       ListTile(
                                                         title: Text(
-                                                          product.ProductName,
+                                                          product.productName,
                                                           style: TextStyle(
                                                             fontSize:
                                                                 screenWidth *
@@ -1709,7 +1712,7 @@ class _MainPageState extends State<MainPage> {
                                                           ),
                                                         ),
                                                         trailing: Text(
-                                                          '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                                                          '${product.sellingPrice.toStringAsFixed(2)} JOD',
                                                           style: TextStyle(
                                                             fontSize:
                                                                 screenWidth *
@@ -2277,10 +2280,10 @@ void _chargeOrder() async {
   // Update product inventory
   for (var item in selectedItems) {
     Product product = _getProductById(item.productId);
-    if (product.id != 0) {
+    if (product.productId != 0) {
       // Subtract the quantity ordered from the product inventory
-      product.ProductInventory -= item.quantity;
-      print("Updated inventory for ${product.ProductName}: ${product.ProductInventory}");
+      product.productInventory -= item.quantity;
+      print("Updated inventory for ${product.productName}: ${product.productInventory}");
       
       // Update the product inventory in the database (optional)
       await apiHandler.updateProductInventoryInDatabase(product);
@@ -2306,33 +2309,33 @@ void _chargeOrder() async {
 
     // Cast the data list to a List<Product> and search for the product by its ID
     var product = (data as List<Product>).firstWhere(
-      (product) => product.id == productId,
+      (product) => product.productId == productId,
       orElse: () {
         // If product isn't found, fetch it from the API (or return a default)
         print(
           "Product with ID $productId not found in cache, fetching from API...",
         );
         return Product(
-          id: 0,
+          productId: 0,
           organizationId: _orgId ?? 0,
-          ProductCategory: 0,
-          ProductName: 'Unknown Product',
-          ProductDescription: 'No description available',
-          PurchasePrice: 0.0,
-          SellingPrice: 0.0,
-          ProductInventory: 0.0,
-          Barcode: '',
+          categoryId: 0,
+          productName: 'Unknown Product',
+          productDescription: 'No description available',
+          purchasePrice: 0.0,
+          sellingPrice: 0.0,
+          productInventory: 0.0,
+          barcode: '',
         );
       },
     );
 
-    if (product.id == 0) {
+    if (product.productId == 0) {
       // If the product is still the default (not found), make an API call to fetch the product by ID
       print("Fetching product from API...");
       // Optionally make an API call to fetch a single product by its ID and return that.
     }
 
-    print("Found product: ${product.ProductName}, ID: ${product.id}");
+    print("Found product: ${product.productName}, ID: ${product.productId}");
     return product;
   }
 }
@@ -2409,15 +2412,15 @@ class _AddProductDialogState extends State<AddProductDialog>
     setState(() => _isSubmitting = true);
 
     final newProd = Product(
-      id: 0,
+      productId: 0,
       organizationId: _orgId ?? 0,
-      ProductCategory: _chosenCategory!.id,
-      ProductName: _nameCtrl.text.trim(),
-      ProductDescription: _descCtrl.text.trim(),
-      SellingPrice: double.parse(_priceCtrl.text),
-      PurchasePrice: double.parse(_purPriceCtrl.text),
-      ProductInventory: double.parse(_inventoryCtrl.text),
-      Barcode: widget.barcode,
+      categoryId: _chosenCategory!.id,
+      productName: _nameCtrl.text.trim(),
+      productDescription: _descCtrl.text.trim(),
+      sellingPrice: double.parse(_priceCtrl.text),
+      purchasePrice: double.parse(_purPriceCtrl.text),
+      productInventory: double.parse(_inventoryCtrl.text),
+      barcode: widget.barcode,
     );
 
     final resp = await ApiHandler().AddProducts(product: newProd);

@@ -29,13 +29,13 @@ class _CustomersPageState extends State<CustomersPage> {
 
   Future<void> _showCustomerDialog({Customer? customer}) async {
     final TextEditingController nameController =
-        TextEditingController(text: customer?.Name ?? '');
+        TextEditingController(text: customer?.name ?? '');
     final TextEditingController emailController =
-        TextEditingController(text: customer?.Email ?? '');
+        TextEditingController(text: customer?.email ?? '');
     final TextEditingController phoneController =
-        TextEditingController(text: customer?.Phone ?? '');
+        TextEditingController(text: customer?.phone ?? '');
     final TextEditingController addressController =
-        TextEditingController(text: customer?.Address ?? '');
+        TextEditingController(text: customer?.address ?? '');
     final orgId = await SessionManager.getOrganizationId();
 
     showDialog(
@@ -81,19 +81,19 @@ class _CustomersPageState extends State<CustomersPage> {
             ElevatedButton(
               onPressed: () async {
                 Customer newCustomer = Customer(
-                  CustomerId: customer?.CustomerId ?? 0,
-                  OrganizationId: orgId!.toInt(),
-                  Name: nameController.text,
-                  Email: emailController.text,
-                  Phone: phoneController.text,
-                  Address: addressController.text,
+                  customerId: customer?.customerId ?? 0,
+                  organizationId: orgId!.toInt(),
+                  name: nameController.text,
+                  email: emailController.text,
+                  phone: phoneController.text,
+                  address: addressController.text,
                 );
 
                 if (customer == null) {
                   await apiHandler.addCustomer(customer: newCustomer);
                 } else {
                   await apiHandler.updateCustomer(
-                      id: customer.CustomerId, customer: newCustomer);
+                      id: customer.customerId, customer: newCustomer);
                 }
 
                 Navigator.pop(context);
@@ -228,10 +228,10 @@ class _CustomersPageState extends State<CustomersPage> {
                       leading: CircleAvatar(
                         radius: avatarRadius,
                         backgroundColor: Colors.orange,
-                        child: Text(customer.Name[0],
+                        child: Text(customer.name[0],
                             style: TextStyle(fontSize: titleFontSize)),
                       ),
-                      title: Text(customer.Name,
+                      title: Text(customer.name,
                           style: TextStyle(
                               fontSize: titleFontSize,
                               fontWeight: FontWeight.bold)),
@@ -239,13 +239,13 @@ class _CustomersPageState extends State<CustomersPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                              '${translation(context).customerEmail}: ${customer.Email}',
+                              '${translation(context).customerEmail}: ${customer.email ?? ''}',
                               style: TextStyle(fontSize: subtitleFontSize)),
                           Text(
-                              '${translation(context).customerPhone}: ${customer.Phone}',
+                              '${translation(context).customerPhone}: ${customer.phone}',
                               style: TextStyle(fontSize: subtitleFontSize)),
                           Text(
-                              '${translation(context).customerAddress}: ${customer.Address}',
+                              '${translation(context).customerAddress}: ${customer.address ?? ''}',
                               style: TextStyle(fontSize: subtitleFontSize)),
                         ],
                       ),
@@ -262,7 +262,7 @@ class _CustomersPageState extends State<CustomersPage> {
                             icon: Icon(Icons.delete,
                                 color: Colors.red, size: iconSize),
                             onPressed: () =>
-                                _deleteCustomer(customer.CustomerId),
+                                _deleteCustomer(customer.customerId),
                           ),
                         ],
                       ),

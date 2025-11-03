@@ -25,7 +25,6 @@ class _AddProductsState extends State<AddProducts> {
   final TextEditingController _categorySearchController =
       TextEditingController();
   int? _orgId = 0;
-  Category? _selectedCategory;
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
     setState(() {
@@ -113,16 +112,16 @@ class _AddProductsState extends State<AddProducts> {
           ? data['ProductCategory'] as int
           : int.tryParse(data['ProductCategory'].toString()) ?? 0;
       final product = Product(
-        id: 0,
+        productId: 0,
         organizationId: _orgId!.toInt(),
-        ProductCategory: catId,
-        ProductName: data['ProductName'],
-        ProductDescription: data['ProductDescription'],
-        SellingPrice: double.tryParse(data['sellingPrice'].toString()) ?? 0.0,
-        PurchasePrice: double.tryParse(data['purchasePrice'].toString()) ?? 0.0,
-        ProductInventory:
+        categoryId: catId,
+        productName: data['ProductName'],
+        productDescription: data['ProductDescription'],
+        sellingPrice: double.tryParse(data['sellingPrice'].toString()) ?? 0.0,
+        purchasePrice: double.tryParse(data['purchasePrice'].toString()) ?? 0.0,
+        productInventory:
             double.tryParse(data['ProductInventory'].toString()) ?? 0.0,
-        Barcode: data['Barcode'],
+        barcode: data['Barcode'],
       );
 
       try {
@@ -234,12 +233,7 @@ class _AddProductsState extends State<AddProducts> {
               );
             }).toList(),
             onChanged: (value) {
-              setState(() {
-                _selectedCategory = filteredCategories.firstWhere(
-                  (category) => category.id == value,
-                  orElse: () => filteredCategories.first,
-                );
-              });
+              // Category selected
             },
           ),
         ],

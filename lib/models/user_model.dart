@@ -1,48 +1,51 @@
 class User {
   final int id;
   final int organizationId;
-  final String FullName;
-  final String UserName;
-  final String Email;
-  final String Password;
-  final String PhoneNumber;
-  final String Role;
+  final String fullName;
+  final String userName;
+  final String email;
+  final String password;
+  final String phoneNumber;
+  final String role;
+  final bool isActive;
 
   const User({
     required this.id,
     required this.organizationId,
-    required this.FullName,
-    required this.UserName,
-    required this.Email,
-    required this.Password,
-    required this.PhoneNumber,
-    required this.Role,
+    required this.fullName,
+    required this.userName,
+    required this.email,
+    required this.password,
+    required this.phoneNumber,
+    required this.role,
+    this.isActive = true,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-      id: json['id'] ?? 0, // Default 0 if null
-      FullName: json["fullName"] ?? '', // Ensure matching API response casing
-      UserName: json["userName"] ?? '',
-      Email: json["email"] ?? '',
-      Password: json["password"] ?? '',
-      PhoneNumber: json["phoneNumber"] ?? '',
-      Role: json["role"] ?? '',
-      organizationId: json["organizationId"] ?? json["OrganizationId"] ?? 0);
+      id: json['id'] ?? 0,
+      fullName: json["fullName"] ?? '',
+      userName: json["userName"] ?? '',
+      email: json["email"] ?? '',
+      password: json["password"] ?? '',
+      phoneNumber: json["phoneNumber"] ?? '',
+      role: json["role"] ?? '',
+      organizationId: json["organizationId"] ?? 0,
+      isActive: json["isActive"] ?? true);
 
   Map<String, dynamic> toJson() => {
-        // Corrected function name
         'id': id,
-        'fullName': FullName, // Ensure it matches API expectation
-        'userName': UserName,
-        'email': Email,
-        'password': Password,
-        'phoneNumber': PhoneNumber,
-        'role': Role,
-        'organizationId': organizationId
+        'fullName': fullName,
+        'userName': userName,
+        'email': email,
+        'password': password,
+        'phoneNumber': phoneNumber,
+        'role': role,
+        'organizationId': organizationId,
+        'isActive': isActive
       };
 
   @override
   String toString() {
-    return 'User{id: $id, fullName: $FullName, userName: $UserName, email: $Email, phone: $PhoneNumber, role: $Role, orgId: $organizationId}';
+    return 'User{id: $id, fullName: $fullName, userName: $userName, email: $email, phone: $phoneNumber, role: $role, orgId: $organizationId, isActive: $isActive}';
   }
 }

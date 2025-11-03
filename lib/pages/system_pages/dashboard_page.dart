@@ -1,7 +1,6 @@
 import 'dart:async';
 //import 'dart:io';
 import 'package:visionpos/models/order_dto.dart';
-import 'package:visionpos/models/product_model.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/language_changing/constants.dart';
 import 'package:visionpos/pages/system_pages/orderDetails_page.dart';
@@ -985,20 +984,19 @@ void _fetchOrdersForSelectedDateRange() async {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                  product?['productCategory'] ??
-                                                      'No Category',
+                                                  'Category: ${((product?['categoryId'] ?? 0) as num).toInt().toString()}',
                                                   style: TextStyle(
                                                       fontSize: 12,
                                                       color: Colors.grey)),
                                               Text(
-                                                  '${item.quantity} x \$${product?['sellingPrice'].toStringAsFixed(2)}',
+                                                  '${item.quantity} x \$${((product?['sellingPrice'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
                                                   style: TextStyle(
                                                       fontSize: 14,
                                                       color: Colors.black)),
                                             ],
                                           ),
                                           trailing: Text(
-                                            '\$${(item.quantity * (product?['sellingPrice'] ?? 0)).toStringAsFixed(2)}',
+                                            '\$${(item.quantity * ((product?['sellingPrice'] ?? 0) as num).toDouble()).toStringAsFixed(2)}',
                                             style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 14),

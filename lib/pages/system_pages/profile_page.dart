@@ -122,7 +122,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         "lib/assets/profile photo.jpg")),
                                 SizedBox(height: 10),
                                 Text(
-                                  data[0].FullName,
+                                  data[0].fullName,
                                   style: TextStyle(
                                       fontSize: nameFontSize,
                                       fontWeight: FontWeight.bold,
@@ -130,7 +130,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                                 SizedBox(height: 5),
                                 Text(
-                                  data[0].Role,
+                                  data[0].role,
                                   style: TextStyle(
                                       fontSize: roleFontSize,
                                       color: Colors.white70),
@@ -142,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           _buildProfileItem(
                               Icons.person,
                               translation(context).username,
-                              data[0].UserName,
+                              data[0].userName,
                               titleFontSize,
                               subtitleFontSize,
                               itemPaddingHorizontal,
@@ -150,7 +150,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           _buildProfileItem(
                               Icons.person,
                               translation(context).email,
-                              data[0].Email,
+                              data[0].email,
                               titleFontSize,
                               subtitleFontSize,
                               itemPaddingHorizontal,
@@ -158,7 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           _buildProfileItem(
                               Icons.phone_enabled,
                               translation(context).phone_number,
-                              data[0].PhoneNumber,
+                              data[0].phoneNumber,
                               titleFontSize,
                               subtitleFontSize,
                               itemPaddingHorizontal,

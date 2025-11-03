@@ -28,7 +28,7 @@ class ProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filteredProducts = products.where((p) {
-      final int? pCatId = _toInt(p.ProductCategory);
+      final int? pCatId = _toInt(p.categoryId);
       if (pCatId == null) return false;
 
       final bool matchesRoot = (selectedRootId == null) ||
@@ -64,7 +64,7 @@ class ProductGrid extends StatelessWidget {
           itemCount: filteredProducts.length,
           itemBuilder: (context, index) {
             final product = filteredProducts[index];
-            final categoryName = _getCategoryName(product.ProductCategory);
+            final categoryName = _getCategoryName(product.categoryId);
 
             return GestureDetector(
               onTap: () => onProductTap(product),
@@ -77,7 +77,7 @@ class ProductGrid extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      product.ProductName,
+                      product.productName,
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.014,
                         fontWeight: FontWeight.bold,
@@ -93,7 +93,7 @@ class ProductGrid extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                      '${product.sellingPrice.toStringAsFixed(2)} JOD',
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.012,
                         color: Colors.green,

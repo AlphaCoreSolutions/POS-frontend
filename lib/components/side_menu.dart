@@ -83,7 +83,7 @@ class _DrawerPageState extends State<DrawerPage> {
                 Flexible(
                   child: data.isNotEmpty
                       ? Text(
-                          data[0].FullName,
+                          data[0].fullName,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize:

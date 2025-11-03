@@ -154,16 +154,16 @@ class PosProvider with ChangeNotifier {
 
   // Order Management
   void addToOrder(Product product) {
-    final index =
-        _selectedItems.indexWhere((item) => item.productId == product.id);
+    final index = _selectedItems
+        .indexWhere((item) => item.productId == product.productId);
 
     if (index != -1) {
       _selectedItems[index] = _selectedItems[index].updateQuantity(
         _selectedItems[index].quantity + 1,
       );
     } else {
-      _selectedItems
-          .add(order_item_dto.OrderItemDto(productId: product.id, quantity: 1));
+      _selectedItems.add(order_item_dto.OrderItemDto(
+          productId: product.productId, quantity: 1));
     }
 
     _calculateTotals();
@@ -248,7 +248,7 @@ class PosProvider with ChangeNotifier {
   double _calculateSubtotal() {
     double subtotal = _selectedItems.fold(0.0, (sum, item) {
       final product = _getProductById(item.productId);
-      final price = product?.SellingPrice ?? 0.0;
+      final price = product?.sellingPrice ?? 0.0;
       return sum + (price * item.quantity);
     });
 
@@ -271,17 +271,17 @@ class PosProvider with ChangeNotifier {
 
   Product? _getProductById(int productId) {
     return _products.cast<Product>().firstWhere(
-          (product) => product.id == productId,
+          (product) => product.productId == productId,
           orElse: () => Product(
-            id: 0,
+            productId: 0,
             organizationId: _orgId ?? 0,
-            ProductCategory: 0,
-            ProductName: 'Unknown Product',
-            ProductDescription: 'No description available',
-            PurchasePrice: 0.0,
-            SellingPrice: 0.0,
-            ProductInventory: 0.0,
-            Barcode: '',
+            categoryId: 0,
+            productName: 'Unknown Product',
+            productDescription: 'No description available',
+            purchasePrice: 0.0,
+            sellingPrice: 0.0,
+            productInventory: 0.0,
+            barcode: '',
           ),
         );
   }
@@ -316,7 +316,7 @@ class PosProvider with ChangeNotifier {
     return _products
         .cast<Product>()
         .where((product) =>
-            product.ProductName.toLowerCase().contains(query.toLowerCase()))
+            product.productName.toLowerCase().contains(query.toLowerCase()))
         .toList();
   }
 

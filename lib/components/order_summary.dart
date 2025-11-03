@@ -19,17 +19,17 @@ class OrderSummary extends StatelessWidget {
 
   Product _getProductById(int productId) {
     return (products as List<Product>).firstWhere(
-      (product) => product.id == productId,
+      (product) => product.productId == productId,
       orElse: () => Product(
-        id: 0,
+        productId: 0,
         organizationId: 0,
-        ProductCategory: 0,
-        ProductName: 'Unknown Product',
-        ProductDescription: 'No description available',
-        PurchasePrice: 0.0,
-        SellingPrice: 0.0,
-        ProductInventory: 0.0,
-        Barcode: '',
+        categoryId: 0,
+        productName: 'Unknown Product',
+        productDescription: 'No description available',
+        purchasePrice: 0.0,
+        sellingPrice: 0.0,
+        productInventory: 0.0,
+        barcode: '',
       ),
     );
   }
@@ -73,7 +73,7 @@ class OrderSummary extends StatelessWidget {
                             children: [
                               ListTile(
                                 title: Text(
-                                  product.ProductName,
+                                  product.productName,
                                   style: TextStyle(
                                     fontSize:
                                         MediaQuery.of(context).size.width *
@@ -90,7 +90,7 @@ class OrderSummary extends StatelessWidget {
                                   ),
                                 ),
                                 trailing: Text(
-                                  '${product.SellingPrice.toStringAsFixed(2)} JOD',
+                                  '${product.sellingPrice.toStringAsFixed(2)} JOD',
                                   style: TextStyle(
                                     fontSize:
                                         MediaQuery.of(context).size.width *

@@ -41,12 +41,12 @@ class _EditPageState extends State<EditPage> {
       final user = User(
           id: widget.user.id,
           organizationId: _orgId!.toInt(),
-          FullName: data['fullname'],
-          UserName: data['UserName'],
-          Email: data['email'],
-          Password: data['Password'],
-          PhoneNumber: data['phone'],
-          Role: data['Role']);
+          fullName: data['fullname'],
+          userName: data['UserName'],
+          email: data['email'],
+          password: data['Password'],
+          phoneNumber: data['phone'],
+          role: data['Role']);
 
       response = await apiHandler.updateUser(id: widget.user.id, user: user);
     }
@@ -80,12 +80,12 @@ class _EditPageState extends State<EditPage> {
             child: FormBuilder(
               key: _formkey,
               initialValue: {
-                'fullname': widget.user.FullName,
-                'UserName': widget.user.UserName,
-                'Password': widget.user.Password,
-                'email': widget.user.Email,
-                'phone': widget.user.PhoneNumber,
-                'Role': widget.user.Role,
+                'fullname': widget.user.fullName,
+                'UserName': widget.user.userName,
+                'Password': widget.user.password,
+                'email': widget.user.email,
+                'phone': widget.user.phoneNumber,
+                'Role': widget.user.role,
               },
               child: Column(
                 children: [

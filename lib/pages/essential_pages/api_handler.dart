@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:visionpos/models/api_response.dart';
 import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/customer_model.dart';
 import 'package:visionpos/models/order_dto.dart';
@@ -221,7 +220,22 @@ class ApiHandler {
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        List<dynamic> responseData = json.decode(response.body);
+        final decoded = json.decode(response.body);
+        List<dynamic> responseData;
+
+        // Handle ApiResponse wrapper or direct list
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          if (decoded['success'] == true) {
+            responseData = decoded['data'] as List<dynamic>? ?? const [];
+          } else {
+            throw Exception('API Error: ${decoded['message']}');
+          }
+        } else if (decoded is List) {
+          responseData = decoded;
+        } else {
+          throw Exception('Unexpected response structure');
+        }
+
         List<OrderDto> orders = responseData
             .map((orderData) => OrderDto.fromJson(orderData))
             .toList();
@@ -352,9 +366,23 @@ class ApiHandler {
       }
 
       final decoded = json.decode(response.body);
-      // Your controller returns a List, but this makes it robust if it ever wraps:
-      final List<dynamic> list =
-          decoded is List ? decoded : (decoded['items'] as List? ?? const []);
+      // Handle ApiResponse wrapper structure
+      List<dynamic> list;
+      if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+        // Handle ApiResponse<IEnumerable<CategoryModel>> structure
+        if (decoded['success'] == true) {
+          list = decoded['data'] as List<dynamic>? ?? const [];
+        } else {
+          debugPrint('[GET] API error: ${decoded['message']}');
+          return [];
+        }
+      } else if (decoded is List) {
+        // Handle direct list response (fallback)
+        list = decoded;
+      } else {
+        debugPrint('[GET] Unexpected response structure: $decoded');
+        return [];
+      }
       debugPrint('Raw API response: $list');
 
       return list
@@ -369,14 +397,27 @@ class ApiHandler {
   /// (Optional) server leaf-categories by org, if you want it:
   Future<List<Category>> getLeafCategoriesByOrg(int orgId) async {
     final uri = Uri.parse(
-      '$CategoryUri/GetSubcategoriesByOrganization',
-    ).replace(queryParameters: {'orgId': '$orgId'});
+      '$CategoryUri/subcategories/organization/$orgId',
+    );
     final resp = await http.get(
       uri,
       headers: {'Content-type': 'application/json; charset=UTF-8'},
     );
     if (resp.statusCode == 200) {
-      final List list = json.decode(resp.body);
+      final decoded = json.decode(resp.body);
+      // Handle ApiResponse wrapper structure
+      List<dynamic> list;
+      if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+        if (decoded['success'] == true) {
+          list = decoded['data'] as List<dynamic>? ?? const [];
+        } else {
+          throw Exception('API Error: ${decoded['message']}');
+        }
+      } else if (decoded is List) {
+        list = decoded;
+      } else {
+        throw Exception('Unexpected response structure');
+      }
       return list.map((e) => Category.fromJson(e)).toList();
     }
     throw Exception('Failed leaf categories: ${resp.statusCode}');
@@ -385,17 +426,20 @@ class ApiHandler {
   /// Advanced search for categories
   Future<List<Category>> searchCategories(String searchQuery,
       {int? orgId}) async {
-    final queryParams = <String, String>{
-      'searchQuery': searchQuery,
-    };
+    final queryParams = <String, String>{};
 
     // Add orgId if provided
     if (orgId != null) {
       queryParams['orgId'] = orgId.toString();
     }
 
+    // Add category name search if provided
+    if (searchQuery.isNotEmpty) {
+      queryParams['categoryName'] = searchQuery;
+    }
+
     final uri = Uri.parse(
-      '$CategoryUri/AdvanceSearch',
+      '$CategoryUri/search',
     ).replace(queryParameters: queryParams);
 
     print('🟡 [searchCategories] GET $uri');
@@ -410,7 +454,20 @@ class ApiHandler {
     print('🟢 [searchCategories] Body: ${resp.body}');
 
     if (resp.statusCode == 200) {
-      final List list = json.decode(resp.body);
+      final decoded = json.decode(resp.body);
+      // Handle ApiResponse wrapper structure
+      List<dynamic> list;
+      if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+        if (decoded['success'] == true) {
+          list = decoded['data'] as List<dynamic>? ?? const [];
+        } else {
+          throw Exception('API Error: ${decoded['message']}');
+        }
+      } else if (decoded is List) {
+        list = decoded;
+      } else {
+        throw Exception('Unexpected response structure');
+      }
       return list.map((e) => Category.fromJson(e)).toList();
     }
     throw Exception('Failed to search categories: ${resp.statusCode}');
@@ -544,7 +601,22 @@ class ApiHandler {
       );
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
-        final List<dynamic> jsonData = json.decode(response.body);
+        final decoded = json.decode(response.body);
+        // Handle ApiResponse wrapper structure
+        List<dynamic> jsonData;
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          if (decoded['success'] == true) {
+            jsonData = decoded['data'] as List<dynamic>? ?? const [];
+          } else {
+            print('API Error: ${decoded['message']}');
+            return [];
+          }
+        } else if (decoded is List) {
+          jsonData = decoded;
+        } else {
+          print('Unexpected response structure: $decoded');
+          return [];
+        }
         print('Raw API Product response: $jsonData');
         data = jsonData.map((json) => Product.fromJson(json)).toList();
       }
@@ -621,10 +693,10 @@ class ApiHandler {
   }
 
   Future<List<Product>> advanceSearchProducts(String filter) async {
-    // Build a clean, encoded URI
+    // Build a clean, encoded URI using the new search endpoint
     final uri = Uri.parse(
-      '$productUri/GetAdvanceSearch',
-    ).replace(queryParameters: {'searchQuery': filter});
+      '$productUri/search',
+    ).replace(queryParameters: {'productName': filter});
 
     print('🟡 GET $uri'); // <-- inspect the fully‑encoded URL
     print('🔵 Filter body: $filter');
@@ -638,11 +710,23 @@ class ApiHandler {
     print('🟢 Body:   ${response.body}');
 
     if (response.statusCode == 200) {
-      final list = (json.decode(response.body) as List)
-          .map((e) => Product.fromJson(e))
-          .toList();
-      print('🟢 Found ${list.length} products');
-      return list;
+      final decoded = json.decode(response.body);
+      // Handle ApiResponse wrapper structure
+      List<dynamic> list;
+      if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+        if (decoded['success'] == true) {
+          list = decoded['data'] as List<dynamic>? ?? const [];
+        } else {
+          throw Exception('API Error: ${decoded['message']}');
+        }
+      } else if (decoded is List) {
+        list = decoded;
+      } else {
+        throw Exception('Unexpected response structure');
+      }
+      final products = list.map((e) => Product.fromJson(e)).toList();
+      print('🟢 Found ${products.length} products');
+      return products;
     }
     throw Exception('Search failed: ${response.statusCode}');
   }
@@ -1234,7 +1318,17 @@ class ApiHandler {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final jsonResponse = json.decode(response.body);
+        // Reports endpoints return direct data objects, not ApiResponse wrapper
+        if (jsonResponse is Map) {
+          return jsonResponse as Map<String, dynamic>;
+        } else if (jsonResponse is Map &&
+            jsonResponse['success'] == true &&
+            jsonResponse['data'] != null) {
+          // Handle ApiResponse structure if backend changes
+          return jsonResponse['data'] as Map<String, dynamic>;
+        }
+        return null;
       }
       return null;
     } catch (e) {
@@ -1271,7 +1365,20 @@ class ApiHandler {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
+        final jsonResponse = json.decode(response.body);
+        // Reports endpoints return direct data arrays/objects, not ApiResponse wrapper
+        if (jsonResponse is List) {
+          return List<Map<String, dynamic>>.from(jsonResponse);
+        } else if (jsonResponse is Map &&
+            jsonResponse['success'] == true &&
+            jsonResponse['data'] != null) {
+          // Handle ApiResponse structure if backend changes
+          return List<Map<String, dynamic>>.from(jsonResponse['data']);
+        } else if (jsonResponse is Map) {
+          // Single object response, wrap in array
+          return [Map<String, dynamic>.from(jsonResponse)];
+        }
+        return [];
       }
       return [];
     } catch (e) {
@@ -1297,7 +1404,20 @@ class ApiHandler {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
+        final jsonResponse = json.decode(response.body);
+        // Reports endpoints return direct data arrays, not ApiResponse wrapper
+        if (jsonResponse is List) {
+          return List<Map<String, dynamic>>.from(jsonResponse);
+        } else if (jsonResponse is Map &&
+            jsonResponse['success'] == true &&
+            jsonResponse['data'] != null) {
+          // Handle ApiResponse structure if backend changes
+          return List<Map<String, dynamic>>.from(jsonResponse['data']);
+        } else if (jsonResponse is Map) {
+          // Single object response, wrap in array
+          return [Map<String, dynamic>.from(jsonResponse)];
+        }
+        return [];
       }
       return [];
     } catch (e) {
@@ -1323,7 +1443,20 @@ class ApiHandler {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
+        final jsonResponse = json.decode(response.body);
+        // Reports endpoints return direct data arrays, not ApiResponse wrapper
+        if (jsonResponse is List) {
+          return List<Map<String, dynamic>>.from(jsonResponse);
+        } else if (jsonResponse is Map &&
+            jsonResponse['success'] == true &&
+            jsonResponse['data'] != null) {
+          // Handle ApiResponse structure if backend changes
+          return List<Map<String, dynamic>>.from(jsonResponse['data']);
+        } else if (jsonResponse is Map) {
+          // Single object response, wrap in array
+          return [Map<String, dynamic>.from(jsonResponse)];
+        }
+        return [];
       }
       return [];
     } catch (e) {
@@ -1348,7 +1481,17 @@ class ApiHandler {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final jsonResponse = json.decode(response.body);
+        // Reports endpoints return direct data objects, not ApiResponse wrapper
+        if (jsonResponse is Map) {
+          return jsonResponse as Map<String, dynamic>;
+        } else if (jsonResponse is Map &&
+            jsonResponse['success'] == true &&
+            jsonResponse['data'] != null) {
+          // Handle ApiResponse structure if backend changes
+          return jsonResponse['data'] as Map<String, dynamic>;
+        }
+        return null;
       }
       return null;
     } catch (e) {
@@ -1389,7 +1532,17 @@ class ApiHandler {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final jsonResponse = json.decode(response.body);
+        // Reports endpoints return direct data objects, not ApiResponse wrapper
+        if (jsonResponse is Map) {
+          return jsonResponse as Map<String, dynamic>;
+        } else if (jsonResponse is Map &&
+            jsonResponse['success'] == true &&
+            jsonResponse['data'] != null) {
+          // Handle ApiResponse structure if backend changes
+          return jsonResponse['data'] as Map<String, dynamic>;
+        }
+        return null;
       }
       return null;
     } catch (e) {
