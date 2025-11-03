@@ -495,7 +495,7 @@ class _ReportsPageState extends State<ReportsPage>
                           color: Colors.white,
                         ),
                         color: _getColorForPaymentMethod(
-                            item['paymentMethod'] ?? ''),
+                            _getPaymentMethodName(item['paymentMethod'] ?? 0)),
                       );
                     }).toList(),
                     sectionsSpace: 2,
@@ -507,7 +507,8 @@ class _ReportsPageState extends State<ReportsPage>
           ),
           const SizedBox(height: 20),
           ..._salesByPaymentMethod.map((item) {
-            final method = (item['paymentMethod'] ?? 'Unknown').toString();
+            final methodCode = item['paymentMethod'] ?? 0;
+            final method = _getPaymentMethodName(methodCode);
             final count = ((item['totalOrders'] ?? 0) as num).toInt();
             final amount = ((item['totalAmount'] ?? 0) as num).toDouble();
 
@@ -1010,6 +1011,24 @@ class _ReportsPageState extends State<ReportsPage>
         return Icons.payment;
       default:
         return Icons.account_balance_wallet;
+    }
+  }
+
+  String _getPaymentMethodName(dynamic methodCode) {
+    final code = methodCode is String
+        ? int.tryParse(methodCode) ?? 0
+        : (methodCode as num).toInt();
+    switch (code) {
+      case 1:
+        return 'Cash';
+      case 2:
+        return 'Visa';
+      case 3:
+        return 'Credit Card';
+      case 4:
+        return 'Debit Card';
+      default:
+        return 'Unknown';
     }
   }
 }
