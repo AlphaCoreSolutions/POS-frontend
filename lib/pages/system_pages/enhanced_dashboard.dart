@@ -29,6 +29,28 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
   List<Map<String, dynamic>> _monthlyComparison = [];
   Map<String, dynamic>? _lowStockAlert;
 
+  String _getPaymentMethodName(dynamic methodCode) {
+    int code = 0;
+    if (methodCode is int) {
+      code = methodCode;
+    } else if (methodCode is String) {
+      code = int.tryParse(methodCode) ?? 0;
+    }
+
+    switch (code) {
+      case 1:
+        return 'Cash';
+      case 2:
+        return 'Visa';
+      case 3:
+        return 'Credit Card';
+      case 4:
+        return 'Debit Card';
+      default:
+        return methodCode?.toString() ?? 'Unknown';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -502,7 +524,8 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
                       sections: _paymentDistribution.map((item) {
                         final percentage =
                             ((item['percentage'] ?? 0) as num).toDouble();
-                        final method = item['paymentMethod'] ?? 'Unknown';
+                        final method =
+                            _getPaymentMethodName(item['paymentMethod']);
                         return PieChartSectionData(
                           value: percentage,
                           title: '${percentage.toStringAsFixed(1)}%',
@@ -524,7 +547,7 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
             ),
             const SizedBox(height: 16),
             ..._paymentDistribution.map((item) {
-              final method = item['paymentMethod'] ?? 'Unknown';
+              final method = _getPaymentMethodName(item['paymentMethod']);
               final count = item['count'] ?? 0;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -917,7 +940,8 @@ class _EnhancedDashboardState extends State<EnhancedDashboard> {
                   order['orderPlaced'] ?? DateTime.now().toIso8601String());
               final grandTotal = ((order['grandTotal'] ?? 0) as num).toDouble();
               final itemCount = order['itemCount'] ?? 0;
-              final paymentMethod = order['paymentMethod'] ?? 'Unknown';
+              final paymentMethod =
+                  _getPaymentMethodName(order['paymentMethod']);
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
