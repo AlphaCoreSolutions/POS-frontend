@@ -114,7 +114,7 @@ class _AddProductsState extends State<AddProducts> {
           : int.tryParse(data['ProductCategory'].toString()) ?? 0;
       final product = Product(
         id: 0,
-        OrganizationId: _orgId!.toInt(),
+        organizationId: _orgId!.toInt(),
         ProductCategory: catId,
         ProductName: data['ProductName'],
         ProductDescription: data['ProductDescription'],

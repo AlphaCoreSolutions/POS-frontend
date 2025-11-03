@@ -1,6 +1,6 @@
 class User {
   final int id;
-  final int OrganizationId;
+  final int organizationId;
   final String FullName;
   final String UserName;
   final String Email;
@@ -10,7 +10,7 @@ class User {
 
   const User({
     required this.id,
-    required this.OrganizationId,
+    required this.organizationId,
     required this.FullName,
     required this.UserName,
     required this.Email,
@@ -27,7 +27,7 @@ class User {
       Password: json["password"] ?? '',
       PhoneNumber: json["phoneNumber"] ?? '',
       Role: json["role"] ?? '',
-      OrganizationId: json["organizationId"] ?? 0);
+      organizationId: json["organizationId"] ?? json["OrganizationId"] ?? 0);
 
   Map<String, dynamic> toJson() => {
         // Corrected function name
@@ -38,11 +38,11 @@ class User {
         'password': Password,
         'phoneNumber': PhoneNumber,
         'role': Role,
-        'OrganizationId': OrganizationId
+        'organizationId': organizationId
       };
 
   @override
   String toString() {
-    return 'User{id: $id, fullName: $FullName, userName: $UserName, email: $Email, phone: $PhoneNumber, role: $Role, orgId: $OrganizationId}';
+    return 'User{id: $id, fullName: $FullName, userName: $UserName, email: $Email, phone: $PhoneNumber, role: $Role, orgId: $organizationId}';
   }
 }

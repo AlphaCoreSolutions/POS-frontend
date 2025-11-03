@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:visionpos/models/api_response.dart';
 import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/customer_model.dart';
 import 'package:visionpos/models/order_dto.dart';
@@ -185,8 +186,19 @@ class ApiHandler {
       print("Response Status Code: ${response.statusCode}");
       print("Response Body: ${response.body}");
 
-      // Update the condition to accept 201 as success
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Parse ApiResponse structure
+        final responseData = json.decode(response.body);
+        if (responseData is Map<String, dynamic>) {
+          final apiResponse = responseData;
+          if (apiResponse['success'] == true) {
+            print("Order posted successfully!");
+            return true;
+          } else {
+            print("API returned error: ${apiResponse['message']}");
+            throw Exception('API Error: ${apiResponse['message']}');
+          }
+        }
         print("Order posted successfully!");
         return true;
       } else {
@@ -282,7 +294,7 @@ class ApiHandler {
           .map(
             (entry) => FlSpot(
               entry.key.toDouble(),
-              (entry.value.GrandTotal as num).toDouble(),
+              (entry.value.grandTotal as num).toDouble(),
             ),
           )
           .toList();

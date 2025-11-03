@@ -22,13 +22,13 @@ class OrderSummary extends StatelessWidget {
       (product) => product.id == productId,
       orElse: () => Product(
         id: 0,
-        OrganizationId: 0,
+        organizationId: 0,
         ProductCategory: 0,
         ProductName: 'Unknown Product',
         ProductDescription: 'No description available',
-        PurchasePrice: 0,
-        SellingPrice: 0,
-        ProductInventory: 0,
+        PurchasePrice: 0.0,
+        SellingPrice: 0.0,
+        ProductInventory: 0.0,
         Barcode: '',
       ),
     );

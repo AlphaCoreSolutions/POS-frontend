@@ -27,7 +27,7 @@ class PosProvider with ChangeNotifier {
   double _taxes = 0.0;
   double _total = 0.0;
   double _tips = 0.0;
-  String _paymentMethod = 'Cash';
+  int _paymentMethod = 1; // 1 for Cash, 2 for Visa
   bool _isCash = true;
   double _discount = 0.0;
   final double _discountPercentage = 0.0;
@@ -55,7 +55,7 @@ class PosProvider with ChangeNotifier {
   double get taxes => _taxes;
   double get total => _total;
   double get tips => _tips;
-  String get paymentMethod => _paymentMethod;
+  int get paymentMethod => _paymentMethod;
   bool get isCash => _isCash;
   double get discount => _discount;
   double get discountPercentage => _discountPercentage;
@@ -208,7 +208,7 @@ class PosProvider with ChangeNotifier {
   // Payment and Promo
   void togglePaymentMethod() {
     _isCash = !_isCash;
-    _paymentMethod = _isCash ? 'Cash' : 'Visa';
+    _paymentMethod = _isCash ? 1 : 2;
     notifyListeners();
   }
 
@@ -274,13 +274,13 @@ class PosProvider with ChangeNotifier {
           (product) => product.id == productId,
           orElse: () => Product(
             id: 0,
-            OrganizationId: _orgId ?? 0,
+            organizationId: _orgId ?? 0,
             ProductCategory: 0,
             ProductName: 'Unknown Product',
             ProductDescription: 'No description available',
-            PurchasePrice: 0,
-            SellingPrice: 0,
-            ProductInventory: 0,
+            PurchasePrice: 0.0,
+            SellingPrice: 0.0,
+            ProductInventory: 0.0,
             Barcode: '',
           ),
         );
@@ -292,9 +292,10 @@ class PosProvider with ChangeNotifier {
 
     final order = order_dto.OrderDto(
       id: 0,
+      organizationId: _orgId ?? 0,
       orderItems: _selectedItems,
-      GrandTotal: _total,
-      PaymentMethod: _paymentMethod,
+      grandTotal: _total,
+      paymentMethod: _paymentMethod,
       tip: _tips,
     );
 

@@ -79,7 +79,7 @@ class _MainPageState extends State<MainPage> {
   Map<int, double> productPrices = {};
   double tips = 0.0;
   //String orderStatus = '';
-  String paymentMethod = 'Cash'; // Default payment method
+  int paymentMethod = 1; // 1 for Cash, 2 for Visa
   bool isCash = true; // Initially set to 'Cash'
   double switchScale = 0.8;
   int? _toInt(dynamic v) {
@@ -283,9 +283,10 @@ class _MainPageState extends State<MainPage> {
       List<int> bytes = await generateWindowsTicket(
         OrderDto(
           id: orderCount,
+          organizationId: _orgId ?? 0,
           orderItems: selectedItems,
-          GrandTotal: _calculateGrandTotal(selectedItems),
-          PaymentMethod: paymentMethod,
+          grandTotal: _calculateGrandTotal(selectedItems),
+          paymentMethod: paymentMethod,
           tip: tips,
         ),
       );
@@ -391,14 +392,15 @@ class _MainPageState extends State<MainPage> {
     );
 
     bytes += generator.text(
-      'Total:      ${(order.GrandTotal + order.tip).toStringAsFixed(2)} JOD',
+      'Total:      ${(order.grandTotal + order.tip).toStringAsFixed(2)} JOD',
       styles: PosStyles(align: PosAlign.right, bold: true),
     );
 
     bytes += generator.feed(1);
 
+    String paymentName = order.paymentMethod == 1 ? 'Cash' : 'Visa';
     bytes += generator.text(
-      'PaymentMethod:          ${order.PaymentMethod}    ',
+      'PaymentMethod:          $paymentName    ',
       styles: PosStyles(align: PosAlign.right),
     );
 
@@ -596,8 +598,8 @@ class _MainPageState extends State<MainPage> {
   void _togglePaymentMethod(bool value) {
     setState(() {
       isCash = value;
-      paymentMethod =
-          isCash ? 'Cash' : 'Visa'; // Toggle between 'Cash' and 'Visa'
+      paymentMethod = isCash ? 1 : 2;
+      //isCash ? 'Cash' : 'Visa'; // Toggle between 'Cash' and 'Visa'
     });
   }
 
@@ -770,9 +772,10 @@ class _MainPageState extends State<MainPage> {
     double grandTotal = _calculateGrandTotal(selectedItems);
     OrderDto order = OrderDto(
       id: 0,
+      organizationId: _orgId ?? 0,
       orderItems: selectedItems,
-      GrandTotal: grandTotal,
-      PaymentMethod: paymentMethod,
+      grandTotal: grandTotal,
+      paymentMethod: paymentMethod,
       //OrderStatus: OrderStatus,
       tip: tips,
     );
@@ -2021,7 +2024,9 @@ class _MainPageState extends State<MainPage> {
                                       Row(
                                         children: [
                                           Text(
-                                            paymentMethod, // Show the current payment method
+                                            paymentMethod == 1
+                                                ? 'Cash'
+                                                : 'Visa', // Show the current payment method
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: screenWidth *
@@ -2309,13 +2314,13 @@ void _chargeOrder() async {
         );
         return Product(
           id: 0,
-          OrganizationId: _orgId!.toInt(),
+          organizationId: _orgId ?? 0,
           ProductCategory: 0,
           ProductName: 'Unknown Product',
           ProductDescription: 'No description available',
-          PurchasePrice: 0,
-          SellingPrice: 0,
-          ProductInventory: 0,
+          PurchasePrice: 0.0,
+          SellingPrice: 0.0,
+          ProductInventory: 0.0,
           Barcode: '',
         );
       },
@@ -2405,7 +2410,7 @@ class _AddProductDialogState extends State<AddProductDialog>
 
     final newProd = Product(
       id: 0,
-      OrganizationId: _orgId ?? 0,
+      organizationId: _orgId ?? 0,
       ProductCategory: _chosenCategory!.id,
       ProductName: _nameCtrl.text.trim(),
       ProductDescription: _descCtrl.text.trim(),

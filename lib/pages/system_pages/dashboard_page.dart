@@ -434,7 +434,7 @@ void _fetchOrdersForSelectedDateRange() async {
 
     // Loop through the list of orders and sum up their grandTotal
     for (var order in orders) {
-      totalSales += order.GrandTotal; // Access grandTotal from OrderDto
+      totalSales += order.grandTotal; // Access grandTotal from OrderDto
     }
 
     return totalSales;
@@ -866,7 +866,7 @@ void _fetchOrdersForSelectedDateRange() async {
                                 Column(
                                   children: [
                                     Text(
-                                      'Total: \$${order.GrandTotal.toStringAsFixed(2)}',
+                                      'Total: \$${order.grandTotal.toStringAsFixed(2)}',
                                       style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -919,7 +919,7 @@ void _fetchOrdersForSelectedDateRange() async {
                                   },
                                 ),
                                 Text(
-                                  'Payment Method: ${order.PaymentMethod}',
+                                  'Payment Method: ${order.paymentMethod}',
                                   style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,

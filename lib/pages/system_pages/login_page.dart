@@ -42,9 +42,14 @@ class _LoginScreenState extends State<LoginScreen> {
       errorMessage = null;
     });
 
-    final url = Uri.parse(ApiConfig.instance.buildUrl('Authentication'));
+    final url = Uri.parse(ApiConfig.instance.buildUrl('Authentication/login'));
     final response = await http.post(
-      url.replace(queryParameters: {
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: json.encode({
         'username': usernameController.text,
         'password': passwordController.text,
       }),
@@ -53,29 +58,28 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = false);
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['flag'] == true) {
+      final responseData = json.decode(response.body);
+      if (responseData['success'] == true) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', data['token']);
-        await prefs.setString('refreshToken', data['refreshToken']);
+        final loginData = responseData['data'];
 
-        final int userId = data['userId'] as int;
+        await prefs.setString('token', loginData['accessToken']);
+        await prefs.setString('refreshToken', loginData['refreshToken']);
+
+        final int userId = loginData['userId'] as int;
         await prefs.setInt('userId', userId);
 
         // Fetch the user first
         final user = await ApiHandler().fetchUserById(userId);
 
         // ✅ Persist org id BEFORE navigating
-        await SessionManager.setOrganizationId(user.OrganizationId);
-
-        // (Optional) keep a single source of truth; no need to set the same key twice.
-        // If you want both, do it before navigate (but it's redundant):
-        // await prefs.setInt('organizationId', user.OrganizationId);
+        await SessionManager.setOrganizationId(user.organizationId);
 
         // ✅ Now navigate
         widget.onLoginSuccess();
       } else {
-        setState(() => errorMessage = data['message'] ?? 'Login failed');
+        setState(
+            () => errorMessage = responseData['message'] ?? 'Login failed');
       }
     } else {
       setState(() => errorMessage = 'Server error: ${response.statusCode}');

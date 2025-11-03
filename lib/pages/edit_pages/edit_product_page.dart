@@ -113,7 +113,7 @@ class _UpdateProductState extends State<UpdateProduct> {
 
     final product = Product(
       id: widget.product.id,
-      OrganizationId: (_orgId ?? 0),
+      organizationId: (_orgId ?? 0),
       ProductCategory: catId,
       ProductName: data['ProductName'],
       ProductDescription: data['ProductDescription'],

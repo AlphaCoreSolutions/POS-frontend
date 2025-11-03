@@ -40,7 +40,7 @@ class _EditPageState extends State<EditPage> {
       final data = _formkey.currentState!.value;
       final user = User(
           id: widget.user.id,
-          OrganizationId: _orgId!.toInt(),
+          organizationId: _orgId!.toInt(),
           FullName: data['fullname'],
           UserName: data['UserName'],
           Email: data['email'],

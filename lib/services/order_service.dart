@@ -27,17 +27,18 @@ class OrderService {
   }
 
   static order_dto.OrderDto createOrder({
+    required int organizationId,
     required List<order_item_dto.OrderItemDto> items,
-    required double grandTotal,
-    required String paymentMethod,
-    required double tip,
+    int customerId = 0,
+    int paymentMethod = 1,
+    double tips = 0.0,
   }) {
     return order_dto.OrderDto(
-      id: 0,
+      organizationId: organizationId,
+      customerId: customerId,
+      paymentMethod: paymentMethod,
+      tips: tips,
       orderItems: items,
-      GrandTotal: grandTotal,
-      PaymentMethod: paymentMethod,
-      tip: tip,
     );
   }
 
