@@ -25,7 +25,7 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime? selectedToDate;
   List<OrderDto> ordersList = [];
   int lowStockCount = 0;
-  String? bestSellerText;
+  String bestSellerText = "No Data Available";
   int maxUsage = 0;
   DateTime? trendFromDate;
   DateTime? trendToDate;
@@ -53,7 +53,8 @@ class _DashboardPageState extends State<DashboardPage> {
     String? bestSellerName = await apiHandler.fetchBestSellingProduct();
 
     setState(() {
-      bestSellerText = bestSellerName ?? "No Data Available"; // Update UI
+      bestSellerText =
+          bestSellerName?.toString() ?? "No Data Available"; // Update UI
     });
   }
 

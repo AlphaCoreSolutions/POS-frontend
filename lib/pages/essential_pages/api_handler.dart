@@ -831,7 +831,7 @@ class ApiHandler {
           );
           if (productDetails != null &&
               productDetails.containsKey('productName')) {
-            return productDetails['productName'];
+            return productDetails['productName'].toString();
           }
         }
       }
