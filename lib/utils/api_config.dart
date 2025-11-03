@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiConfig {
   // Default base URLs for different environments
   static const String _localBaseUrl = "https://localhost:5001/api";
-  static const String _productionBaseUrl = "http://posi.visioncit.com/api";
+  static const String _productionBaseUrl = "https://posi.visioncit.com/api";
   static const String _stagingBaseUrl = "http://192.168.100.19/api";
 
   // Preference key for storing selected base URL
