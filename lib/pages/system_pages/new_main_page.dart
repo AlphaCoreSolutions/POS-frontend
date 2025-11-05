@@ -25,6 +25,7 @@ class _NewMainPageState extends State<NewMainPage> {
   final TextEditingController _promoCodeController = TextEditingController();
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
+  bool _isSidebarOpen = false;
 
   @override
   void initState() {
@@ -153,7 +154,11 @@ class _NewMainPageState extends State<NewMainPage> {
         title: Text(AppLocalizations.of(context)!.appTitle),
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          onPressed: () {
+            setState(() {
+              _isSidebarOpen = !_isSidebarOpen;
+            });
+          },
         ),
         actions: [
           QuickApiSwitcher(
@@ -165,448 +170,491 @@ class _NewMainPageState extends State<NewMainPage> {
           ),
         ],
       ),
-      drawer: const DrawerPage(),
-      body: provider.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final isMobile = constraints.maxWidth < 768;
+      body: Stack(children: [
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 300),
+          left: _isSidebarOpen ? 0 : -250,
+          top: 0,
+          bottom: 0,
+          width: 250,
+          child: DrawerPage(),
+        ),
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 300),
+          left: _isSidebarOpen ? 250 : 0,
+          top: 0,
+          right: _isSidebarOpen ? -250 : 0,
+          bottom: 0,
+          child: AbsorbPointer(
+            absorbing: _isSidebarOpen,
+            child: provider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 768;
 
-                if (isMobile) {
-                  return Stack(
-                    children: [
-                      // Main content
-                      Column(
-                        children: [
-                          // Category selector
-                          Container(
-                            height: screenHeight * 0.25,
-                            padding: const EdgeInsets.all(8),
-                            child: CategorySelector(
-                              rootCategories: provider.rootCategories,
-                              activeSubs: provider.activeSubs,
-                              selectedCategory: provider.selectedCategory,
-                              selectedSubId: provider.selectedSubId,
-                              onRootTap: provider.selectRootCategory,
-                              onSubTap: provider.selectSubCategory,
-                            ),
-                          ),
-                          // Product grid
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              child: ProductGrid(
-                                products: provider.products,
-                                allCategories: provider.categories,
-                                selectedRootId: provider.selectedRootId,
-                                selectedSubId: provider.selectedSubId,
-                                onProductTap: _onProductTap,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Mobile order summary overlay
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          height: screenHeight * 0.4,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius:
-                                BorderRadius.vertical(top: Radius.circular(16)),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black26, blurRadius: 10)
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              // Handle
-                              Container(
-                                width: 40,
-                                height: 4,
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(2),
+                      if (isMobile) {
+                        return Stack(
+                          children: [
+                            // Main content
+                            Column(
+                              children: [
+                                // Category selector
+                                Container(
+                                    height: screenHeight * 0.25,
+                                    padding: const EdgeInsets.all(8),
+                                    child: CategorySelector(
+                                      allCategories: provider
+                                          .categories, // <-- pass full list
+                                      selectedCategory:
+                                          provider.selectedCategory,
+                                      selectedSubId: provider.selectedSubId,
+                                      onRootTap: provider.selectRootCategory,
+                                      onSubTap: provider.selectSubCategory,
+                                    )),
+                                // Product grid
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: ProductGrid(
+                                      products: provider.products,
+                                      allCategories: provider.categories,
+                                      selectedRootId: provider.selectedRootId,
+                                      selectedSubId: provider.selectedSubId,
+                                      onProductTap: _onProductTap,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              // Order summary content
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        AppLocalizations.of(context)!.orders,
-                                        style: TextStyle(
-                                          fontSize: screenWidth * 0.05,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                              ],
+                            ),
+                            // Mobile order summary overlay
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: screenHeight * 0.4,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(16)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black26, blurRadius: 10)
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    // Handle
+                                    Container(
+                                      width: 40,
+                                      height: 4,
+                                      margin: const EdgeInsets.symmetric(
+                                          vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade300,
+                                        borderRadius: BorderRadius.circular(2),
                                       ),
-                                      const SizedBox(height: 16),
-                                      Expanded(
-                                        child: OrderSummary(
-                                          selectedItems: provider.selectedItems,
-                                          products: provider.products,
-                                          onRemoveProduct:
-                                              provider.removeFromOrder,
-                                          onAddQuantity: provider.addQuantity,
-                                        ),
-                                      ),
-                                      // Promo code section
-                                      PromoCodeSection(
-                                        promoCodeController:
-                                            _promoCodeController,
-                                        layerLink: _layerLink,
-                                        onFindPromoCode: _onFindPromoCode,
-                                        onValidatePromoCode:
-                                            _onValidatePromoCode,
-                                        selectedPromoCode:
-                                            provider.selectedPromoCode,
-                                        onRemovePromoCode:
-                                            provider.removePromoCode,
-                                      ),
-                                      // Payment section
-                                      PaymentSection(
-                                        paymentMethod:
-                                            provider.paymentMethod == 1
-                                                ? 'Cash'
-                                                : 'Visa',
-                                        isCash: provider.isCash,
-                                        onTogglePaymentMethod: (_) =>
-                                            provider.togglePaymentMethod(),
-                                      ),
-                                      // Printer and submit
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          PrinterSection(
-                                            connected: true,
-                                            onShowPrinterDialog:
-                                                _onShowPrinterDialog,
-                                          ),
-                                          ElevatedButton(
-                                            onPressed:
-                                                provider.selectedItems.isEmpty
-                                                    ? null
-                                                    : () async {
-                                                        final success =
-                                                            await provider
-                                                                .submitOrder();
-                                                        if (success) {
-                                                          ScaffoldMessenger.of(
-                                                                  context)
-                                                              .showSnackBar(
-                                                            const SnackBar(
-                                                                content: Text(
-                                                                    'Order submitted successfully')),
-                                                          );
-                                                        } else {
-                                                          ScaffoldMessenger.of(
-                                                                  context)
-                                                              .showSnackBar(
-                                                            const SnackBar(
-                                                                content: Text(
-                                                                    'Failed to submit order')),
-                                                          );
-                                                        }
-                                                      },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  const Color(0xFFB87333),
-                                              foregroundColor: Colors.white,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 32,
-                                                      vertical: 16),
-                                            ),
-                                            child: Text(
-                                                AppLocalizations.of(context)!
-                                                    .submit),
-                                          ),
-                                        ],
-                                      ),
-                                      // Total
-                                      Container(
+                                    ),
+                                    // Order summary content
+                                    Expanded(
+                                      child: Padding(
                                         padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
-                                          border: Border(
-                                              top: BorderSide(
-                                                  color: Colors.grey.shade300)),
-                                        ),
                                         child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
+                                            Text(
+                                              AppLocalizations.of(context)!
+                                                  .orders,
+                                              style: TextStyle(
+                                                fontSize: screenWidth * 0.05,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 16),
+                                            Expanded(
+                                              child: OrderSummary(
+                                                selectedItems:
+                                                    provider.selectedItems,
+                                                products: provider.products,
+                                                onRemoveProduct:
+                                                    provider.removeFromOrder,
+                                                onAddQuantity:
+                                                    provider.addQuantity,
+                                              ),
+                                            ),
+                                            // Promo code section
+                                            PromoCodeSection(
+                                              promoCodeController:
+                                                  _promoCodeController,
+                                              layerLink: _layerLink,
+                                              onFindPromoCode: _onFindPromoCode,
+                                              onValidatePromoCode:
+                                                  _onValidatePromoCode,
+                                              selectedPromoCode:
+                                                  provider.selectedPromoCode,
+                                              onRemovePromoCode:
+                                                  provider.removePromoCode,
+                                            ),
+                                            // Payment section
+                                            PaymentSection(
+                                              paymentMethod:
+                                                  provider.paymentMethod == 1
+                                                      ? 'Cash'
+                                                      : 'Visa',
+                                              isCash: provider.isCash,
+                                              onTogglePaymentMethod: (_) =>
+                                                  provider
+                                                      .togglePaymentMethod(),
+                                            ),
+                                            // Printer and submit
                                             Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment
                                                       .spaceBetween,
                                               children: [
-                                                Text('Subtotal:'),
-                                                Text(
-                                                    '${provider.subtotal.toStringAsFixed(2)} JOD'),
+                                                PrinterSection(
+                                                  connected: true,
+                                                  onShowPrinterDialog:
+                                                      _onShowPrinterDialog,
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed:
+                                                      provider.selectedItems
+                                                              .isEmpty
+                                                          ? null
+                                                          : () async {
+                                                              final success =
+                                                                  await provider
+                                                                      .submitOrder();
+                                                              if (success) {
+                                                                ScaffoldMessenger.of(
+                                                                        context)
+                                                                    .showSnackBar(
+                                                                  const SnackBar(
+                                                                      content: Text(
+                                                                          'Order submitted successfully')),
+                                                                );
+                                                              } else {
+                                                                ScaffoldMessenger.of(
+                                                                        context)
+                                                                    .showSnackBar(
+                                                                  const SnackBar(
+                                                                      content: Text(
+                                                                          'Failed to submit order')),
+                                                                );
+                                                              }
+                                                            },
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        const Color(0xFFB87333),
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 32,
+                                                        vertical: 16),
+                                                  ),
+                                                  child: Text(
+                                                      AppLocalizations.of(
+                                                              context)!
+                                                          .submit),
+                                                ),
                                               ],
                                             ),
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text('Taxes:'),
-                                                Text(
-                                                    '${provider.taxes.toStringAsFixed(2)} JOD'),
-                                              ],
-                                            ),
-                                            if (provider.tips > 0)
-                                              Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
+                                            // Total
+                                            Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.shade100,
+                                                border: Border(
+                                                    top: BorderSide(
+                                                        color: Colors
+                                                            .grey.shade300)),
+                                              ),
+                                              child: Column(
                                                 children: [
-                                                  Text('Tips:'),
-                                                  Text(
-                                                      '${provider.tips.toStringAsFixed(2)} JOD'),
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Text('Subtotal:'),
+                                                      Text(
+                                                          '${provider.subtotal.toStringAsFixed(2)} JOD'),
+                                                    ],
+                                                  ),
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Text('Taxes:'),
+                                                      Text(
+                                                          '${provider.taxes.toStringAsFixed(2)} JOD'),
+                                                    ],
+                                                  ),
+                                                  if (provider.tips > 0)
+                                                    Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Text('Tips:'),
+                                                        Text(
+                                                            '${provider.tips.toStringAsFixed(2)} JOD'),
+                                                      ],
+                                                    ),
+                                                  const Divider(),
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        'Total:',
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold),
+                                                      ),
+                                                      Text(
+                                                        '${provider.total.toStringAsFixed(2)} JOD',
+                                                        style: TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Colors.green,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ],
                                               ),
-                                            const Divider(),
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text(
-                                                  'Total:',
-                                                  style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold),
-                                                ),
-                                                Text(
-                                                  '${provider.total.toStringAsFixed(2)} JOD',
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.green,
-                                                  ),
-                                                ),
-                                              ],
                                             ),
                                           ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                } else {
-                  // Desktop/Tablet layout
-                  return Row(
-                    children: [
-                      // Main content area
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          children: [
-                            // Category selector
-                            Container(
-                              height: screenHeight * 0.2,
-                              padding: const EdgeInsets.all(8),
-                              child: CategorySelector(
-                                rootCategories: provider.rootCategories,
-                                activeSubs: provider.activeSubs,
-                                selectedCategory: provider.selectedCategory,
-                                selectedSubId: provider.selectedSubId,
-                                onRootTap: provider.selectRootCategory,
-                                onSubTap: provider.selectSubCategory,
-                              ),
-                            ),
-                            // Product grid
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                child: ProductGrid(
-                                  products: provider.products,
-                                  allCategories: provider.categories,
-                                  selectedRootId: provider.selectedRootId,
-                                  selectedSubId: provider.selectedSubId,
-                                  onProductTap: _onProductTap,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                      // Right panel
-                      Container(
-                        width: constraints.maxWidth < 1200 ? 350 : 400,
-                        decoration: BoxDecoration(
-                          border: Border(
-                              left: BorderSide(color: Colors.grey.shade300)),
-                        ),
-                        child: Column(
+                        );
+                      } else {
+                        // Desktop/Tablet layout
+                        return Row(
                           children: [
-                            // Order summary
+                            // Main content area
                             Expanded(
-                              flex: 3,
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                child: OrderSummary(
-                                  selectedItems: provider.selectedItems,
-                                  products: provider.products,
-                                  onRemoveProduct: provider.removeFromOrder,
-                                  onAddQuantity: provider.addQuantity,
-                                ),
-                              ),
-                            ),
-                            // Promo code section
-                            Container(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              child: PromoCodeSection(
-                                promoCodeController: _promoCodeController,
-                                layerLink: _layerLink,
-                                onFindPromoCode: _onFindPromoCode,
-                                onValidatePromoCode: _onValidatePromoCode,
-                                selectedPromoCode: provider.selectedPromoCode,
-                                onRemovePromoCode: provider.removePromoCode,
-                              ),
-                            ),
-                            // Payment section
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              child: PaymentSection(
-                                paymentMethod: provider.paymentMethod == 1
-                                    ? 'Cash'
-                                    : 'Visa',
-                                isCash: provider.isCash,
-                                onTogglePaymentMethod: (_) =>
-                                    provider.togglePaymentMethod(),
-                              ),
-                            ),
-                            // Printer and submit
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              flex: 2,
+                              child: Column(
                                 children: [
-                                  PrinterSection(
-                                    connected: true,
-                                    onShowPrinterDialog: _onShowPrinterDialog,
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: provider.selectedItems.isEmpty
-                                        ? null
-                                        : () async {
-                                            final success =
-                                                await provider.submitOrder();
-                                            if (success) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content: Text(
-                                                        'Order submitted successfully')),
-                                              );
-                                            } else {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content: Text(
-                                                        'Failed to submit order')),
-                                              );
-                                            }
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFB87333),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 32, vertical: 16),
+                                  // Category selector
+                                  Container(
+                                      height: screenHeight * 0.2,
+                                      padding: const EdgeInsets.all(8),
+                                      child: CategorySelector(
+                                        allCategories: provider
+                                            .categories, // <-- pass full list
+                                        selectedCategory:
+                                            provider.selectedCategory,
+                                        selectedSubId: provider.selectedSubId,
+                                        onRootTap: provider.selectRootCategory,
+                                        onSubTap: provider.selectSubCategory,
+                                      )),
+                                  // Product grid
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      child: ProductGrid(
+                                        products: provider.products,
+                                        allCategories: provider.categories,
+                                        selectedRootId: provider.selectedRootId,
+                                        selectedSubId: provider.selectedSubId,
+                                        onProductTap: _onProductTap,
+                                      ),
                                     ),
-                                    child: Text(
-                                        AppLocalizations.of(context)!.submit),
                                   ),
                                 ],
                               ),
                             ),
-                            // Total display
+                            // Right panel
                             Container(
-                              padding: const EdgeInsets.all(16),
+                              width: constraints.maxWidth < 1200 ? 350 : 400,
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
                                 border: Border(
-                                    top: BorderSide(
+                                    left: BorderSide(
                                         color: Colors.grey.shade300)),
                               ),
                               child: Column(
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Subtotal:'),
-                                      Text(
-                                          '${provider.subtotal.toStringAsFixed(2)} JOD'),
-                                    ],
+                                  // Order summary
+                                  Expanded(
+                                    flex: 3,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      child: OrderSummary(
+                                        selectedItems: provider.selectedItems,
+                                        products: provider.products,
+                                        onRemoveProduct:
+                                            provider.removeFromOrder,
+                                        onAddQuantity: provider.addQuantity,
+                                      ),
+                                    ),
                                   ),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Taxes:'),
-                                      Text(
-                                          '${provider.taxes.toStringAsFixed(2)} JOD'),
-                                    ],
+                                  // Promo code section
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: PromoCodeSection(
+                                      promoCodeController: _promoCodeController,
+                                      layerLink: _layerLink,
+                                      onFindPromoCode: _onFindPromoCode,
+                                      onValidatePromoCode: _onValidatePromoCode,
+                                      selectedPromoCode:
+                                          provider.selectedPromoCode,
+                                      onRemovePromoCode:
+                                          provider.removePromoCode,
+                                    ),
                                   ),
-                                  if (provider.tips > 0)
-                                    Row(
+                                  // Payment section
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    child: PaymentSection(
+                                      paymentMethod: provider.paymentMethod == 1
+                                          ? 'Cash'
+                                          : 'Visa',
+                                      isCash: provider.isCash,
+                                      onTogglePaymentMethod: (_) =>
+                                          provider.togglePaymentMethod(),
+                                    ),
+                                  ),
+                                  // Printer and submit
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Tips:'),
-                                        Text(
-                                            '${provider.tips.toStringAsFixed(2)} JOD'),
+                                        PrinterSection(
+                                          connected: true,
+                                          onShowPrinterDialog:
+                                              _onShowPrinterDialog,
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: provider
+                                                  .selectedItems.isEmpty
+                                              ? null
+                                              : () async {
+                                                  final success = await provider
+                                                      .submitOrder();
+                                                  if (success) {
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
+                                                      const SnackBar(
+                                                          content: Text(
+                                                              'Order submitted successfully')),
+                                                    );
+                                                  } else {
+                                                    ScaffoldMessenger.of(
+                                                            context)
+                                                        .showSnackBar(
+                                                      const SnackBar(
+                                                          content: Text(
+                                                              'Failed to submit order')),
+                                                    );
+                                                  }
+                                                },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFFB87333),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 32, vertical: 16),
+                                          ),
+                                          child: Text(
+                                              AppLocalizations.of(context)!
+                                                  .submit),
+                                        ),
                                       ],
                                     ),
-                                  const Divider(),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Total:',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      Text(
-                                        '${provider.total.toStringAsFixed(2)} JOD',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green,
+                                  ),
+                                  // Total display
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      border: Border(
+                                          top: BorderSide(
+                                              color: Colors.grey.shade300)),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Subtotal:'),
+                                            Text(
+                                                '${provider.subtotal.toStringAsFixed(2)} JOD'),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Taxes:'),
+                                            Text(
+                                                '${provider.taxes.toStringAsFixed(2)} JOD'),
+                                          ],
+                                        ),
+                                        if (provider.tips > 0)
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text('Tips:'),
+                                              Text(
+                                                  '${provider.tips.toStringAsFixed(2)} JOD'),
+                                            ],
+                                          ),
+                                        const Divider(),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Total:',
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                            Text(
+                                              '${provider.total.toStringAsFixed(2)} JOD',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    ],
-                  );
-                }
-              },
-            ),
+                        );
+                      }
+                    },
+                  ),
+          ),
+        ),
+      ]),
     );
   }
 }

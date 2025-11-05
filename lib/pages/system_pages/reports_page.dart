@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:visionpos/pages/essential_pages/api_handler.dart';
-import 'package:visionpos/utils/session_manager.dart';
-import 'package:visionpos/utils/pdf_service.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdfx/pdfx.dart';
+import 'package:share_plus/share_plus.dart';
+
+import 'package:visionpos/pages/essential_pages/api_handler.dart';
+import 'package:visionpos/utils/pdf_service.dart';
+import 'package:visionpos/utils/session_manager.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -22,17 +26,16 @@ class _ReportsPageState extends State<ReportsPage>
 
   late TabController _tabController;
 
-  // Date filters
-  DateTime _startDate =
-      DateTime(2000); // Include all historical data by default
+  // Date filters (inclusive start, exclusive end for convenience)
+  DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _endDate = DateTime.now().add(const Duration(days: 1));
 
   // Data holders
-  Map<String, dynamic>? _salesByDateRange;
+  Map<String, dynamic>? _salesByDateRange; // summary map
   List<Map<String, dynamic>> _topSellingProducts = [];
   List<Map<String, dynamic>> _salesByPaymentMethod = [];
   List<Map<String, dynamic>> _salesByCategory = [];
-  Map<String, dynamic>? _inventoryStatus;
+  Map<String, dynamic>? _inventoryStatus; // may contain counts or lists
   Map<String, dynamic>? _profitAnalysis;
 
   @override
@@ -50,13 +53,14 @@ class _ReportsPageState extends State<ReportsPage>
 
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
+    if (!mounted) return;
     setState(() => _orgId = orgId);
-    _loadAllReports();
+    if (_orgId != null) _loadReportData();
   }
 
-  Future<void> _loadAllReports() async {
+  Future<void> _loadReportData() async {
+    if (_orgId == null) return;
     setState(() => _isLoading = true);
-
     try {
       final results = await Future.wait([
         _apiHandler.getSalesByDateRange(_startDate, _endDate, _orgId),
@@ -67,217 +71,188 @@ class _ReportsPageState extends State<ReportsPage>
         _apiHandler.getProfitAnalysis(_startDate, _endDate, _orgId),
       ]);
 
-      setState(() {
-        _salesByDateRange = results[0] as Map<String, dynamic>?;
-        _topSellingProducts = results[1] as List<Map<String, dynamic>>;
-        _salesByPaymentMethod = results[2] as List<Map<String, dynamic>>;
-        _salesByCategory = results[3] as List<Map<String, dynamic>>;
-        _inventoryStatus = results[4] as Map<String, dynamic>?;
-        _profitAnalysis = results[5] as Map<String, dynamic>?;
-      });
+      // Defensive casts to expected shapes
+      _salesByDateRange = (results[0] as Map).cast<String, dynamic>();
+      _topSellingProducts = (results[1] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList();
+      _salesByPaymentMethod = (results[2] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList();
+      _salesByCategory = (results[3] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList();
+      _inventoryStatus = (results[4] as Map).cast<String, dynamic>();
+      _profitAnalysis = (results[5] as Map).cast<String, dynamic>();
     } catch (e) {
-      print('Error loading reports: $e');
+      debugPrint('Failed to load reports: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _selectDateRange() async {
-    final DateTimeRange? picked = await showDateRangePicker(
+  Future<void> _pickDateRange() async {
+    final initialDateRange = DateTimeRange(start: _startDate, end: _endDate);
+    final picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDateRange: initialDateRange,
     );
-
     if (picked != null) {
       setState(() {
-        _startDate = picked.start;
-        _endDate = picked.end;
+        _startDate =
+            DateTime(picked.start.year, picked.start.month, picked.start.day);
+        // make end exclusive by adding one day
+        _endDate = DateTime(picked.end.year, picked.end.month, picked.end.day)
+            .add(const Duration(days: 1));
       });
-      _loadAllReports();
+      _loadReportData();
     }
   }
 
-  Future<void> _exportCurrentTab() async {
-    try {
-      final currentTab = _tabController.index;
-      late final Uint8List pdfBytes;
-      late final String fileName;
+  /// Writes [data] to a temp file, previews it with pdfx, and offers share/print.
+  Future<void> _showPdf(Uint8List data) async {
+    final dir = await getTemporaryDirectory();
+    final path =
+        '${dir.path}/report_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final file = File(path);
+    await file.writeAsBytes(data, flush: true);
 
-      switch (currentTab) {
-        case 0: // Sales Overview
-          final dailySales = (_salesByDateRange?['orders'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-          final totalRevenue =
-              ((_salesByDateRange?['totalSales'] ?? 0) as num).toDouble();
-          final totalOrders =
-              ((_salesByDateRange?['totalOrders'] ?? 0) as num).toInt();
+    final controller = PdfController(document: PdfDocument.openFile(path));
 
-          pdfBytes = await PdfService.generateSalesReport(
-            startDate: _startDate,
-            endDate: _endDate,
-            dailySales: dailySales,
-            topProducts: _topSellingProducts,
-            paymentMethods: _salesByPaymentMethod,
-            totalRevenue: totalRevenue,
-            totalOrders: totalOrders,
-          );
-          fileName =
-              'Sales_Report_${DateFormat('yyyyMMdd').format(_startDate)}_${DateFormat('yyyyMMdd').format(_endDate)}.pdf';
-          break;
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: SizedBox(
+          width: 900,
+          height: 1000,
+          child: Column(
+            children: [
+              // Header with actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      'Preview',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Share / Print',
+                        icon: const Icon(Icons.ios_share),
+                        onPressed: () async {
+                          await Share.shareXFiles(
+                            [XFile(file.path)],
+                            text: 'Report',
+                          );
+                        },
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: PdfView(
+                  controller: controller,
+                  builders: PdfViewBuilders<DefaultBuilderOptions>(
+                    options: const DefaultBuilderOptions(),
+                    documentLoaderBuilder: (_) =>
+                        const Center(child: CircularProgressIndicator()),
+                    pageLoaderBuilder: (_) =>
+                        const Center(child: CircularProgressIndicator()),
+                    errorBuilder: (_, error) => Center(
+                      child: Text('Failed to render PDF:\n$error'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
-        case 1: // Top Products
-          final dailySales = (_salesByDateRange?['orders'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-          final totalRevenue =
-              ((_salesByDateRange?['totalSales'] ?? 0) as num).toDouble();
-          final totalOrders =
-              ((_salesByDateRange?['totalOrders'] ?? 0) as num).toInt();
+    controller.dispose();
+  }
 
-          pdfBytes = await PdfService.generateSalesReport(
-            startDate: _startDate,
-            endDate: _endDate,
-            dailySales: dailySales,
-            topProducts: _topSellingProducts,
-            paymentMethods: [],
-            totalRevenue: totalRevenue,
-            totalOrders: totalOrders,
-          );
-          fileName =
-              'Top_Products_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
-          break;
+  void _showFullPdfPreview() async {
+    if (_salesByDateRange == null) return;
 
-        case 4: // Inventory
-          final inventory = (_inventoryStatus?['products'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-          final lowStock = (_inventoryStatus?['products'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-          final totalProducts =
-              ((_inventoryStatus?['totalProducts'] ?? 0) as num).toInt();
-          final totalValue =
-              ((_inventoryStatus?['totalStockValue'] ?? 0) as num).toDouble();
+    final pdfData = await PdfService.generateDashboardReport(
+      summary: _salesByDateRange!,
+      salesTrend: _salesByPaymentMethod,
+      topProducts: _topSellingProducts,
+      topCategories: _salesByCategory,
+      recentOrders: const [],
+    );
 
-          pdfBytes = await PdfService.generateInventoryReport(
-            inventory: inventory,
-            lowStock: lowStock,
-            totalProducts: totalProducts,
-            totalValue: totalValue,
-          );
-          fileName =
-              'Inventory_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
-          break;
+    await _showPdf(pdfData);
+  }
 
-        case 5: // Profit Analysis
-          final profitData = (_profitAnalysis?['details'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-          final totalRevenue =
-              ((_profitAnalysis?['totalRevenue'] ?? 0) as num).toDouble();
-          final totalCost =
-              ((_profitAnalysis?['totalCost'] ?? 0) as num).toDouble();
-          final totalProfit =
-              ((_profitAnalysis?['totalProfit'] ?? 0) as num).toDouble();
-          final profitMargin =
-              ((_profitAnalysis?['profitMargin'] ?? 0) as num).toDouble();
-
-          pdfBytes = await PdfService.generateProfitReport(
-            startDate: _startDate,
-            endDate: _endDate,
-            profitData: profitData,
-            totalRevenue: totalRevenue,
-            totalCost: totalCost,
-            totalProfit: totalProfit,
-            profitMargin: profitMargin,
-          );
-          fileName =
-              'Profit_Analysis_${DateFormat('yyyyMMdd').format(_startDate)}_${DateFormat('yyyyMMdd').format(_endDate)}.pdf';
-          break;
-
-        default:
-          // For other tabs, use sales report
-          final dailySales = (_salesByDateRange?['orders'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-          final totalRevenue =
-              ((_salesByDateRange?['totalSales'] ?? 0) as num).toDouble();
-          final totalOrders =
-              ((_salesByDateRange?['totalOrders'] ?? 0) as num).toInt();
-
-          pdfBytes = await PdfService.generateSalesReport(
-            startDate: _startDate,
-            endDate: _endDate,
-            dailySales: dailySales,
-            topProducts: _topSellingProducts,
-            paymentMethods: _salesByPaymentMethod,
-            totalRevenue: totalRevenue,
-            totalOrders: totalOrders,
-          );
-          fileName =
-              'Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
-      }
-
-      final filePath = await PdfService.savePdf(pdfBytes, fileName);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Report exported to: $filePath')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error exporting: $e')),
-        );
-      }
-    }
+  Widget _buildExportButton(
+    String label,
+    Future<Uint8List> Function() onBuild,
+  ) {
+    return ElevatedButton.icon(
+      icon: const Icon(Icons.picture_as_pdf),
+      label: Text(label),
+      onPressed: () async {
+        final data = await onBuild();
+        await _showPdf(data);
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final df = DateFormat('yMMMd');
+    final dateLabel =
+        '${df.format(_startDate)} — ${df.format(_endDate.subtract(const Duration(days: 1)))}';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('POS Reports'),
-        backgroundColor: const Color(0xFF36454F),
-        foregroundColor: Colors.white,
+        title: const Text('Reports Dashboard'),
         actions: [
-          // Export Current Tab
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: _exportCurrentTab,
-            tooltip: 'Export to PDF',
+          TextButton.icon(
+            onPressed: _pickDateRange,
+            icon: const Icon(Icons.date_range, color: Colors.white),
+            label: Text(dateLabel, style: const TextStyle(color: Colors.white)),
           ),
-          // Date Range
-          IconButton(
-            icon: const Icon(Icons.date_range),
-            onPressed: _selectDateRange,
-            tooltip: 'Select Date Range',
-          ),
-          // Refresh
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadAllReports,
-            tooltip: 'Refresh',
+            onPressed: _loadReportData,
+            tooltip: 'Reload',
           ),
-          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _showFullPdfPreview,
+            tooltip: 'Export All Reports as PDF',
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          indicatorColor: const Color(0xFFB87333),
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(text: 'Sales Overview'),
+            Tab(text: 'Sales'),
             Tab(text: 'Top Products'),
-            Tab(text: 'Payment Methods'),
+            Tab(text: 'Payments'),
             Tab(text: 'Categories'),
             Tab(text: 'Inventory'),
-            Tab(text: 'Profit Analysis'),
+            Tab(text: 'Profit'),
           ],
         ),
       ),
@@ -286,749 +261,276 @@ class _ReportsPageState extends State<ReportsPage>
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildSalesOverviewTab(),
+                _buildSalesReportTab(),
                 _buildTopProductsTab(),
-                _buildPaymentMethodsTab(),
-                _buildCategoriesTab(),
+                _buildPaymentTab(),
+                _buildCategoryTab(),
                 _buildInventoryTab(),
-                _buildProfitAnalysisTab(),
+                _buildProfitTab(),
               ],
             ),
     );
   }
 
-  Widget _buildSalesOverviewTab() {
-    if (_salesByDateRange == null) {
-      return const Center(child: Text('No data available'));
-    }
+  // ——— Tabs ———
 
-    final totalOrders =
-        ((_salesByDateRange!['totalOrders'] ?? 0) as num).toInt();
-    final totalSales =
-        ((_salesByDateRange!['totalSales'] ?? 0) as num).toDouble();
-    final avgOrderValue =
-        ((_salesByDateRange!['averageOrderValue'] ?? 0) as num).toDouble();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDateRangeHeader(),
-          const SizedBox(height: 20),
-          Row(
+  Widget _buildSalesReportTab() {
+    final totalSales = _salesByDateRange?['totalSales'];
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: _buildStatCard(
-                  'Total Orders',
-                  totalOrders.toString(),
-                  Icons.shopping_cart,
-                  Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  'Total Sales',
-                  '\$${totalSales.toStringAsFixed(2)}',
-                  Icons.attach_money,
-                  Colors.green,
+              const Text('Sales Summary',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              _buildExportButton(
+                'Export PDF',
+                () => PdfService.generateDashboardReport(
+                  summary: _salesByDateRange ?? const {},
+                  salesTrend: _salesByPaymentMethod,
+                  topProducts: const [],
+                  topCategories: const [],
+                  recentOrders: const [],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildStatCard(
-            'Average Order Value',
-            '\$${avgOrderValue.toStringAsFixed(2)}',
-            Icons.trending_up,
-            Colors.orange,
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              ListTile(
+                title: const Text('Total Sales'),
+                trailing: Text(totalSales?.toString() ?? '-'),
+              ),
+              const Divider(),
+              ..._salesByPaymentMethod.map(
+                (m) => ListTile(
+                  title: Text(m['method']?.toString() ?? ''),
+                  trailing: Text(m['amount']?.toString() ?? ''),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          const Text(
-            'Recent Orders',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          _buildOrdersList(),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildTopProductsTab() {
-    if (_topSellingProducts.isEmpty) {
-      return const Center(child: Text('No product data available'));
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDateRangeHeader(),
-          const SizedBox(height: 20),
-          const Text(
-            'Top Selling Products',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
-              return SizedBox(
-                height: chartHeight,
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: _topSellingProducts.isNotEmpty
-                        ? (((_topSellingProducts.first['totalQuantitySold'] ??
-                                    0) as num)
-                                .toDouble()) *
-                            1.2
-                        : 100,
-                    barTouchData: BarTouchData(enabled: true),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            if (value.toInt() >= 0 &&
-                                value.toInt() < _topSellingProducts.length) {
-                              final product =
-                                  _topSellingProducts[value.toInt()];
-                              final name =
-                                  (product['productName'] ?? '').toString();
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  name.length > 10
-                                      ? '${name.substring(0, 10)}...'
-                                      : name,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                              );
-                            }
-                            return const Text('');
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: true, reservedSize: 40),
-                      ),
-                      topTitles:
-                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles:
-                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    barGroups: _topSellingProducts.asMap().entries.map((entry) {
-                      return BarChartGroupData(
-                        x: entry.key,
-                        barRods: [
-                          BarChartRodData(
-                            toY:
-                                ((entry.value['totalQuantitySold'] ?? 0) as num)
-                                    .toDouble(),
-                            color: Color(0xFFB87333),
-                            width: 20,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4)),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Top Selling Products',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              _buildExportButton(
+                'Export PDF',
+                () => PdfService.generateDashboardReport(
+                  summary: const {},
+                  salesTrend: const [],
+                  topProducts: _topSellingProducts,
+                  topCategories: const [],
+                  recentOrders: const [],
                 ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            itemCount: _topSellingProducts.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = _topSellingProducts[index];
+              return ListTile(
+                leading: Text('${index + 1}'),
+                title: Text(item['product']?.toString() ?? '—'),
+                trailing: Text(item['sales']?.toString() ?? '0'),
               );
             },
           ),
-          const SizedBox(height: 20),
-          _buildProductsList(),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildPaymentMethodsTab() {
-    if (_salesByPaymentMethod.isEmpty) {
-      return const Center(child: Text('No payment data available'));
-    }
-
-    final total = _salesByPaymentMethod.fold<double>(
-      0,
-      (sum, item) => sum + ((item['totalAmount'] ?? 0) as num).toDouble(),
-    );
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDateRangeHeader(),
-          const SizedBox(height: 20),
-          const Text(
-            'Payment Method Distribution',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
-              return SizedBox(
-                height: chartHeight,
-                child: PieChart(
-                  PieChartData(
-                    sections: _salesByPaymentMethod.map((item) {
-                      final amount =
-                          ((item['totalAmount'] ?? 0) as num).toDouble();
-                      final percentage = total > 0 ? (amount / total * 100) : 0;
-                      return PieChartSectionData(
-                        value: amount,
-                        title: '${percentage.toStringAsFixed(1)}%',
-                        radius: 100,
-                        titleStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        color: _getColorForPaymentMethod(
-                            _getPaymentMethodName(item['paymentMethod'] ?? 0)),
-                      );
-                    }).toList(),
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 40,
-                  ),
+  Widget _buildPaymentTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Sales by Payment Method',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              _buildExportButton(
+                'Export PDF',
+                () => PdfService.generateDashboardReport(
+                  summary: const {},
+                  salesTrend: _salesByPaymentMethod,
+                  topProducts: const [],
+                  topCategories: const [],
+                  recentOrders: const [],
                 ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            itemCount: _salesByPaymentMethod.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = _salesByPaymentMethod[index];
+              return ListTile(
+                title: Text(item['method']?.toString() ?? '—'),
+                trailing: Text(item['amount']?.toString() ?? '0'),
               );
             },
           ),
-          const SizedBox(height: 20),
-          ..._salesByPaymentMethod.map((item) {
-            final methodCode = item['paymentMethod'] ?? 0;
-            final method = _getPaymentMethodName(methodCode);
-            final count = ((item['totalOrders'] ?? 0) as num).toInt();
-            final amount = ((item['totalAmount'] ?? 0) as num).toDouble();
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Icon(
-                  _getIconForPaymentMethod(method),
-                  color: _getColorForPaymentMethod(method),
-                ),
-                title: Text(method),
-                subtitle: Text('$count orders'),
-                trailing: Text(
-                  '\$${amount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildCategoriesTab() {
-    if (_salesByCategory.isEmpty) {
-      return const Center(child: Text('No category data available'));
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDateRangeHeader(),
-          const SizedBox(height: 20),
-          const Text(
-            'Sales by Category',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final chartHeight = constraints.maxWidth < 600 ? 250.0 : 300.0;
-              return SizedBox(
-                height: chartHeight,
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: _salesByCategory.isNotEmpty
-                        ? ((_salesByCategory.first['totalRevenue'] ?? 0) as num)
-                                .toDouble() *
-                            1.2
-                        : 100,
-                    barTouchData: BarTouchData(enabled: true),
-                    titlesData: FlTitlesData(
-                      show: true,
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            if (value.toInt() >= 0 &&
-                                value.toInt() < _salesByCategory.length) {
-                              final category = _salesByCategory[value.toInt()];
-                              final name = category['categoryName'] ?? '';
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  name.length > 10
-                                      ? '${name.substring(0, 10)}...'
-                                      : name,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                              );
-                            }
-                            return const Text('');
-                          },
-                        ),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: true, reservedSize: 50),
-                      ),
-                      topTitles:
-                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles:
-                          AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    barGroups: _salesByCategory.asMap().entries.map((entry) {
-                      return BarChartGroupData(
-                        x: entry.key,
-                        barRods: [
-                          BarChartRodData(
-                            toY: ((entry.value['totalRevenue'] ?? 0) as num)
-                                .toDouble(),
-                            color: const Color(0xFF36454F),
-                            width: 20,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4)),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+  Widget _buildCategoryTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Sales by Category',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              _buildExportButton(
+                'Export PDF',
+                () => PdfService.generateDashboardReport(
+                  summary: const {},
+                  salesTrend: const [],
+                  topProducts: const [],
+                  topCategories: _salesByCategory,
+                  recentOrders: const [],
                 ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            itemCount: _salesByCategory.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = _salesByCategory[index];
+              return ListTile(
+                title: Text(item['category']?.toString() ?? '—'),
+                trailing: Text(item['amount']?.toString() ?? '0'),
               );
             },
           ),
-          const SizedBox(height: 20),
-          ..._salesByCategory.map((item) {
-            final name = (item['categoryName'] ?? 'Unknown').toString();
-            final quantity = ((item['totalQuantitySold'] ?? 0) as num).toInt();
-            final revenue = ((item['totalRevenue'] ?? 0) as num).toDouble();
-            final productCount = ((item['productCount'] ?? 0) as num).toInt();
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(name),
-                subtitle: Text('$productCount products • $quantity units sold'),
-                trailing: Text(
-                  '\$${revenue.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.green,
-                  ),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildInventoryTab() {
-    if (_inventoryStatus == null) {
-      return const Center(child: Text('No inventory data available'));
-    }
-
-    final totalProducts =
-        ((_inventoryStatus!['totalProducts'] ?? 0) as num).toInt();
-    final totalStockValue =
-        ((_inventoryStatus!['totalStockValue'] ?? 0) as num).toDouble();
-    final lowStockCount =
-        ((_inventoryStatus!['lowStockCount'] ?? 0) as num).toInt();
-    final outOfStockCount =
-        ((_inventoryStatus!['outOfStockCount'] ?? 0) as num).toInt();
-    final products = (_inventoryStatus!['products'] as List?) ?? [];
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Inventory Status',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  'Total Products',
-                  totalProducts.toString(),
-                  Icons.inventory_2,
-                  Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  'Stock Value',
-                  '\$${totalStockValue.toStringAsFixed(2)}',
-                  Icons.monetization_on,
-                  Colors.green,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  'Low Stock',
-                  lowStockCount.toString(),
-                  Icons.warning,
-                  Colors.orange,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  'Out of Stock',
-                  outOfStockCount.toString(),
-                  Icons.error,
-                  Colors.red,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Products',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          ...products.map<Widget>((product) {
-            final name = product['productName'] ?? 'Unknown';
-            final currentStock = (product['currentStock'] ?? 0);
-            final isLowStock = product['isLowStock'] ?? false;
-            final isOutOfStock = product['isOutOfStock'] ?? false;
-
-            Color statusColor = Colors.green;
-            String statusText = 'In Stock';
-            if (isOutOfStock) {
-              statusColor = Colors.red;
-              statusText = 'Out of Stock';
-            } else if (isLowStock) {
-              statusColor = Colors.orange;
-              statusText = 'Low Stock';
-            }
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(name),
-                subtitle: Text(
-                  statusText,
-                  style: TextStyle(
-                      color: statusColor, fontWeight: FontWeight.bold),
-                ),
-                trailing: Chip(
-                  label: Text('$currentStock units'),
-                  backgroundColor: statusColor.withOpacity(0.2),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfitAnalysisTab() {
-    if (_profitAnalysis == null) {
-      return const Center(child: Text('No profit data available'));
-    }
-
-    final totalRevenue =
-        ((_profitAnalysis!['totalRevenue'] ?? 0) as num).toDouble();
-    final totalCost = ((_profitAnalysis!['totalCost'] ?? 0) as num).toDouble();
-    final totalProfit =
-        ((_profitAnalysis!['totalProfit'] ?? 0) as num).toDouble();
-    final profitMargin =
-        ((_profitAnalysis!['profitMargin'] ?? 0) as num).toDouble();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDateRangeHeader(),
-          const SizedBox(height: 20),
-          const Text(
-            'Profit Analysis',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          _buildStatCard(
-            'Total Revenue',
-            '\$${totalRevenue.toStringAsFixed(2)}',
-            Icons.trending_up,
-            Colors.green,
-          ),
-          const SizedBox(height: 16),
-          _buildStatCard(
-            'Total Cost',
-            '\$${totalCost.toStringAsFixed(2)}',
-            Icons.trending_down,
-            Colors.red,
-          ),
-          const SizedBox(height: 16),
-          _buildStatCard(
-            'Total Profit',
-            '\$${totalProfit.toStringAsFixed(2)}',
-            Icons.attach_money,
-            Colors.blue,
-          ),
-          const SizedBox(height: 16),
-          _buildStatCard(
-            'Profit Margin',
-            '${profitMargin.toStringAsFixed(2)}%',
-            Icons.percent,
-            Colors.purple,
-          ),
-          const SizedBox(height: 30),
-          SizedBox(
-            height: 200,
-            child: PieChart(
-              PieChartData(
-                sections: [
-                  PieChartSectionData(
-                    value: totalCost,
-                    title: 'Cost\n\$${totalCost.toStringAsFixed(0)}',
-                    radius: 80,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    color: Colors.red,
-                  ),
-                  PieChartSectionData(
-                    value: totalProfit,
-                    title: 'Profit\n\$${totalProfit.toStringAsFixed(0)}',
-                    radius: 80,
-                    titleStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    color: Colors.green,
-                  ),
-                ],
-                sectionsSpace: 2,
-                centerSpaceRadius: 40,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper widgets
-  Widget _buildDateRangeHeader() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF36454F).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '${DateFormat('MMM dd, yyyy').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          TextButton.icon(
-            onPressed: _selectDateRange,
-            icon: const Icon(Icons.edit),
-            label: const Text('Change'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-      String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOrdersList() {
-    final orders = (_salesByDateRange!['orders'] as List?) ?? [];
-
-    if (orders.isEmpty) {
-      return const Text('No orders found');
-    }
+    final totalItems = _inventoryStatus?['totalItems']?.toString() ?? '—';
+    final lowStock = _inventoryStatus?['lowStock']?.toString() ?? '—';
+    final items =
+        (_inventoryStatus?['items'] as List?)?.cast<Map<String, dynamic>>() ??
+            const [];
 
     return Column(
-      children: orders.take(5).map<Widget>((order) {
-        final orderId = ((order['orderId'] ?? 0) as num).toInt();
-        final orderPlaced = DateTime.parse(
-            order['orderDate'] ?? DateTime.now().toIso8601String());
-        final grandTotal = ((order['grandTotal'] ?? 0) as num).toDouble();
-        final itemCount = ((order['itemCount'] ?? 0) as num).toInt();
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFFB87333),
-              child: Text('#$orderId',
-                  style: const TextStyle(color: Colors.white, fontSize: 12)),
-            ),
-            title: Text('Order #$orderId'),
-            subtitle: Text(
-              '${DateFormat('MMM dd, hh:mm a').format(orderPlaced)} • $itemCount items',
-            ),
-            trailing: Text(
-              '\$${grandTotal.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.green,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Inventory Status',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              _buildExportButton(
+                'Export PDF',
+                () => PdfService.generateDashboardReport(
+                  summary: _inventoryStatus ?? const {},
+                  salesTrend: const [],
+                  topProducts: const [],
+                  topCategories: const [],
+                  recentOrders: const [],
+                ),
               ),
-            ),
+            ],
           ),
-        );
-      }).toList(),
+        ),
+        Expanded(
+          child: ListView(
+            children: [
+              ListTile(
+                title: const Text('Total Items'),
+                trailing: Text(totalItems),
+              ),
+              ListTile(
+                title: const Text('Low Stock'),
+                trailing: Text(lowStock),
+              ),
+              const Divider(),
+              ...items.map(
+                (e) => ListTile(
+                  title: Text(e['name']?.toString() ?? '—'),
+                  subtitle: Text('Qty: ${e['quantity']?.toString() ?? '0'}'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildProductsList() {
+  Widget _buildProfitTab() {
+    final profit = _profitAnalysis?['profit']?.toString() ?? '—';
+    final margin = _profitAnalysis?['margin']?.toString() ?? '—';
+
     return Column(
-      children: _topSellingProducts.map<Widget>((product) {
-        final name = product['productName'] ?? 'Unknown';
-        final quantity = ((product['totalQuantitySold'] ?? 0) as num).toInt();
-        final revenue = ((product['totalRevenue'] ?? 0) as num).toDouble();
-        final unitPrice = ((product['unitPrice'] ?? 0) as num).toDouble();
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(name),
-            subtitle: Text(
-                '$quantity units sold • \$${unitPrice.toStringAsFixed(2)}/unit'),
-            trailing: Text(
-              '\$${revenue.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.green,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Profit Analysis',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              _buildExportButton(
+                'Export PDF',
+                () => PdfService.generateDashboardReport(
+                  summary: _profitAnalysis ?? const {},
+                  salesTrend: const [],
+                  topProducts: const [],
+                  topCategories: const [],
+                  recentOrders: const [],
+                ),
               ),
-            ),
+            ],
           ),
-        );
-      }).toList(),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              ListTile(title: const Text('Profit'), trailing: Text(profit)),
+              ListTile(title: const Text('Margin'), trailing: Text(margin)),
+            ],
+          ),
+        ),
+      ],
     );
-  }
-
-  Color _getColorForPaymentMethod(String method) {
-    switch (method.toLowerCase()) {
-      case 'cash':
-        return Colors.green;
-      case 'visa':
-      case 'credit card':
-        return Colors.blue;
-      case 'debit card':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _getIconForPaymentMethod(String method) {
-    switch (method.toLowerCase()) {
-      case 'cash':
-        return Icons.money;
-      case 'visa':
-      case 'credit card':
-        return Icons.credit_card;
-      case 'debit card':
-        return Icons.payment;
-      default:
-        return Icons.account_balance_wallet;
-    }
-  }
-
-  String _getPaymentMethodName(dynamic methodCode) {
-    final code = methodCode is String
-        ? int.tryParse(methodCode) ?? 0
-        : (methodCode as num).toInt();
-    switch (code) {
-      case 1:
-        return 'Cash';
-      case 2:
-        return 'Visa';
-      case 3:
-        return 'Credit Card';
-      case 4:
-        return 'Debit Card';
-      default:
-        return 'Unknown';
-    }
   }
 }

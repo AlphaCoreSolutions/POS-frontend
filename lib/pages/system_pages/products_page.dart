@@ -420,7 +420,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                               textAlign: TextAlign.center,
                                             ),
                                           ),
-
+/*
                                           Text(
                                             'Stock: ${data[index].productInventory?.toStringAsFixed(0) ?? '0'}', // Display the price formatted to 2 decimal places
                                             style: TextStyle(
@@ -428,7 +428,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                                 color: Colors.green),
                                             textAlign: TextAlign.center,
                                           ),
-
+*/
                                           // Price of the product
                                           Row(
                                             mainAxisAlignment:

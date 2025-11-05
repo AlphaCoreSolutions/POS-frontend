@@ -1,3 +1,25 @@
+// android/build.gradle (project-level)
+
+subprojects { p ->
+  afterEvaluate {
+    if (p.plugins.hasPlugin('com.android.library')) {
+      def androidExt = p.extensions.findByName('android')
+      if (androidExt != null && !androidExt.hasProperty('namespace')) {
+        def manifestFile = file("${p.projectDir}/src/main/AndroidManifest.xml")
+        if (manifestFile.exists()) {
+          def text = manifestFile.getText('UTF-8')
+          def m = (text =~ /package="([^"]+)"/)
+          if (m.find()) {
+            def pkg = m.group(1)
+            androidExt.namespace = pkg
+            println("Set namespace '${pkg}' for module ${p.name}")
+          }
+        }
+      }
+    }
+  }
+}
+
 allprojects {
     repositories {
         google()
@@ -13,6 +35,5 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-tasks.register("clean", Delete) {
-    delete rootProject.buildDir
-}
+tasks.register("clean", Delete) { delete rootProject.buildDir }
+

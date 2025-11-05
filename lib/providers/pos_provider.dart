@@ -42,7 +42,26 @@ class PosProvider with ChangeNotifier {
   int? _orgId;
 
   // Getters
-  List<dynamic> get products => _products;
+  List<Product> get products {
+    final all = _products.cast<Product>();
+
+    if (_selectedSubId != null) {
+      return all.where((p) => p.categoryId == _selectedSubId).toList();
+    }
+
+    if (_selectedCategory != null) {
+      // Get all subcategories under this root
+      final subIds = _categories
+          .where((c) => c.mainCategoryId == _selectedCategory!.id)
+          .map((c) => c.id)
+          .toList();
+
+      return all.where((p) => subIds.contains(p.categoryId)).toList();
+    }
+
+    return all;
+  }
+
   List<Category> get categories => _categories;
   List<Category> get rootCategories => _rootCategories;
   List<Category> get activeSubs => _activeSubs;

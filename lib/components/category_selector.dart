@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:visionpos/models/category_model.dart';
 
-class CategorySelector extends StatelessWidget {
-  final List<Category> rootCategories;
-  final List<Category> activeSubs;
+class CategorySelector extends StatefulWidget {
+  final List<Category> allCategories;
   final Category? selectedCategory;
   final int? selectedSubId;
   final Function(Category?) onRootTap;
@@ -11,8 +10,7 @@ class CategorySelector extends StatelessWidget {
 
   const CategorySelector({
     super.key,
-    required this.rootCategories,
-    required this.activeSubs,
+    required this.allCategories,
     this.selectedCategory,
     this.selectedSubId,
     required this.onRootTap,
@@ -20,170 +18,99 @@ class CategorySelector extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Main category row (horizontal)
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.18,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: rootCategories.length + 1,
-            itemBuilder: (context, index) {
-              final isAll = index == 0;
-              final cat = isAll ? null : rootCategories[index - 1];
-              final name = isAll ? 'All' : cat!.categoryName;
+  State<CategorySelector> createState() => _CategorySelectorState();
+}
 
-              return GestureDetector(
-                onTap: () => onRootTap(cat),
+class _CategorySelectorState extends State<CategorySelector> {
+  int? expandedCategoryId;
+
+  List<Category> get rootCategories =>
+      widget.allCategories.where((cat) => cat.mainCategoryId == null).toList();
+
+  List<Category> getSubCategories(int parentId) => widget.allCategories
+      .where((cat) => cat.mainCategoryId == parentId)
+      .toList();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: rootCategories.map((cat) {
+          final isExpanded = expandedCategoryId == cat.id;
+          final subCats = getSubCategories(cat.id);
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (expandedCategoryId == cat.id) {
+                      expandedCategoryId = null;
+                      widget.onRootTap(null);
+                    } else {
+                      expandedCategoryId = cat.id;
+                      widget.onRootTap(cat);
+                    }
+                  });
+                },
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  width: MediaQuery.of(context).size.width * 0.13,
-                  child: Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: MediaQuery.of(context).size.width * 0.016,
-                          fontWeight: FontWeight.bold,
-                          color: const Color.fromARGB(166, 0, 0, 0),
-                        ),
-                      ),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    cat.categoryName,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-
-        // Animated subcategory rail (vertical, compact)
-        AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          key: ValueKey(activeSubs.length),
-          curve: Curves.easeOut,
-          child: activeSubs.isEmpty
-              ? const SizedBox.shrink()
-              : SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.16,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: MediaQuery.of(context).size.width * 0.12,
-                        margin: const EdgeInsets.only(left: 4, right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Scrollbar(
-                          thumbVisibility: true,
-                          interactive: true,
-                          child: ListView.separated(
-                            primary: false,
-                            padding: const EdgeInsets.all(10),
-                            physics: const BouncingScrollPhysics(),
-                            itemCount: activeSubs.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (context, i) {
-                              final sub = activeSubs[i];
-                              final selected = sub.id == selectedSubId;
-                              final cs = Theme.of(context).colorScheme;
-
-                              return Material(
-                                color: selected
-                                    ? cs.primary.withOpacity(0.08)
-                                    : Colors.white,
-                                elevation: selected ? 2 : 0,
-                                shadowColor: cs.primary.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  onTap: () => onSubTap(sub),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 160),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 10,
-                                      horizontal: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: selected
-                                            ? cs.primary
-                                            : Colors.grey.withOpacity(0.22),
-                                        width: selected ? 1.25 : 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        AnimatedContainer(
-                                          color: selected
-                                              ? cs.primary
-                                              : Colors.grey.withOpacity(0.18),
-                                          duration:
-                                              const Duration(milliseconds: 160),
-                                          width: 28,
-                                          height: 28,
-                                          alignment: Alignment.center,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: selected
-                                                ? cs.primary.withOpacity(0.18)
-                                                : Colors.grey.shade200,
-                                          ),
-                                          child: Icon(
-                                            Icons.label_rounded,
-                                            size: 16,
-                                            color: selected
-                                                ? cs.primary
-                                                : Colors.grey.shade700,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            sub.categoryName,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: const Color(0xFF36454F),
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: MediaQuery.of(context)
-                                                      .size
-                                                      .width *
-                                                  0.011,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Icon(
-                                          Icons.chevron_right_rounded,
-                                          size: 18,
-                                          color: selected
-                                              ? cs.primary
-                                              : Colors.grey.shade600,
-                                        ),
-                                      ],
-                                    ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                child: isExpanded && subCats.isNotEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: subCats.map((subCat) {
+                            return GestureDetector(
+                              onTap: () => widget.onSubTap(subCat),
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.secondary
+                                      .withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  subCat.categoryName,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.secondary,
                                   ),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
     );
   }
 }

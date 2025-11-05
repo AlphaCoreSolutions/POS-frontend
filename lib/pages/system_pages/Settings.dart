@@ -475,7 +475,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     if (confirm == true) {
                                       final deleted =
                                           await _apiHandler.deletePromoCode(
-                                        _promoCodes[index].id!,
+                                        _promoCodes[index].id,
                                       );
                                       if (deleted) {
                                         setState(() {

@@ -119,8 +119,8 @@ class _UpdateProductState extends State<UpdateProduct> {
       // match keys you set in initialValue:
       sellingPrice: double.tryParse(data['SellingPrice'].toString()) ?? 0.0,
       purchasePrice: double.tryParse(data['purchasePrice'].toString()) ?? 0.0,
-      productInventory:
-          double.tryParse(data['ProductInventory'].toString()) ?? 0.0,
+      // productInventory:
+      //   double.tryParse(data['ProductInventory'].toString()) ?? 0.0,
       barcode: data['Barcode'],
     );
 
@@ -175,9 +175,9 @@ class _UpdateProductState extends State<UpdateProduct> {
                       'ProductDescription': widget.product.productDescription,
                       'purchasePrice': widget.product.purchasePrice.toString(),
                       'SellingPrice': widget.product.sellingPrice.toString(),
-                      'ProductInventory':
-                          widget.product.productInventory.toString(),
-                      'Barcode': widget.product.barcode,
+                      //'ProductInventory':
+                      //  widget.product.productInventory.toString(),
+                      //'Barcode': widget.product.barcode,
                     },
                     child: Column(
                       children: [
@@ -234,10 +234,10 @@ class _UpdateProductState extends State<UpdateProduct> {
                             numeric: true),
                         _text('SellingPrice', 'Selling Price', Icons.sell,
                             numeric: true),
-                        _text(
-                            'ProductInventory', 'Inventory', Icons.inventory_2,
-                            numeric: true),
-                        _text('Barcode', 'Barcode', Icons.qr_code),
+                        //_text(
+                        // 'ProductInventory', 'Inventory', Icons.inventory_2,
+                        //numeric: true),
+                        //_text('Barcode', 'Barcode', Icons.qr_code),
                       ],
                     ),
                   ),

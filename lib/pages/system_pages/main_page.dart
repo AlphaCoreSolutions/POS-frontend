@@ -39,7 +39,7 @@ class _MainPageState extends State<MainPage> {
   OverlayEntry? overlayEntry;
   int userId = 1;
   int ordeId = 0;
-  int? _orgId = 0;
+  int? _orgId;
   // ignore: unused_field
   List<Category> _categories = [];
 
@@ -87,11 +87,6 @@ class _MainPageState extends State<MainPage> {
     if (v is int) return v;
     if (v is String) return int.tryParse(v);
     return null;
-  }
-
-  bool _isRoot(Category c) {
-    final p = _toInt(c.mainCategoryId);
-    return p == null || p == 0;
   }
 
   int? get selectedRootId => selectedCategory?.id;
@@ -145,13 +140,6 @@ class _MainPageState extends State<MainPage> {
     setState(() {});
   }
 
-  void _onCategoriesLoaded(List<Category> all) {
-    setState(() {
-      _allCategories = all;
-      _rootCategories = all.where(_isRoot).toList();
-    });
-  }
-
   void _buildCategoryIndices(List<Category> all) {
     _catById.clear();
     _subIdsByRoot.clear();
@@ -159,6 +147,7 @@ class _MainPageState extends State<MainPage> {
     for (final c in all) {
       _catById[c.id] = c;
       final parent = c.id;
+      // ignore: unnecessary_null_comparison
       if (parent != null) {
         (_subIdsByRoot[parent] ??= <int>[]).add(c.id);
       }
@@ -323,7 +312,7 @@ class _MainPageState extends State<MainPage> {
 
     // Add the header
     bytes += generator.text(
-      '2Go Cafe',
+      '${order.id}',
       styles: PosStyles(
         align: PosAlign.center,
         bold: true,
@@ -770,46 +759,43 @@ class _MainPageState extends State<MainPage> {
   }
 
   void submitOrder() async {
-    double grandTotal = _calculateGrandTotal(selectedItems);
-    OrderDto order = OrderDto(
+    // Ensure we have a valid org id (non-null, non-zero) before proceeding
+    if (_orgId == null || _orgId == 0) {
+      final id = await SessionManager.getOrganizationId();
+      if (id == null || id == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  '⚠️ Organization is not set. Please re-login or select an organization.')),
+        );
+        return;
+      }
+      setState(() => _orgId = id);
+    }
+
+    // Now safe to compute totals and build the order
+    final double grandTotal = _calculateGrandTotal(selectedItems);
+
+    final order = OrderDto(
       id: 0,
-      organizationId: _orgId ?? 0,
+      organizationId: _orgId!, // guaranteed valid here
       orderItems: selectedItems,
       grandTotal: grandTotal,
       paymentMethod: paymentMethod,
-      //OrderStatus: OrderStatus,
       tip: tips,
     );
 
-    bool success = await ApiHandler().postOrder(order);
+    final success = await ApiHandler().postOrder(order);
 
     if (success) {
-      /*
-    // Update product inventory
-    for (var item in selectedItems) {
-      Product product = _getProductById(item.productId);
-      
-      if (product.productId != 0) {
-        // Deduct the quantity and update in DB
-        product.productInventory -= item.quantity;
-        print("🔄 Updating inventory for ${product.productName}: ${product.productInventory}");
-        
-        await ApiHandler().updateProductInventoryInDatabase(product);
-      }
-    }
-    */
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Order submitted successfully!')),
+        const SnackBar(content: Text('✅ Order submitted successfully!')),
       );
-
-      setState(() {
-        selectedItems.clear(); // Clear the list
-      });
+      setState(() => selectedItems.clear());
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Failed to submit order')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ Failed to submit order')),
+      );
     }
   }
 

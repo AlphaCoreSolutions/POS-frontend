@@ -119,9 +119,9 @@ class _AddProductsState extends State<AddProducts> {
         productDescription: data['ProductDescription'],
         sellingPrice: double.tryParse(data['sellingPrice'].toString()) ?? 0.0,
         purchasePrice: double.tryParse(data['purchasePrice'].toString()) ?? 0.0,
-        productInventory:
-            double.tryParse(data['ProductInventory'].toString()) ?? 0.0,
-        barcode: data['Barcode'],
+        //productInventory:
+        //  double.tryParse(data['ProductInventory'].toString()) ?? 0.0,
+        //barcode: data['Barcode'],
       );
 
       try {
@@ -167,7 +167,7 @@ class _AddProductsState extends State<AddProducts> {
                 children: [
                   //buildImagePicker('ProductPicture'),
                   buildCategoryDropdown(), // Use a dropdown for categories
-                  buildTextField('Barcode', 'Barcode', Icons.barcode_reader),
+                  //buildTextField('Barcode', 'Barcode', Icons.barcode_reader),
                   buildTextField('ProductName', 'Product Name', Icons.label),
                   buildTextField(
                       'ProductDescription', 'Description', Icons.description),
@@ -175,8 +175,8 @@ class _AddProductsState extends State<AddProducts> {
                       isNumeric: true),
                   buildTextField('sellingPrice', 'Selling Price', Icons.sell,
                       isNumeric: true),
-                  buildTextField(
-                      'ProductInventory', 'Inventory', Icons.inventory_2),
+                  // buildTextField(
+                  //'ProductInventory', 'Inventory', Icons.inventory_2),
                   const SizedBox(height: 20),
                 ],
               ),
