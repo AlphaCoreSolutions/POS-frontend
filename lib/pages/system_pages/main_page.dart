@@ -307,12 +307,12 @@ class _MainPageState extends State<MainPage> {
 */
   Future<List<int>> generateWindowsTicket(OrderDto order) async {
     final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm58, profile);
+    final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
 
     // Add the header
     bytes += generator.text(
-      '${order.id}',
+      'مطعم باسم ابو كف',
       styles: PosStyles(
         align: PosAlign.center,
         bold: true,
@@ -419,7 +419,7 @@ class _MainPageState extends State<MainPage> {
     bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
 
     bytes += generator.text(
-      'Phone Number: +962 7 9702 0297',
+      'Phone Number: +962 7 9756 3838',
       styles: PosStyles(align: PosAlign.center),
     );
 
