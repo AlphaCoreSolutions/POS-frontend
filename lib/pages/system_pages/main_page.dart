@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
+import 'package:image/image.dart' as img; // for image raster
+import 'package:esc_pos_utils/esc_pos_utils.dart'; // you already use it
 
-import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:visionpos/L10n/app_localizations.dart';
+import 'package:visionpos/components/printer_setup_dialog.dart';
 import 'package:visionpos/language_changing/constants.dart';
 import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/models/order_item_dto.dart';
@@ -11,6 +14,7 @@ import 'package:visionpos/pages/add_pages/add_category.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/product_model.dart';
+import 'package:visionpos/services/arabic_font_loader.dart';
 import 'package:visionpos/utils/session_manager.dart';
 import 'package:visionpos/components/quick_api_switcher.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +22,10 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:intl/intl.dart';
+import 'package:visionpos/services/bluetooth_printing_service.dart';
+import 'package:visionpos/services/receipt_builder.dart';
+import 'package:visionpos/services/kitchen_router.dart';
+import 'package:visionpos/services/triple_printer.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -267,23 +275,133 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  void _printReceipt() async {
-    if (connected) {
-      List<int> bytes = await generateWindowsTicket(
-        OrderDto(
-          id: orderCount,
-          organizationId: _orgId ?? 0,
-          orderItems: selectedItems,
-          grandTotal: _calculateGrandTotal(selectedItems),
-          paymentMethod: paymentMethod,
-          tip: tips,
-        ),
+  Future<void> _printReceipt() async {
+    try {
+      if (selectedItems.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا توجد عناصر للطباعة')),
+        );
+        return;
+      }
+
+      final btConnected = await PrintBluetoothThermal.connectionStatus;
+      if (!(connected == true && btConnected == true)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('الطابعة غير متصلة، الرجاء الاتصال أولاً')),
+        );
+        return;
+      }
+
+      // Cast your products list
+      final List<Product> productList = products is List<Product>
+          ? products as List<Product>
+          : (products as List).cast<Product>();
+
+      final order = OrderDto(
+        id: orderCount,
+        organizationId: _orgId ?? 0,
+        customerId: 0,
+        tips: tips,
+        orderItems: selectedItems,
+        grandTotal: _calculateGrandTotal(selectedItems),
+        paymentMethod: paymentMethod,
+        tip: tips,
+        orderPlaced: null,
       );
-      await PrintBluetoothThermal.writeBytes(bytes);
-      print("Printing successful!");
-    } else {
-      print("No printer connected. Please select a printer first.");
+
+      final bytes = await generateWindowsTicket(order, productList);
+      final ok = await PrintBluetoothThermal.writeBytes(bytes);
+
+      if (ok == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ تم إرسال الفاتورة للطابعة')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ فشل في الطباعة')),
+        );
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('print error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ أثناء الطباعة: $e')),
+      );
     }
+  }
+
+  Future<void> printArabicSmokeTest() async {
+    // Must be connected already
+    final connectedNow = await PrintBluetoothThermal.connectionStatus;
+    if (connectedNow != true) {
+      // ignore: avoid_print
+      print('SmokeTest: printer not connected');
+      return;
+    }
+
+    // Load font
+    await ArabicFontLoader.ensureLoaded(
+      family: 'NotoNaskhArabic',
+      assetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+    );
+
+    // Build a single raster line
+    final profile = await CapabilityProfile.load();
+    final paper = PaperSize.mm80; // change to mm58 if needed
+    final widthPx = 576; // 80mm ~576, 58mm ~384
+    final gen = Generator(paper, profile);
+    final bytes = <int>[];
+
+    Future<img.Image?> _render(String text) async {
+      final style = ui.TextStyle(
+        fontFamily: 'NotoNaskhArabic',
+        color: const ui.Color(0xFF000000),
+        fontSize: 28,
+        fontWeight: ui.FontWeight.w600,
+      );
+      final pStyle = ui.ParagraphStyle(
+        textDirection: ui.TextDirection.rtl,
+        textAlign: ui.TextAlign.center,
+        maxLines: null,
+      );
+      final b = ui.ParagraphBuilder(pStyle)
+        ..pushStyle(style)
+        ..addText(text);
+      final p = b.build()
+        ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+      final h = p.height.ceil();
+      final rec = ui.PictureRecorder();
+      final c = ui.Canvas(rec);
+      c.drawRect(ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), h.toDouble()),
+          ui.Paint()..color = const ui.Color(0xFFFFFFFF));
+      c.drawParagraph(p, const ui.Offset(0, 0));
+      final pic = rec.endRecording();
+      final imgUi = await pic.toImage(widthPx, h);
+      final bd = await imgUi.toByteData(format: ui.ImageByteFormat.png);
+      if (bd == null) return null;
+      return img.decodePng(bd.buffer.asUint8List());
+    }
+
+    final im = await _render('مرحبا بالعالم — اختبار العربية');
+    if (im == null) {
+      // ignore: avoid_print
+      print('SmokeTest: failed to render image');
+      return;
+    }
+
+    // Try imageRaster, then fallback to image
+    try {
+      bytes.addAll(gen.imageRaster(im, align: PosAlign.center));
+    } catch (_) {
+      // ignore: avoid_print
+      print('SmokeTest: imageRaster failed, trying image()');
+      bytes.addAll(gen.image(im, align: PosAlign.center));
+    }
+    bytes.addAll(gen.feed(2));
+    bytes.addAll(gen.cut());
+
+    await PrintBluetoothThermal.writeBytes(bytes);
   }
 
   /*
@@ -305,132 +423,218 @@ class _MainPageState extends State<MainPage> {
     }
   }
 */
-  Future<List<int>> generateWindowsTicket(OrderDto order) async {
+
+  Future<List<int>> generateWindowsTicket(
+    OrderDto order,
+    List<Product> products,
+  ) async {
+    // ----- Adjust these to your printer -----
+    final bool is80mm = false; // set true if your printer is 80mm
+    final paper = is80mm ? PaperSize.mm80 : PaperSize.mm58;
+    final int widthPx = is80mm ? 576 : 384; // 58mm ≈ 384 px, 80mm ≈ 576 px
+
+    // Arabic font must exist in pubspec with same family name
+    const String arabicFontFamily = 'NotoNaskhArabic';
+
+    // 1) Load the font (very important)
+    await ArabicFontLoader.ensureLoaded(
+      family: arabicFontFamily,
+      assetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+    );
+
+    // 2) ESC/POS generator
     final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm80, profile);
-    List<int> bytes = [];
+    final gen = Generator(paper, profile);
+    final bytes = <int>[];
 
-    // Add the header
-    bytes += generator.text(
-      'مطعم باسم ابو كف',
-      styles: PosStyles(
-        align: PosAlign.center,
-        bold: true,
-        height: PosTextSize.size2,
-        width: PosTextSize.size2,
-      ),
-    );
+    // 3) Join items with products by productId
+    final byId = <int, Product>{for (final p in products) p.productId: p};
 
-    bytes += generator.text(
-      'Time: ${formattedTime}',
-      styles: PosStyles(align: PosAlign.center, bold: true),
-    );
+    // ---------- helpers ----------
+    PosAlign _pos(TextAlign a) => a == TextAlign.center
+        ? PosAlign.center
+        : a == TextAlign.right
+            ? PosAlign.right
+            : PosAlign.left;
 
-    bytes += generator.text(
-      'Receipt # ${order.id}',
-      styles: PosStyles(align: PosAlign.center, bold: true),
-    );
+    // Render one line with Flutter text engine
+    Future<img.Image?> _renderLine({
+      required String text,
+      required bool rtl,
+      required TextAlign align,
+      double fontSize = 30, // bigger = cleaner
+      bool bold = true, // slightly heavier strokes
+    }) async {
+      final style = ui.TextStyle(
+        fontFamily: arabicFontFamily,
+        color: const ui.Color(0xFF000000),
+        fontSize: fontSize,
+        fontWeight: bold ? ui.FontWeight.w600 : ui.FontWeight.w400,
+      );
 
-    bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
+      final pStyle = ui.ParagraphStyle(
+        textDirection: rtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+        textAlign: align == TextAlign.center
+            ? ui.TextAlign.center
+            : align == TextAlign.right
+                ? ui.TextAlign.right
+                : ui.TextAlign.left,
+        maxLines: null,
+      );
 
-    bytes += generator.text(
-      'Item:        Qty:         Price:',
-      styles: PosStyles(align: PosAlign.right, bold: true),
-    );
+      final builder = ui.ParagraphBuilder(pStyle)
+        ..pushStyle(style)
+        ..addText(text);
+      final paragraph = builder.build()
+        ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
 
-    bytes += generator.hr(); // Horizontal line
+      final h = paragraph.height.ceil();
+      if (h <= 0) return null;
 
-    // Iterate over order items and fetch product info
-    for (var item in order.orderItems) {
-      // Fetch product details
-      Product product = await _getProductById(item.productId);
+      final rec = ui.PictureRecorder();
+      final canvas = ui.Canvas(rec);
+      // solid white background (avoid dither noise)
+      canvas.drawRect(
+        ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), h.toDouble()),
+        ui.Paint()..color = const ui.Color(0xFFFFFFFF),
+      );
+      canvas.drawParagraph(paragraph, const ui.Offset(0, 0));
+      final pic = rec.endRecording();
+      final uiImg = await pic.toImage(widthPx, h);
+      final bd = await uiImg.toByteData(format: ui.ImageByteFormat.png);
+      if (bd == null) return null;
+      return img.decodePng(bd.buffer.asUint8List());
+    }
 
-      // ignore: unnecessary_null_comparison
-      if (product != null) {
-        double totalPrice = item.quantity * product.sellingPrice;
+    // Convert to pure black/white with a threshold (no error-diffusion dithering)
+    img.Image _toBW(img.Image src, {int threshold = 200}) {
+      final out = img.Image.from(src);
+      for (int y = 0; y < out.height; y++) {
+        for (int x = 0; x < out.width; x++) {
+          final c = out.getPixel(x, y);
+          final r = img.getRed(c);
+          final g = img.getGreen(c);
+          final b = img.getBlue(c);
+          // simple luma
+          final l = (0.299 * r + 0.587 * g + 0.114 * b).round();
+          final v = (l < threshold) ? 0 : 255;
+          out.setPixelRgba(x, y, v, v, v, 255);
+        }
+      }
+      return out;
+    }
 
-        // Ensure proper spacing
-        String productName = product.productName.padRight(
-          12,
-        ); // 20-character width
-        String quantity = 'x${item.quantity}'.padLeft(
-          5,
-        ); // Right-align quantity
-        String price = '${totalPrice.toStringAsFixed(2)} JOD'.padLeft(
-          15,
-        ); // Align price
+    Future<void> _line({
+      required String text,
+      bool rtl = false,
+      TextAlign align = TextAlign.left,
+      double size = 30, // larger default
+      bool bold = true,
+    }) async {
+      final im = await _renderLine(
+          text: text, rtl: rtl, align: align, fontSize: size, bold: bold);
+      if (im == null) return;
 
-        bytes += generator.text(
-          '$productName$quantity$price',
-          styles: PosStyles(align: PosAlign.left),
+      // Ensure exact width & binarize
+      final resized =
+          im.width == widthPx ? im : img.copyResize(im, width: widthPx);
+      final bw = _toBW(resized, threshold: 200); // tweak 180..220 if needed
+
+      // Some printers hate GS v 0; try raster first, then legacy
+      try {
+        bytes.addAll(gen.imageRaster(bw, align: _pos(align)));
+      } catch (_) {
+        bytes.addAll(gen.image(bw, align: _pos(align)));
+      }
+    }
+
+    String _fmtQty(double q) => (q.truncateToDouble() == q)
+        ? q.toStringAsFixed(0)
+        : q.toStringAsFixed(2);
+
+    // ---------- header ----------
+    await _line(
+        text: 'أبو كاف',
+        rtl: true,
+        align: TextAlign.center,
+        size: 34,
+        bold: true);
+    await _line(text: '', size: 12, bold: false);
+
+    // ---------- items ----------
+    double itemsTotal = 0.0;
+    for (final it in order.orderItems) {
+      final p = byId[it.productId];
+      final name = p?.productName ?? 'غير معروف';
+      final unit = p?.sellingPrice ?? 0.0;
+      final qty = it.quantity;
+      final disc = it.discount;
+      final lineTotal = (unit * qty) - disc;
+      itemsTotal += lineTotal;
+
+      await _line(
+        text: '$name ×${_fmtQty(qty)}  —  ${lineTotal.toStringAsFixed(2)}',
+        rtl: true,
+        align: TextAlign.left,
+        size: 28,
+        bold: false,
+      );
+
+      if (disc > 0) {
+        await _line(
+          text: 'خصم: ${disc.toStringAsFixed(2)}',
+          rtl: true,
+          align: TextAlign.right,
+          size: 24,
+          bold: false,
         );
       }
     }
 
-    bytes += generator.hr(); // Horizontal line
+    await _line(
+        text: '——————————————', align: TextAlign.center, size: 22, bold: false);
 
-    // Add subtotal, taxes, and total
-    bytes += generator.text(
-      'Subtotal:       ${_calculateSubtotal(selectedItems)} JOD',
-      styles: PosStyles(align: PosAlign.right, bold: true),
+    // ---------- totals ----------
+    final grand = order.grandTotal.toDouble();
+    final tip = (order.tip != 0.0 ? order.tip : order.tips).toDouble();
+    final pm = order.paymentMethod;
+
+    await _line(
+      text: 'الإجمالي: ${grand.toStringAsFixed(2)}',
+      rtl: true,
+      align: TextAlign.right,
+      size: 30,
+      bold: true,
     );
 
-    bytes += generator.text(
-      '${AppLocalizations.of(context)!.tax}(${selectedTaxType == "In-House" ? currentTaxes?.inHouse.toStringAsFixed(0) ?? 0 : currentTaxes?.takeOut.toStringAsFixed(0) ?? 0}%):      ${_calculateTaxes(selectedItems).toStringAsFixed(2)} JOD',
-      styles: PosStyles(align: PosAlign.right, bold: true),
+    if (tip > 0) {
+      await _line(
+        text: 'البقشيش: ${tip.toStringAsFixed(2)}',
+        rtl: true,
+        align: TextAlign.right,
+        size: 26,
+        bold: false,
+      );
+    }
+
+    await _line(
+      text: 'طريقة الدفع: $pm',
+      rtl: true,
+      align: TextAlign.right,
+      size: 26,
+      bold: false,
     );
 
-    bytes += generator.text(
-      'Total:      ${(order.grandTotal + order.tip).toStringAsFixed(2)} JOD',
-      styles: PosStyles(align: PosAlign.right, bold: true),
-    );
+    await _line(text: '', size: 12, bold: false);
+    await _line(
+        text: 'شكرًا لزيارتكم',
+        rtl: true,
+        align: TextAlign.center,
+        size: 28,
+        bold: true);
 
-    bytes += generator.feed(1);
-
-    String paymentName = order.paymentMethod == 1 ? 'Cash' : 'Visa';
-    bytes += generator.text(
-      'PaymentMethod:          $paymentName    ',
-      styles: PosStyles(align: PosAlign.right),
-    );
-
-    bytes += generator.text(
-      'Tip:                    ${order.tip.toStringAsFixed(2)} JOD',
-      styles: PosStyles(align: PosAlign.right),
-    );
-
-    bytes += generator.feed(3); // Space at the end
-    bytes += generator.hr(); // Horizontal line
-    /*
-    bytes += generator.text('AlphaCore Solution',
-        styles: PosStyles(
-            align: PosAlign.center,
-            bold: true,
-            height: PosTextSize.size1,
-            width: PosTextSize.size1));
-            */
-
-    bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
-
-    bytes += generator.text(
-      'Contact Information:',
-      styles: PosStyles(align: PosAlign.center),
-    );
-
-    bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
-
-    bytes += generator.text(
-      'Phone Number: +962 7 9756 3838',
-      styles: PosStyles(align: PosAlign.center),
-    );
-
-    bytes += generator.text('', styles: PosStyles(align: PosAlign.center));
-    /*
-    bytes += generator.text('acsolutions.business@gmail.com',
-        styles: PosStyles(align: PosAlign.center));
-*/
-    bytes += generator.feed(0);
-    bytes += generator.cut(); // Cut the paper
-
+    bytes.addAll(gen.feed(2));
+    bytes.addAll(gen.cut());
     return bytes;
   }
 
@@ -788,6 +992,60 @@ class _MainPageState extends State<MainPage> {
     final success = await ApiHandler().postOrder(order);
 
     if (success) {
+      // === Triple Printer: customer + kitchens ===
+      try {
+        // Build items for printing
+        final List<Map<String, dynamic>> printItems = selectedItems.map((it) {
+          final product = _getProductById(it.productId);
+          return {
+            'name': product.productName,
+            'quantity': it.quantity,
+            'price': product.sellingPrice,
+            'categoryId': product.categoryId,
+          };
+        }).toList();
+
+        // Compute summary numbers
+        final double subtotal = printItems.fold(0.0,
+            (sum, it) => sum + (it['price'] as num) * (it['quantity'] as num));
+        final double tax = _calculateTaxes(selectedItems);
+        final double tip =
+            tips; // reuse existing tips variable if present, else 0
+        final double total = subtotal + tax + tips;
+
+        final orderMap = {
+          'orderNumber': order.id, // or your returned order number
+          'paymentMethod': paymentMethod == 1 ? 'CASH' : 'VISA',
+          'subtotal': subtotal,
+          'tax': tax,
+          'tips': tip,
+          'total': total,
+          'items': printItems,
+        };
+
+        // Init Bluetooth printers
+        final bt = BluetoothPrinterManager();
+        await bt.load();
+
+        final router = KitchenRouter(
+          falafelCategoryIds: {7}, // <-- set your Falafel categories here
+          shawarmaSnacksCategoryIds: {
+            6,
+            8,
+            9
+          }, // <-- set your Shawarma & Snacks categories here
+        );
+
+        final builder = await ReceiptBuilder.create();
+        final triple = TriplePrinter(bt: bt, builder: builder, router: router);
+
+        await triple.printAll(orderMap);
+      } catch (e) {
+        // Swallow printing errors to avoid blocking the POS
+        debugPrint('Printing error: $e');
+      }
+      // === End Triple Printer ===
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Order submitted successfully!')),
       );
@@ -1088,6 +1346,10 @@ class _MainPageState extends State<MainPage> {
               actions: [
                 QuickApiSwitcher(),
                 SizedBox(width: 10),
+                IconButton(
+                  icon: const Icon(Icons.print),
+                  onPressed: () => showPrinterSetupDialog(context),
+                ),
                 ElevatedButton(
                   onPressed: _showPrinterDialog,
                   style: ElevatedButton.styleFrom(

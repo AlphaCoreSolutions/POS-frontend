@@ -1,0 +1,5 @@
+- [ ] Remove blue_thermal_printer from pubspec.yaml
+- [ ] Update lib/services/bluetooth_printing_service.dart to use print_bluetooth_thermal
+- [ ] Update lib/components/printer_setup_dialog.dart to use print_bluetooth_thermal
+- [ ] Run flutter pub get
+- [ ] Test build
