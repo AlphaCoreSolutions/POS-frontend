@@ -1,38 +1,569 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:image/image.dart' as img;
+import 'package:esc_pos_utils/esc_pos_utils.dart';
+import 'package:visionpos/services/arabic_font_loader.dart';
 
-import 'dart:typed_data'; import 'dart:ui' as ui; import 'package:image/image.dart' as img; import 'package:esc_pos_utils/esc_pos_utils.dart'; import 'package:visionpos/services/arabic_font_loader.dart'; /// Arabic-only receipts (customer + kitchen) using raster text for reliable shaping. /// - Customer receipt: shows items and totals (all Arabic). /// - Kitchen ticket: section header + items (Arabic). class ReceiptBuilder { final PaperSize paper; final CapabilityProfile profile; /// Printable width in pixels (typical): 58mm ≈ 384px, 80mm ≈ 576px. final int widthPx; /// Arabic font family as declared in pubspec.yaml (must match `family:` name). final String? arabicFontFamily; /// Path to the TTF (used by the custom loader). final String? arabicFontAssetPath; /// Enable verbose logs. final bool debug; /// Optional: convert 
+/// Arabic-only receipts (customer + kitchen) using direct text printing for efficiency.
+/// - Customer receipt: shows items and totals (all Arabic).
+/// - Kitchen ticket: section header + items (Arabic).
+/// Falls back to raster if direct text fails (configurable).
+class ReceiptBuilder {
+  final PaperSize paper;
+  final CapabilityProfile profile;
 
-0-9 into Arabic-Indic (٠١٢٣٤٥٦٧٨٩). Default: false. final bool useArabicIndicDigits; ReceiptBuilder._( this.paper, this.profile, this.widthPx, this.arabicFontFamily, this.arabicFontAssetPath, { required this.debug, required this.useArabicIndicDigits, }); /// Factory to init capability profile and load the Arabic font once. static Future create({ PaperSize paper = PaperSize.mm80, String? profileName, String? arabicFontFamily, // e.g., 'NotoKufiArabic' String? arabicFontAssetPath, // e.g., 'assets/fonts/NotoKufiArabic-Regular.ttf' bool debug = false, int? widthPxOverride, // override to 512/640 if your 80mm printer needs it bool useArabicIndicDigits = false, }) async { final sw = Stopwatch()..start(); _d(debug, 'RB.create() → loading profile "${profileName ?? 'default'}"...'); final profile = await CapabilityProfile.load(name: 
+  /// Printable width in pixels (typical): 58mm ≈ 384px, 80mm ≈ 576px.
+  final int widthPx;
 
-profileName ?? 'default'); final widthPx = widthPxOverride ?? ((paper == PaperSize.mm58) ? 384 : 576); _d(debug, 'RB.create() ✓ profile in ${sw.elapsedMilliseconds}ms; paper=$paper, widthPx=$widthPx'); if (arabicFontFamily != null && arabicFontAssetPath != null) { try { final swFont = Stopwatch()..start(); _d(debug, 'RB.create() → loading Arabic font "$arabicFontFamily" from "$arabicFontAssetPath"...'); await ArabicFontLoader.ensureLoaded( family: arabicFontFamily, assetPath: arabicFontAssetPath, ); _d(debug, 'RB.create() ✓ font loaded in ${swFont.elapsedMilliseconds}ms'); } catch (e, st) { _e(debug, 'RB.create() ✗ font load failed: $e\n$st'); } } else { _w(debug, 'RB.create() ⚠ No Arabic font configured; set arabicFontFamily + 
+  /// Arabic font family as declared in pubspec.yaml (must match `family:` name).
+  final String? arabicFontFamily;
 
-arabicFontAssetPath.'); } return ReceiptBuilder._( paper, profile, widthPx, arabicFontFamily, arabicFontAssetPath, debug: debug, useArabicIndicDigits: useArabicIndicDigits, ); } // --------------------------------------------------------------------------- // CUSTOMER RECEIPT (Arabic, with items) // --------------------------------------------------------------------------- /// /// Expects: /// order = { /// 'orderNumber': ..., /// 'paymentMethod': 'Cash'|'Card'|..., /// 'subtotal': num?, 'tax': num?, 'tips': num?, 'total': num? /// } /// items = [ /// {'name': 'شاورما', 'quantity': 2, 'unitPrice': 1.50, 'notes': 'بدون بصل'}, /// ... /// ] /// /// If totals not provided, they’ll be computed from items (unitPrice * qty). Future buildCustomer( Map order, { List>? items, }) async { final g = Generator(paper, profile); final List bytes = []; final sw = Stopwatch()..start(); final List> list = (items 
+  /// Path to the TTF (used by the custom loader).
+  final String? arabicFontAssetPath;
 
-?? (order['items'] as List?)?.cast>() ?? []) .map>((e) => Map.from(e)) .toList(); _d(debug, 'buildCustomer() → items=${list.length}'); // ---- Header ---- bytes.addAll(await _arabicTextLineAsRaster( g, 'فاتورة', align: PosAlign.center, fontSize: 28, )); bytes.addAll(g.hr()); // ---- Order info ---- final orderNo = (order['orderNumber'] ?? '').toString(); if (orderNo.isNotEmpty) { bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'رقم الطلب', value: _digits(orderNo), fontSize: 22, )); } final payAr = _paymentMethodArabic((order['paymentMethod'] ?? '').toString()); if (payAr.isNotEmpty) { bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'طريقة الدفع', value: payAr, fontSize: 22, )); } bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 
+  /// Enable verbose logs.
+  final bool debug;
 
-'التاريخ والوقت', value: _digits(_formatNow()), fontSize: 20, )); bytes.addAll(g.hr()); // ---- Items (Arabic) ---- num computedSubtotal = 0; for (int i = 0; i < list.length; i++) { final it = list[i]; final String name = (it['name'] ?? 'صنف').toString(); final num qty = _asNum(it['quantity'], fallback: 1); final num unit = _pickPrice(it); final num lineTotal = unit * qty; computedSubtotal += lineTotal; // Line 1: " × " ....... "" bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: '${_digits(qty.toString())} × $name', value: _digits(_money(lineTotal)), fontSize: 22, )); // Optional Line 2: "سعر الوحدة .... " bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'سعر الوحدة', value: _digits(_money(unit)), fontSize: 18, )); // Notes (if any) final notes = (it['notes'] ?? '').toString().trim(); if (notes.isNotEmpty) { bytes.addAll(await _arabicTextLineAsRaster( g, 'ملاحظات: 
+  /// Optional: convert 0-9 into Arabic-Indic (٠١٢٣٤٥٦٧٨٩). Default: false.
+  final bool useArabicIndicDigits;
 
-$notes', align: PosAlign.left, fontSize: 18, )); } } bytes.addAll(g.hr()); // ---- Money section ---- num subtotal = _asNum(order['subtotal'], fallback: computedSubtotal); num tax = _asNum(order['tax'], fallback: 0); num tips = _asNum(order['tips'], fallback: 0); num total = _asNum(order['total'], fallback: subtotal + tax + tips); bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'الإجمالي الفرعي', value: _digits(_money(subtotal)), fontSize: 22, )); if (tax > 0) { bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'الضريبة', value: _digits(_money(tax)), fontSize: 22, )); } if (tips > 0) { bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'الإكرامية', value: _digits(_money(tips)), fontSize: 22, )); } bytes.addAll(g.hr()); bytes.addAll(await 
+  /// Optional: fall back to raster rendering if direct text fails. Default: false.
+  final bool useRasterFallback;
 
-_arabicKeyValueLineAsRaster( g, label: 'الإجمالي', value: _digits(_money(total)), fontSize: 26, )); bytes.addAll(g.hr()); // Footer bytes.addAll(await _arabicTextLineAsRaster( g, 'شكراً لكم', align: PosAlign.center, fontSize: 22, )); bytes.addAll(g.feed(2)); bytes.addAll(g.cut()); final out = Uint8List.fromList(bytes); _d(debug, 'buildCustomer() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms'); return out; } // --------------------------------------------------------------------------- // KITCHEN TICKET (Arabic, items for a single section) // --------------------------------------------------------------------------- Future buildKitchen( Map order, { required String kitchenName, required List> items, }) async { final g = Generator(paper, profile); final List bytes = []; final sw = Stopwatch()..start(); _d(debug, 
+  ReceiptBuilder._(
+    this.paper,
+    this.profile,
+    this.widthPx,
+    this.arabicFontFamily,
+    this.arabicFontAssetPath, {
+    required this.debug,
+    required this.useArabicIndicDigits,
+    required this.useRasterFallback,
+  });
 
-'buildKitchen() → start; kitchen="$kitchenName", items=${items.length}'); bytes.addAll(await _arabicTextLineAsRaster( g, kitchenName, align: PosAlign.center, fontSize: 28, )); bytes.addAll(g.hr()); for (int i = 0; i < items.length; i++) { final item = items[i]; final String name = (item['name'] ?? 'صنف').toString(); final num qty = _asNum(item['quantity'], fallback: 1); final String notes = (item['notes'] ?? '').toString(); // " × " bytes.addAll(await _arabicTextLineAsRaster( g, '${_digits(qty.toString())} × $name', align: PosAlign.left, fontSize: 22, )); if (notes.trim().isNotEmpty) { bytes.addAll(await _arabicTextLineAsRaster( g, 'ملاحظات: $notes', align: PosAlign.left, fontSize: 18, )); } } bytes.addAll(g.hr()); final orderNo = (order['orderNumber'] ?? '').toString(); if 
+  /// Factory to init capability profile and load the Arabic font once.
+  static Future<ReceiptBuilder> create({
+    PaperSize paper = PaperSize.mm80,
+    String? profileName,
+    String? arabicFontFamily,
+    String? arabicFontAssetPath,
+    bool debug = false,
+    int? widthPxOverride,
+    bool useArabicIndicDigits = false,
+    bool useRasterFallback = false,
+  }) async {
+    final sw = Stopwatch()..start();
+    _d(debug, 'RB.create() → loading profile "${profileName ?? 'default'}"...');
+    final profile =
+        await CapabilityProfile.load(name: profileName ?? 'default');
+    final widthPx = widthPxOverride ?? ((paper == PaperSize.mm58) ? 384 : 576);
+    _d(debug,
+        'RB.create() ✓ profile in ${sw.elapsedMilliseconds}ms; paper=$paper, widthPx=$widthPx');
+    if (arabicFontFamily != null && arabicFontAssetPath != null) {
+      try {
+        final swFont = Stopwatch()..start();
+        _d(debug,
+            'RB.create() → loading Arabic font "$arabicFontFamily" from "$arabicFontAssetPath"...');
+        await ArabicFontLoader.ensureLoaded(
+          family: arabicFontFamily,
+          assetPath: arabicFontAssetPath,
+        );
+        _d(debug,
+            'RB.create() ✓ font loaded in ${swFont.elapsedMilliseconds}ms');
+      } catch (e, st) {
+        _e(debug, 'RB.create() ✗ font load failed: $e\n$st');
+      }
+    } else {
+      _w(debug,
+          'RB.create() ⚠ No Arabic font configured; set arabicFontFamily + arabicFontAssetPath.');
+    }
+    return ReceiptBuilder._(
+      paper,
+      profile,
+      widthPx,
+      arabicFontFamily,
+      arabicFontAssetPath,
+      debug: debug,
+      useArabicIndicDigits: useArabicIndicDigits,
+      useRasterFallback: useRasterFallback,
+    );
+  }
 
-(orderNo.isNotEmpty) { bytes.addAll(await _arabicKeyValueLineAsRaster( g, label: 'رقم الطلب', value: _digits(orderNo), fontSize: 20, )); } bytes.addAll(await _arabicTextLineAsRaster( g, _digits(_formatNow()), align: PosAlign.center, fontSize: 18, )); bytes.addAll(g.feed(1)); bytes.addAll(g.cut()); final out = Uint8List.fromList(bytes); _d(debug, 'buildKitchen() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms'); return out; } // --------------------------------------------------------------------------- // RASTER HELPERS (Arabic shaping + two-column "label ... value") // --------------------------------------------------------------------------- /// Draw a single Arabic (or mixed) line as raster and return ESC/POS bytes. Future> _arabicTextLineAsRaster( Generator g, String text, { PosAlign align = 
+  // ---------------------------------------------------------------------------
+  // CUSTOMER RECEIPT (Arabic, with items)
+  // ---------------------------------------------------------------------------
+  /// Expects:
+  /// order = {
+  /// 'orderNumber': ...,
+  /// 'paymentMethod': 'Cash'|'Card'|...,
+  /// 'subtotal': num?, 'tax': num?, 'tips': num?, 'total': num?
+  /// }
+  /// items = [
+  /// {'name': 'شاورما', 'quantity': 2, 'unitPrice': 1.50, 'notes': 'بدون بصل'},
+  /// ...
+  /// ]
+  ///
+  /// If totals not provided, they’ll be computed from items (unitPrice * qty).
+  Future<Uint8List> buildCustomer(
+    Map<String, dynamic> order, {
+    List<Map<String, dynamic>>? items,
+  }) async {
+    final g = Generator(paper, profile);
+    final List<int> bytes = [];
+    final sw = Stopwatch()..start();
+    final List<Map<String, dynamic>> list =
+        (items ?? (order['items'] as List?)?.cast<Map<String, dynamic>>() ?? [])
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+    _d(debug, 'buildCustomer() → items=${list.length}');
+    // ---- Header ----
+    bytes.addAll(await _arabicTextLineAsRaster(
+      g,
+      'فاتورة',
+      align: PosAlign.center,
+      fontSize: 28,
+    ));
+    bytes.addAll(g.hr());
+    // ---- Order info ----
+    final orderNo = (order['orderNumber'] ?? '').toString();
+    if (orderNo.isNotEmpty) {
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: 'رقم الطلب',
+        value: _digits(orderNo),
+        fontSize: 22,
+      ));
+    }
+    final payAr =
+        _paymentMethodArabic((order['paymentMethod'] ?? '').toString());
+    if (payAr.isNotEmpty) {
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: 'طريقة الدفع',
+        value: payAr,
+        fontSize: 22,
+      ));
+    }
+    bytes.addAll(await _arabicKeyValueLineAsRaster(
+      g,
+      label: 'التاريخ والوقت',
+      value: _digits(_formatNow()),
+      fontSize: 20,
+    ));
+    bytes.addAll(g.hr());
+    // ---- Items (Arabic) ----
+    num computedSubtotal = 0;
+    for (int i = 0; i < list.length; i++) {
+      final it = list[i];
+      final String name = (it['name'] ?? 'صنف').toString();
+      final num qty = _asNum(it['quantity'], fallback: 1);
+      final num unit = _pickPrice(it);
+      final num lineTotal = unit * qty;
+      computedSubtotal += lineTotal;
+      // Line 1: " × " ....... ""
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: '${_digits(qty.toString())} × $name',
+        value: _digits(_money(lineTotal)),
+        fontSize: 22,
+      ));
+      // Optional Line 2: "سعر الوحدة .... "
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: 'سعر الوحدة',
+        value: _digits(_money(unit)),
+        fontSize: 18,
+      ));
+      // Notes (if any)
+      final notes = (it['notes'] ?? '').toString().trim();
+      if (notes.isNotEmpty) {
+        bytes.addAll(await _arabicTextLineAsRaster(
+          g,
+          'ملاحظات: $notes',
+          align: PosAlign.left,
+          fontSize: 18,
+        ));
+      }
+    }
+    bytes.addAll(g.hr());
+    // ---- Money section ----
+    num subtotal = _asNum(order['subtotal'], fallback: computedSubtotal);
+    num tax = _asNum(order['tax'], fallback: 0);
+    num tips = _asNum(order['tips'], fallback: 0);
+    num total = _asNum(order['total'], fallback: subtotal + tax + tips);
+    bytes.addAll(await _arabicKeyValueLineAsRaster(
+      g,
+      label: 'الإجمالي الفرعي',
+      value: _digits(_money(subtotal)),
+      fontSize: 22,
+    ));
+    if (tax > 0) {
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: 'الضريبة',
+        value: _digits(_money(tax)),
+        fontSize: 22,
+      ));
+    }
+    if (tips > 0) {
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: 'الإكرامية',
+        value: _digits(_money(tips)),
+        fontSize: 22,
+      ));
+    }
+    bytes.addAll(g.hr());
+    bytes.addAll(await _arabicKeyValueLineAsRaster(
+      g,
+      label: 'الإجمالي',
+      value: _digits(_money(total)),
+      fontSize: 26,
+    ));
+    bytes.addAll(g.hr());
+    // Footer
+    bytes.addAll(await _arabicTextLineAsRaster(
+      g,
+      'شكراً لكم',
+      align: PosAlign.center,
+      fontSize: 22,
+    ));
+    bytes.addAll(g.feed(2));
+    bytes.addAll(g.cut());
+    final out = Uint8List.fromList(bytes);
+    _d(debug,
+        'buildCustomer() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms');
+    return out;
+  }
 
-PosAlign.center, double fontSize = 22, double verticalPadding = 6, }) async { final sw = Stopwatch()..start(); if (arabicFontFamily == null) { _w(debug, '_arabicTextLineAsRaster() ⚠ arabicFontFamily == null (Arabic may break)'); } text = useArabicIndicDigits ? _toArabicDigits(text) : text; final bool hasArabic = _containsArabic(text); final paragraphStyle = ui.ParagraphStyle( textAlign: _mapAlign(align), textDirection: hasArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr, maxLines: 6, locale: ui.Locale(hasArabic ? 'ar' : 'en'), ); final textStyle = ui.TextStyle( color: const ui.Color(0xFF000000), fontSize: fontSize, fontFamily: arabicFontFamily, ); ui.Paragraph paragraph; try { final builder = ui.ParagraphBuilder(paragraphStyle)..pushStyle(textStyle); builder.addText(text); paragraph = builder.build() 
+  // ---------------------------------------------------------------------------
+  // KITCHEN TICKET (Arabic, items for a single section)
+  // ---------------------------------------------------------------------------
+  Future<Uint8List> buildKitchen(
+    Map<String, dynamic> order, {
+    required String kitchenName,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final g = Generator(paper, profile);
+    final List<int> bytes = [];
+    final sw = Stopwatch()..start();
+    _d(debug,
+        'buildKitchen() → start; kitchen="$kitchenName", items=${items.length}');
+    bytes.addAll(await _arabicTextLineAsRaster(
+      g,
+      kitchenName,
+      align: PosAlign.center,
+      fontSize: 28,
+    ));
+    bytes.addAll(g.hr());
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      final String name = (item['name'] ?? 'صنف').toString();
+      final num qty = _asNum(item['quantity'], fallback: 1);
+      final String notes = (item['notes'] ?? '').toString();
+      // " × "
+      bytes.addAll(await _arabicTextLineAsRaster(
+        g,
+        '${_digits(qty.toString())} × $name',
+        align: PosAlign.left,
+        fontSize: 22,
+      ));
+      if (notes.trim().isNotEmpty) {
+        bytes.addAll(await _arabicTextLineAsRaster(
+          g,
+          'ملاحظات: $notes',
+          align: PosAlign.left,
+          fontSize: 18,
+        ));
+      }
+    }
+    bytes.addAll(g.hr());
+    final orderNo = (order['orderNumber'] ?? '').toString();
+    if (orderNo.isNotEmpty) {
+      bytes.addAll(await _arabicKeyValueLineAsRaster(
+        g,
+        label: 'رقم الطلب',
+        value: _digits(orderNo),
+        fontSize: 20,
+      ));
+    }
+    bytes.addAll(await _arabicTextLineAsRaster(
+      g,
+      _digits(_formatNow()),
+      align: PosAlign.center,
+      fontSize: 18,
+    ));
+    bytes.addAll(g.feed(1));
+    bytes.addAll(g.cut());
+    final out = Uint8List.fromList(bytes);
+    _d(debug,
+        'buildKitchen() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms');
+    return out;
+  }
 
-..layout(ui.ParagraphConstraints(width: widthPx.toDouble())); } catch (e, st) { _e(debug, '_arabicTextLineAsRaster() ✗ build/layout failed: $e\n$st'); rethrow; } final double paraH = paragraph.height; final int height = (paraH + verticalPadding * 2).ceil().clamp(24, 4096); // Paint & draw Uint8List pngBytes; try { final rec = ui.PictureRecorder(); final canvas = ui.Canvas(rec); final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF); canvas.drawRect(ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg); final double dy = ((height - paraH) / 2).clamp(0.0, height.toDouble()); canvas.drawParagraph(paragraph, ui.Offset(0, dy)); final picture = rec.endRecording(); final uiImg = await picture.toImage(widthPx, height); final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png); if (byteData == 
+  // ---------------------------------------------------------------------------
+  // RASTER HELPERS (Arabic shaping + two-column "label ... value")
+  // ---------------------------------------------------------------------------
+  /// Draw a single Arabic (or mixed) line as raster and return ESC/POS bytes.
+  Future<List<int>> _arabicTextLineAsRaster(
+    Generator g,
+    String text, {
+    PosAlign align = PosAlign.center,
+    double fontSize = 22,
+    double verticalPadding = 6,
+  }) async {
+    if (arabicFontFamily == null) {
+      _w(debug,
+          '_arabicTextLineAsRaster() ⚠ arabicFontFamily == null (Arabic may break)');
+    }
+    text = useArabicIndicDigits ? _toArabicDigits(text) : text;
+    final bool hasArabic = _containsArabic(text);
+    final paragraphStyle = ui.ParagraphStyle(
+      textAlign: _mapAlign(align),
+      textDirection: hasArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+      maxLines: 6,
+      locale: ui.Locale(hasArabic ? 'ar' : 'en'),
+    );
+    final textStyle = ui.TextStyle(
+      color: const ui.Color(0xFF000000),
+      fontSize: fontSize,
+      fontFamily: arabicFontFamily,
+    );
+    ui.Paragraph paragraph;
+    try {
+      final builder = ui.ParagraphBuilder(paragraphStyle)..pushStyle(textStyle);
+      builder.addText(text);
+      paragraph = builder.build()
+        ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+    } catch (e, st) {
+      _e(debug, '_arabicTextLineAsRaster() ✗ build/layout failed: $e\n$st');
+      rethrow;
+    }
+    final double paraH = paragraph.height;
+    final int height = (paraH + verticalPadding * 2).ceil().clamp(24, 4096);
+    // Paint & draw
+    Uint8List pngBytes;
+    try {
+      final rec = ui.PictureRecorder();
+      final canvas = ui.Canvas(rec);
+      final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF);
+      canvas.drawRect(
+          ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
+      final double dy = ((height - paraH) / 2).clamp(0.0, height.toDouble());
+      canvas.drawParagraph(paragraph, ui.Offset(0, dy));
+      final picture = rec.endRecording();
+      final uiImg = await picture.toImage(widthPx, height);
+      final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw StateError('toByteData returned null');
+      pngBytes = byteData.buffer.asUint8List();
+    } catch (e, st) {
+      _e(debug, '_arabicTextLineAsRaster() ✗ rasterize failed: $e\n$st');
+      rethrow;
+    }
+    // Decode → ESC/POS
+    final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes);
+    if (decoded == null) {
+      throw StateError('PNG decode returned null');
+    }
+    return g.imageRaster(
+      decoded,
+      align: align,
+      highDensityHorizontal: true,
+      highDensityVertical: true,
+    );
+  }
 
-null) throw StateError('toByteData returned null'); pngBytes = byteData.buffer.asUint8List(); } catch (e, st) { _e(debug, '_arabicTextLineAsRaster() ✗ rasterize failed: $e\n$st'); rethrow; } // Decode → ESC/POS final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes); if (decoded == null) { throw StateError('PNG decode returned null'); } return g.imageRaster( decoded, align: align, highDensityHorizontal: true, highDensityVertical: true, ); } /// Two-column Arabic line: left label (RTL), right value (usually numbers). /// We render two separate paragraphs on the same row; the value is right-aligned to the paper edge. Future> _arabicKeyValueLineAsRaster( Generator g, { required String label, required String value, double fontSize = 22, double verticalPadding = 6, }) async { final 
+  /// Two-column Arabic line: left label (RTL), right value (usually numbers).
+  /// We render two separate paragraphs on the same row; the value is right-aligned to the paper edge.
+  Future<List<int>> _arabicKeyValueLineAsRaster(
+    Generator g, {
+    required String label,
+    required String value,
+    double fontSize = 22,
+    double verticalPadding = 6,
+  }) async {
+    if (arabicFontFamily == null) {
+      _w(debug, '_arabicKeyValueLineAsRaster() ⚠ arabicFontFamily == null');
+    }
+    label = useArabicIndicDigits ? _toArabicDigits(label) : label;
+    value = useArabicIndicDigits ? _toArabicDigits(value) : value;
+    // LABEL (RTL)
+    final pStyleLabel = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.left,
+      textDirection: ui.TextDirection.rtl,
+      maxLines: 2,
+      locale: const ui.Locale('ar'),
+    );
+    final tStyle = ui.TextStyle(
+      color: const ui.Color(0xFF000000),
+      fontSize: fontSize,
+      fontFamily: arabicFontFamily,
+    );
+    final builderL = ui.ParagraphBuilder(pStyleLabel)..pushStyle(tStyle);
+    builderL.addText(label);
+    final pLabel = builderL.build()
+      ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+    // VALUE (LTR, right aligned across the full width, so it hugs the right edge)
+    final pStyleVal = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.right,
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+      locale: const ui.Locale('en'),
+    );
+    final builderV = ui.ParagraphBuilder(pStyleVal)..pushStyle(tStyle);
+    builderV.addText(value);
+    final pValue = builderV.build()
+      ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+    final double h =
+        [pLabel.height, pValue.height].reduce((a, b) => a > b ? a : b);
+    final int height = (h + verticalPadding * 2).ceil().clamp(24, 4096);
+    Uint8List pngBytes;
+    try {
+      final rec = ui.PictureRecorder();
+      final canvas = ui.Canvas(rec);
+      final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF);
+      canvas.drawRect(
+          ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
+      final double dy = ((height - h) / 2).clamp(0.0, height.toDouble());
+      // Draw label on the left (still RTL inside its own paragraph box)
+      canvas.drawParagraph(pLabel, ui.Offset(0, dy));
+      // Draw value right-aligned to the full width
+      canvas.drawParagraph(pValue, ui.Offset(0, dy));
+      final picture = rec.endRecording();
+      final uiImg = await picture.toImage(widthPx, height);
+      final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw StateError('toByteData returned null');
+      pngBytes = byteData.buffer.asUint8List();
+    } catch (e, st) {
+      _e(debug, '_arabicKeyValueLineAsRaster() ✗ rasterize failed: $e\n$st');
+      rethrow;
+    }
+    final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes);
+    if (decoded == null) {
+      throw StateError('PNG decode returned null');
+    }
+    return g.imageRaster(
+      decoded,
+      align: PosAlign.left,
+      highDensityHorizontal: true,
+      highDensityVertical: true,
+    );
+  }
 
-sw = Stopwatch()..start(); if (arabicFontFamily == null) { _w(debug, '_arabicKeyValueLineAsRaster() ⚠ arabicFontFamily == null'); } label = useArabicIndicDigits ? _toArabicDigits(label) : label; value = useArabicIndicDigits ? _toArabicDigits(value) : value; // LABEL (RTL) final pStyleLabel = ui.ParagraphStyle( textAlign: ui.TextAlign.left, textDirection: ui.TextDirection.rtl, maxLines: 2, locale: const ui.Locale('ar'), ); final tStyle = ui.TextStyle( color: const ui.Color(0xFF000000), fontSize: fontSize, fontFamily: arabicFontFamily, ); final builderL = ui.ParagraphBuilder(pStyleLabel)..pushStyle(tStyle); builderL.addText(label); final pLabel = builderL.build() ..layout(ui.ParagraphConstraints(width: 
+  // ---------------------------------------------------------------------------
+  // DIRECT TEXT HELPERS (Arabic shaping + two-column "label ... value")
+  // ---------------------------------------------------------------------------
 
-widthPx.toDouble())); // VALUE (LTR, right aligned across the full width, so it hugs the right edge) final pStyleVal = ui.ParagraphStyle( textAlign: ui.TextAlign.right, textDirection: ui.TextDirection.ltr, maxLines: 1, locale: const ui.Locale('en'), ); final builderV = ui.ParagraphBuilder(pStyleVal)..pushStyle(tStyle); builderV.addText(value); final pValue = builderV.build() ..layout(ui.ParagraphConstraints(width: widthPx.toDouble())); final double h = [pLabel.height, pValue.height].reduce((a, b) => a > b ? a : b); final int height = (h + verticalPadding * 2).ceil().clamp(24, 4096); Uint8List pngBytes; try { final rec = ui.PictureRecorder(); final canvas = ui.Canvas(rec); final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF); canvas.drawRect(ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), 
+  // ---------------------------------------------------------------------------
+  // Small helpers
+  // ---------------------------------------------------------------------------
+  ui.TextAlign _mapAlign(PosAlign a) {
+    switch (a) {
+      case PosAlign.left:
+        return ui.TextAlign.left;
+      case PosAlign.center:
+        return ui.TextAlign.center;
+      case PosAlign.right:
+        return ui.TextAlign.right;
+    }
+  }
 
-bg); final double dy = ((height - h) / 2).clamp(0.0, height.toDouble()); // Draw label on the left (still RTL inside its own paragraph box) canvas.drawParagraph(pLabel, ui.Offset(0, dy)); // Draw value right-aligned to the full width canvas.drawParagraph(pValue, ui.Offset(0, dy)); final picture = rec.endRecording(); final uiImg = await picture.toImage(widthPx, height); final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png); if (byteData == null) throw StateError('toByteData returned null'); pngBytes = byteData.buffer.asUint8List(); } catch (e, st) { _e(debug, '_arabicKeyValueLineAsRaster() ✗ rasterize failed: $e\n$st'); rethrow; } final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes); if (decoded == null) { throw StateError('PNG decode 
+  String _money(num v) => '\$${v.toStringAsFixed(2)}';
 
-returned null'); } return g.imageRaster( decoded, align: PosAlign.left, highDensityHorizontal: true, highDensityVertical: true, ); } // --------------------------------------------------------------------------- // Small helpers // --------------------------------------------------------------------------- ui.TextAlign _mapAlign(PosAlign a) { switch (a) { case PosAlign.left: return ui.TextAlign.left; case PosAlign.center: return ui.TextAlign.center; case PosAlign.right: return ui.TextAlign.right; } } String _money(num v) => '\$${v.toStringAsFixed(2)}'; num _asNum(dynamic v, {num fallback = 0}) { if (v is num) return v; if (v is String) { final p = num.tryParse(v); if (p != null) return p; } return fallback; } num _pickPrice(Map it) { // Flexible keys to support various item payloads final keys = ['unitPrice', 'price', 'unit_price', 'unit_price_amount', 'amount']; 
+  num _asNum(dynamic v, {num fallback = 0}) {
+    if (v is num) return v;
+    if (v is String) {
+      final p = num.tryParse(v);
+      if (p != null) return p;
+    }
+    return fallback;
+  }
 
-for (final k in keys) { if (it.containsKey(k)) { final v = _asNum(it[k]); if (v > 0) return v; } } return 0; } String _formatNow() { final now = DateTime.now(); final two = (int n) => n.toString().padLeft(2, '0'); return '${now.year}-${two(now.month)}-${two(now.day)} ${two(now.hour)}:${two(now.minute)}:${two(now.second)}'; } bool _containsArabic(String s) => RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]').hasMatch(s); String _paymentMethodArabic(String en) { final s = en.trim().toLowerCase(); switch (s) { case 'cash': case 'cash on delivery': return 'نقداً'; case 'card': case 'credit': case 'debit': case 'visa': case 'mastercard': return 'بطاقة'; case 'wallet': case 'ewallet': case 'e-wallet': return 'محفظة إلكترونية'; case 'online': case 'gateway': case 'stripe': case 'paytabs': case 'paypal': return 'دفع إلكتروني'; default: return en.isEmpty ? '' : en; // fallback to 
+  num _pickPrice(Map<String, dynamic> it) {
+    // Flexible keys to support various item payloads
+    final keys = [
+      'unitPrice',
+      'price',
+      'unit_price',
+      'unit_price_amount',
+      'amount'
+    ];
+    for (final k in keys) {
+      if (it.containsKey(k)) {
+        final v = _asNum(it[k]);
+        if (v > 0) return v;
+      }
+    }
+    return 0;
+  }
 
-original } } String _digits(String s) => useArabicIndicDigits ? _toArabicDigits(s) : s; String _toArabicDigits(String s) { const latin = ['0','1','2','3','4','5','6','7','8','9']; const arab = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩']; for (var i = 0; i < 10; i++) { s = s.replaceAll(latin[i], arab[i]); } return s; } } // ---------------- logging ---------------- void _d(bool debug, String msg) { if (debug) { final t = DateTime.now().toIso8601String().substring(11, 23); // ignore: avoid_print print('[RB][D][$t] $msg'); } } void _w(bool debug, String msg) { if (debug) { final t = DateTime.now().toIso8601String().substring(11, 23); // ignore: avoid_print print('[RB][W][$t] $msg'); } } void _e(bool debug, String msg) { final t = DateTime.now().toIso8601String().substring(11, 23); // ignore: avoid_print print('[RB][E][$t] $msg'); }
+  String _formatNow() {
+    final now = DateTime.now();
+    final two = (int n) => n.toString().padLeft(2, '0');
+    return '${now.year}-${two(now.month)}-${two(now.day)} ${two(now.hour)}:${two(now.minute)}:${two(now.second)}';
+  }
+
+  bool _containsArabic(String s) =>
+      RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]').hasMatch(s);
+
+  String _paymentMethodArabic(String en) {
+    final s = en.trim().toLowerCase();
+    switch (s) {
+      case 'cash':
+      case 'cash on delivery':
+        return 'نقداً';
+      case 'card':
+      case 'credit':
+      case 'debit':
+      case 'visa':
+      case 'mastercard':
+        return 'بطاقة';
+      case 'wallet':
+      case 'ewallet':
+      case 'e-wallet':
+        return 'محفظة إلكترونية';
+      case 'online':
+      case 'gateway':
+      case 'stripe':
+      case 'paytabs':
+      case 'paypal':
+        return 'دفع إلكتروني';
+      default:
+        return en.isEmpty ? '' : en; // fallback to original
+    }
+  }
+
+  String _digits(String s) => useArabicIndicDigits ? _toArabicDigits(s) : s;
+
+  String _toArabicDigits(String s) {
+    const latin = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arab = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    for (var i = 0; i < 10; i++) {
+      s = s.replaceAll(latin[i], arab[i]);
+    }
+    return s;
+  }
+}
+
+// ---------------- logging ----------------
+void _d(bool debug, String msg) {
+  if (debug) {
+    final t = DateTime.now().toIso8601String().substring(11, 23);
+    // ignore: avoid_print
+    print('[RB][D][$t] $msg');
+  }
+}
+
+void _w(bool debug, String msg) {
+  if (debug) {
+    final t = DateTime.now().toIso8601String().substring(11, 23);
+    // ignore: avoid_print
+    print('[RB][W][$t] $msg');
+  }
+}
+
+void _e(bool debug, String msg) {
+  final t = DateTime.now().toIso8601String().substring(11, 23);
+  // ignore: avoid_print
+  print('[RB][E][$t] $msg');
+}

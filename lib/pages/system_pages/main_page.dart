@@ -293,24 +293,37 @@ class _MainPageState extends State<MainPage> {
         return;
       }
 
-      // Cast your products list
-      final List<Product> productList = products is List<Product>
-          ? products as List<Product>
-          : (products as List).cast<Product>();
-
-      final order = OrderDto(
-        id: orderCount,
-        organizationId: _orgId ?? 0,
-        customerId: 0,
-        tips: tips,
-        orderItems: selectedItems,
-        grandTotal: _calculateGrandTotal(selectedItems),
-        paymentMethod: paymentMethod,
-        tip: tips,
-        orderPlaced: null,
+      // Create ReceiptBuilder for Arabic printing
+      final builder = await ReceiptBuilder.create(
+        arabicFontFamily: 'NotoNaskhArabic',
+        arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+        useArabicIndicDigits: true,
+        debug: true, // Enable debug to log font loading and rendering issues
       );
 
-      final bytes = await generateWindowsTicket(order, productList);
+      // Prepare order data for ReceiptBuilder
+      final List<Map<String, dynamic>> items = selectedItems.map((item) {
+        final product = _getProductById(item.productId);
+        return {
+          'name': product.productName,
+          'quantity': item.quantity,
+          'unitPrice': product.sellingPrice,
+          'notes': '', // Add notes if available
+        };
+      }).toList();
+
+      final orderMap = {
+        'orderNumber': orderCount.toString(),
+        'paymentMethod': paymentMethod == 1 ? 'Cash' : 'Card',
+        'subtotal': _calculateSubtotal(selectedItems),
+        'tax': _calculateTaxes(selectedItems),
+        'tips': tips,
+        'total': _calculateTotal(selectedItems),
+        'items': items,
+      };
+
+      // Generate Arabic customer receipt
+      final bytes = await builder.buildCustomer(orderMap, items: items);
       final ok = await PrintBluetoothThermal.writeBytes(bytes);
 
       if (ok == true) {
