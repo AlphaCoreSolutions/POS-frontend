@@ -4,10 +4,10 @@ import 'package:image/image.dart' as img;
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:visionpos/services/arabic_font_loader.dart';
 
-/// Arabic-only receipts (customer + kitchen) using direct text printing for efficiency.
+/// Arabic-only receipts (customer + kitchen) using direct text printing initially for efficiency.
 /// - Customer receipt: shows items and totals (all Arabic).
 /// - Kitchen ticket: section header + items (Arabic).
-/// Falls back to raster if direct text fails (configurable).
+/// Falls back to raster rendering if direct text fails or if configured (useRasterFallback).
 class ReceiptBuilder {
   final PaperSize paper;
   final CapabilityProfile profile;
@@ -117,7 +117,7 @@ class ReceiptBuilder {
             .toList();
     _d(debug, 'buildCustomer() → items=${list.length}');
     // ---- Header ----
-    bytes.addAll(await _arabicTextLineAsRaster(
+    bytes.addAll(await _arabicTextLineHybrid(
       g,
       'فاتورة',
       align: PosAlign.center,
@@ -127,7 +127,7 @@ class ReceiptBuilder {
     // ---- Order info ----
     final orderNo = (order['orderNumber'] ?? '').toString();
     if (orderNo.isNotEmpty) {
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'رقم الطلب',
         value: _digits(orderNo),
@@ -137,14 +137,14 @@ class ReceiptBuilder {
     final payAr =
         _paymentMethodArabic((order['paymentMethod'] ?? '').toString());
     if (payAr.isNotEmpty) {
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'طريقة الدفع',
         value: payAr,
         fontSize: 22,
       ));
     }
-    bytes.addAll(await _arabicKeyValueLineAsRaster(
+    bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
       label: 'التاريخ والوقت',
       value: _digits(_formatNow()),
@@ -161,14 +161,14 @@ class ReceiptBuilder {
       final num lineTotal = unit * qty;
       computedSubtotal += lineTotal;
       // Line 1: " × " ....... ""
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: '${_digits(qty.toString())} × $name',
         value: _digits(_money(lineTotal)),
         fontSize: 22,
       ));
       // Optional Line 2: "سعر الوحدة .... "
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'سعر الوحدة',
         value: _digits(_money(unit)),
@@ -177,7 +177,7 @@ class ReceiptBuilder {
       // Notes (if any)
       final notes = (it['notes'] ?? '').toString().trim();
       if (notes.isNotEmpty) {
-        bytes.addAll(await _arabicTextLineAsRaster(
+        bytes.addAll(await _arabicTextLineHybrid(
           g,
           'ملاحظات: $notes',
           align: PosAlign.left,
@@ -191,14 +191,14 @@ class ReceiptBuilder {
     num tax = _asNum(order['tax'], fallback: 0);
     num tips = _asNum(order['tips'], fallback: 0);
     num total = _asNum(order['total'], fallback: subtotal + tax + tips);
-    bytes.addAll(await _arabicKeyValueLineAsRaster(
+    bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
       label: 'الإجمالي الفرعي',
       value: _digits(_money(subtotal)),
       fontSize: 22,
     ));
     if (tax > 0) {
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'الضريبة',
         value: _digits(_money(tax)),
@@ -206,7 +206,7 @@ class ReceiptBuilder {
       ));
     }
     if (tips > 0) {
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'الإكرامية',
         value: _digits(_money(tips)),
@@ -214,7 +214,7 @@ class ReceiptBuilder {
       ));
     }
     bytes.addAll(g.hr());
-    bytes.addAll(await _arabicKeyValueLineAsRaster(
+    bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
       label: 'الإجمالي',
       value: _digits(_money(total)),
@@ -222,7 +222,7 @@ class ReceiptBuilder {
     ));
     bytes.addAll(g.hr());
     // Footer
-    bytes.addAll(await _arabicTextLineAsRaster(
+    bytes.addAll(await _arabicTextLineHybrid(
       g,
       'شكراً لكم',
       align: PosAlign.center,
@@ -249,7 +249,7 @@ class ReceiptBuilder {
     final sw = Stopwatch()..start();
     _d(debug,
         'buildKitchen() → start; kitchen="$kitchenName", items=${items.length}');
-    bytes.addAll(await _arabicTextLineAsRaster(
+    bytes.addAll(await _arabicTextLineHybrid(
       g,
       kitchenName,
       align: PosAlign.center,
@@ -262,14 +262,14 @@ class ReceiptBuilder {
       final num qty = _asNum(item['quantity'], fallback: 1);
       final String notes = (item['notes'] ?? '').toString();
       // " × "
-      bytes.addAll(await _arabicTextLineAsRaster(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
         '${_digits(qty.toString())} × $name',
         align: PosAlign.left,
         fontSize: 22,
       ));
       if (notes.trim().isNotEmpty) {
-        bytes.addAll(await _arabicTextLineAsRaster(
+        bytes.addAll(await _arabicTextLineHybrid(
           g,
           'ملاحظات: $notes',
           align: PosAlign.left,
@@ -280,14 +280,14 @@ class ReceiptBuilder {
     bytes.addAll(g.hr());
     final orderNo = (order['orderNumber'] ?? '').toString();
     if (orderNo.isNotEmpty) {
-      bytes.addAll(await _arabicKeyValueLineAsRaster(
+      bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'رقم الطلب',
         value: _digits(orderNo),
         fontSize: 20,
       ));
     }
-    bytes.addAll(await _arabicTextLineAsRaster(
+    bytes.addAll(await _arabicTextLineHybrid(
       g,
       _digits(_formatNow()),
       align: PosAlign.center,
@@ -453,6 +453,78 @@ class ReceiptBuilder {
   // ---------------------------------------------------------------------------
   // DIRECT TEXT HELPERS (Arabic shaping + two-column "label ... value")
   // ---------------------------------------------------------------------------
+  /// Draw a single Arabic (or mixed) line as direct text and return ESC/POS bytes.
+  Future<List<int>> _arabicTextLine(
+    Generator g,
+    String text, {
+    PosAlign align = PosAlign.center,
+    double fontSize = 22,
+  }) async {
+    text = useArabicIndicDigits ? _toArabicDigits(text) : text;
+    return g.text(
+      text,
+      styles: PosStyles(align: align, bold: fontSize > 24),
+    );
+  }
+
+  /// Two-column Arabic line: left label (RTL), right value (usually numbers).
+  /// We use g.row() for two columns.
+  Future<List<int>> _arabicKeyValueLine(
+    Generator g, {
+    required String label,
+    required String value,
+    double fontSize = 22,
+  }) async {
+    label = useArabicIndicDigits ? _toArabicDigits(label) : label;
+    value = useArabicIndicDigits ? _toArabicDigits(value) : value;
+    return g.row([
+      PosColumn(text: label, width: 6, styles: PosStyles(align: PosAlign.left)),
+      PosColumn(
+          text: value, width: 6, styles: PosStyles(align: PosAlign.right)),
+    ]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // HYBRID HELPERS: Try direct text first, fallback to raster
+  // ---------------------------------------------------------------------------
+  /// Try direct text, fallback to raster if fails or useRasterFallback is true.
+  Future<List<int>> _arabicTextLineHybrid(
+    Generator g,
+    String text, {
+    PosAlign align = PosAlign.center,
+    double fontSize = 22,
+  }) async {
+    if (useRasterFallback) {
+      return _arabicTextLineAsRaster(g, text, align: align, fontSize: fontSize);
+    }
+    try {
+      return await _arabicTextLine(g, text, align: align, fontSize: fontSize);
+    } catch (e) {
+      _w(debug, '_arabicTextLineHybrid() fallback to raster: $e');
+      return _arabicTextLineAsRaster(g, text, align: align, fontSize: fontSize);
+    }
+  }
+
+  /// Try direct text for key-value, fallback to raster if fails or useRasterFallback is true.
+  Future<List<int>> _arabicKeyValueLineHybrid(
+    Generator g, {
+    required String label,
+    required String value,
+    double fontSize = 22,
+  }) async {
+    if (useRasterFallback) {
+      return _arabicKeyValueLineAsRaster(g,
+          label: label, value: value, fontSize: fontSize);
+    }
+    try {
+      return await _arabicKeyValueLine(g,
+          label: label, value: value, fontSize: fontSize);
+    } catch (e) {
+      _w(debug, '_arabicKeyValueLineHybrid() fallback to raster: $e');
+      return _arabicKeyValueLineAsRaster(g,
+          label: label, value: value, fontSize: fontSize);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Small helpers
