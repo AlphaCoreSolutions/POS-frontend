@@ -125,6 +125,7 @@ class BluetoothPrinterManager with ChangeNotifier {
   /// Send raw bytes to a connected printer, throttled for BT SPP stability.
   Future<void> writeBytes(Uint8List bytes) async {
     debugPrint('📤 Starting writeBytes: ${bytes.length} bytes total');
+    debugPrint('📤 Input type: ${bytes.runtimeType}');
 
     // Init printer (ESC @)
     final init = <int>[0x1B, 0x40];
@@ -132,7 +133,10 @@ class BluetoothPrinterManager with ChangeNotifier {
     await Future.delayed(
         const Duration(milliseconds: 50)); // Allow init to process
 
+    // Convert Uint8List to List<int> for Android compatibility
     final list = bytes.toList(growable: false);
+    debugPrint(
+        '📤 Converted to: ${list.runtimeType} for Android compatibility');
 
     const chunkSize = 256; // 128–512 is typical; 256 is a safe middle
     const interChunkDelayMs = 20; // 10–30ms often works best

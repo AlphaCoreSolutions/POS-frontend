@@ -103,12 +103,20 @@ class TriplePrinter {
             name: 'TriplePrinter',
           );
 
+          // Validate byte type for Android compatibility
+          developer.log(
+            '📋 [PRINT-SESSION-$printSessionId] Falafel ticket type: ${bytes.runtimeType} (Android-compatible: ${bytes is Uint8List})',
+            name: 'TriplePrinter',
+          );
+
           // Log Arabic content validation
           _logArabicContentValidation(
               'مطبخ الفلافل', falafelItems, printSessionId);
 
           final Stopwatch falafelPrintTimer = Stopwatch()..start();
           final success = await bt.withPrinter(PrinterRole.falafel, () async {
+            // Ensure Android compatibility by passing Uint8List
+            // The writeBytes method will convert to List<int> internally
             await bt.writeBytes(bytes);
           });
           falafelPrintTimer.stop();
@@ -169,6 +177,12 @@ class TriplePrinter {
             name: 'TriplePrinter',
           );
 
+          // Validate byte type for Android compatibility
+          developer.log(
+            '📋 [PRINT-SESSION-$printSessionId] Shawarma ticket type: ${bytes.runtimeType} (will be converted to List<int> for Android)',
+            name: 'TriplePrinter',
+          );
+
           // Log Arabic content validation
           _logArabicContentValidation(
               'مطبخ الشاورما والوجبات الخفيفة', shsnItems, printSessionId);
@@ -176,6 +190,8 @@ class TriplePrinter {
           final Stopwatch shawarmaPrintTimer = Stopwatch()..start();
           final success =
               await bt.withPrinter(PrinterRole.shawarmaSnacks, () async {
+            // Ensure Android compatibility by passing Uint8List
+            // The writeBytes method will convert to List<int> internally
             await bt.writeBytes(bytes);
           });
           shawarmaPrintTimer.stop();
