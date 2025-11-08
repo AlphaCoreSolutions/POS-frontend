@@ -124,24 +124,44 @@ class BluetoothPrinterManager with ChangeNotifier {
   /// We also chunk to avoid BT buffer overflows.
   /// Send raw bytes to a connected printer, throttled for BT SPP stability.
   Future<void> writeBytes(Uint8List bytes) async {
+    debugPrint('📤 Starting writeBytes: ${bytes.length} bytes total');
+
     // Init printer (ESC @)
     final init = <int>[0x1B, 0x40];
     await _sendList(init);
+    await Future.delayed(
+        const Duration(milliseconds: 50)); // Allow init to process
 
     final list = bytes.toList(growable: false);
 
     const chunkSize = 256; // 128–512 is typical; 256 is a safe middle
     const interChunkDelayMs = 20; // 10–30ms often works best
 
+    final totalChunks = (list.length / chunkSize).ceil();
+    debugPrint('📤 Sending $totalChunks chunks...');
+
     for (int i = 0; i < list.length; i += chunkSize) {
       final end = math.min(i + chunkSize, list.length);
       final chunk = list.sublist(i, end);
+      final chunkNumber = (i / chunkSize).floor() + 1;
+
       await _sendList(chunk);
+      debugPrint(
+          '📤 Chunk $chunkNumber/$totalChunks sent (${chunk.length} bytes)');
+
       await Future.delayed(const Duration(milliseconds: interChunkDelayMs));
     }
 
-    // feed a bit at the end (newline * 4)
+    // Feed and ensure printer processes the data
     await _sendList(List<int>.filled(4, 0x0A));
+
+    // Critical: Wait for printer buffer to flush completely
+    // Calculate dynamic delay based on data size (more data = more time needed)
+    final flushDelayMs = math.min(500 + (list.length ~/ 100), 3000);
+    debugPrint('📤 Waiting ${flushDelayMs}ms for printer buffer to flush...');
+    await Future.delayed(Duration(milliseconds: flushDelayMs));
+
+    debugPrint('✅ writeBytes completed successfully');
   }
 
   Future<void> _sendList(List<int> data) async {
@@ -159,26 +179,48 @@ class BluetoothPrinterManager with ChangeNotifier {
     FutureOr<void> Function() action,
   ) async {
     final target = _assigned[role];
-    if (target == null) return false;
+    if (target == null) {
+      debugPrint('⚠️ No printer assigned for role: ${role.label}');
+      return false;
+    }
+
+    debugPrint(
+        '🔌 Connecting to ${role.label} printer (MAC: ${target.mac})...');
 
     // small settle time before connect (especially when chaining printers)
     await Future.delayed(const Duration(milliseconds: 150));
 
     final ok = await connect(target.mac);
-    if (!ok) return false;
-    try {
-      await action();
+    if (!ok) {
+      debugPrint('❌ Failed to connect to ${role.label} printer');
+      return false;
+    }
 
-      // Give printer time to flush last bytes before we drop the socket
-      await Future.delayed(const Duration(milliseconds: 250));
+    debugPrint('✅ Connected to ${role.label} printer');
+
+    try {
+      debugPrint('🖨️ Executing print action for ${role.label}...');
+      await action();
+      debugPrint('✅ Print action completed for ${role.label}');
+
+      // CRITICAL: Additional wait to ensure printer finishes printing
+      // The writeBytes method already waits, but add safety margin
+      debugPrint('⏳ Waiting for ${role.label} printer to finish printing...');
+      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('✅ ${role.label} printer should have completed printing');
+
       return true;
-    } catch (e) {
-      debugPrint('BT action error: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ BT action error for ${role.label}: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     } finally {
+      debugPrint('🔌 Disconnecting from ${role.label} printer...');
       await disconnect();
+      debugPrint('✅ Disconnected from ${role.label} printer');
+
       // Avoid rapid reconnect to next printer
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 250));
     }
   }
 }

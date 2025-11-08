@@ -249,56 +249,123 @@ class ReceiptBuilder {
     final sw = Stopwatch()..start();
     _d(debug,
         'buildKitchen() → start; kitchen="$kitchenName", items=${items.length}');
-    bytes.addAll(await _arabicTextLineHybrid(
-      g,
-      kitchenName,
-      align: PosAlign.center,
-      fontSize: 28,
-    ));
-    bytes.addAll(g.hr());
-    for (int i = 0; i < items.length; i++) {
-      final item = items[i];
-      final String name = (item['name'] ?? 'صنف').toString();
-      final num qty = _asNum(item['quantity'], fallback: 1);
-      final String notes = (item['notes'] ?? '').toString();
-      // " × "
-      bytes.addAll(await _arabicTextLineHybrid(
+
+    try {
+      // Kitchen name header (Arabic)
+      _d(debug, 'buildKitchen() → rendering kitchen name: "$kitchenName"');
+      final nameBytes = await _arabicTextLineHybrid(
         g,
-        '${_digits(qty.toString())} × $name',
-        align: PosAlign.left,
-        fontSize: 22,
-      ));
-      if (notes.trim().isNotEmpty) {
-        bytes.addAll(await _arabicTextLineHybrid(
-          g,
-          'ملاحظات: $notes',
-          align: PosAlign.left,
-          fontSize: 18,
-        ));
+        kitchenName,
+        align: PosAlign.center,
+        fontSize: 28,
+      );
+      _d(debug,
+          'buildKitchen() ✓ kitchen name rendered: ${nameBytes.length} bytes');
+      bytes.addAll(nameBytes);
+      bytes.addAll(g.hr());
+
+      // Items
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final String name = (item['name'] ?? 'صنف').toString();
+        final num qty = _asNum(item['quantity'], fallback: 1);
+        final String notes = (item['notes'] ?? '').toString();
+
+        _d(debug,
+            'buildKitchen() → rendering item ${i + 1}/${items.length}: "$name" (qty: $qty)');
+
+        // Item line: "quantity × name"
+        final itemLine = '${_digits(qty.toString())} × $name';
+        try {
+          final itemBytes = await _arabicTextLineHybrid(
+            g,
+            itemLine,
+            align: PosAlign.left,
+            fontSize: 22,
+          );
+          _d(debug,
+              'buildKitchen() ✓ item rendered: ${itemBytes.length} bytes');
+          bytes.addAll(itemBytes);
+        } catch (e, st) {
+          _e(debug,
+              'buildKitchen() ✗ FAILED to render item "$itemLine": $e\n$st');
+          rethrow;
+        }
+
+        // Notes (if present)
+        if (notes.trim().isNotEmpty) {
+          _d(debug, 'buildKitchen() → rendering notes: "$notes"');
+          try {
+            final notesLine = 'ملاحظات: $notes';
+            final notesBytes = await _arabicTextLineHybrid(
+              g,
+              notesLine,
+              align: PosAlign.left,
+              fontSize: 18,
+            );
+            _d(debug,
+                'buildKitchen() ✓ notes rendered: ${notesBytes.length} bytes');
+            bytes.addAll(notesBytes);
+          } catch (e, st) {
+            _e(debug,
+                'buildKitchen() ✗ FAILED to render notes "$notes": $e\n$st');
+            // Don't rethrow for notes - just skip them
+            _w(debug, 'buildKitchen() ⚠ Continuing without notes...');
+          }
+        }
       }
+
+      bytes.addAll(g.hr());
+
+      // Order number
+      final orderNo = (order['orderNumber'] ?? '').toString();
+      if (orderNo.isNotEmpty) {
+        _d(debug, 'buildKitchen() → rendering order number: "$orderNo"');
+        try {
+          final orderNoBytes = await _arabicKeyValueLineHybrid(
+            g,
+            label: 'رقم الطلب',
+            value: _digits(orderNo),
+            fontSize: 20,
+          );
+          _d(debug,
+              'buildKitchen() ✓ order number rendered: ${orderNoBytes.length} bytes');
+          bytes.addAll(orderNoBytes);
+        } catch (e, st) {
+          _e(debug, 'buildKitchen() ✗ FAILED to render order number: $e\n$st');
+          rethrow;
+        }
+      }
+
+      // Timestamp
+      final timestamp = _digits(_formatNow());
+      _d(debug, 'buildKitchen() → rendering timestamp: "$timestamp"');
+      try {
+        final timestampBytes = await _arabicTextLineHybrid(
+          g,
+          timestamp,
+          align: PosAlign.center,
+          fontSize: 18,
+        );
+        _d(debug,
+            'buildKitchen() ✓ timestamp rendered: ${timestampBytes.length} bytes');
+        bytes.addAll(timestampBytes);
+      } catch (e, st) {
+        _e(debug, 'buildKitchen() ✗ FAILED to render timestamp: $e\n$st');
+        rethrow;
+      }
+
+      bytes.addAll(g.feed(1));
+      bytes.addAll(g.cut());
+
+      final out = Uint8List.fromList(bytes);
+      _d(debug,
+          'buildKitchen() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms');
+      return out;
+    } catch (e, st) {
+      _e(debug, 'buildKitchen() ✗✗✗ CRITICAL ERROR: $e\n$st');
+      rethrow;
     }
-    bytes.addAll(g.hr());
-    final orderNo = (order['orderNumber'] ?? '').toString();
-    if (orderNo.isNotEmpty) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
-        g,
-        label: 'رقم الطلب',
-        value: _digits(orderNo),
-        fontSize: 20,
-      ));
-    }
-    bytes.addAll(await _arabicTextLineHybrid(
-      g,
-      _digits(_formatNow()),
-      align: PosAlign.center,
-      fontSize: 18,
-    ));
-    bytes.addAll(g.feed(1));
-    bytes.addAll(g.cut());
-    final out = Uint8List.fromList(bytes);
-    _d(debug,
-        'buildKitchen() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms');
-    return out;
   }
 
   // ---------------------------------------------------------------------------
@@ -312,12 +379,25 @@ class ReceiptBuilder {
     double fontSize = 22,
     double verticalPadding = 6,
   }) async {
+    // Font validation
     if (arabicFontFamily == null) {
       _w(debug,
           '_arabicTextLineAsRaster() ⚠ arabicFontFamily == null (Arabic may break)');
+      _e(debug,
+          '_arabicTextLineAsRaster() ✗ CRITICAL: No Arabic font configured!');
+      throw StateError('Arabic font family not configured');
     }
+
+    // Log input
+    _d(debug,
+        '_arabicTextLineAsRaster() → text: "$text" (len=${text.length}, fontSize=$fontSize, align=$align)');
+
     text = useArabicIndicDigits ? _toArabicDigits(text) : text;
     final bool hasArabic = _containsArabic(text);
+
+    _d(debug,
+        '_arabicTextLineAsRaster() → Arabic detected: $hasArabic, font: $arabicFontFamily');
+
     final paragraphStyle = ui.ParagraphStyle(
       textAlign: _mapAlign(align),
       textDirection: hasArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
@@ -329,19 +409,29 @@ class ReceiptBuilder {
       fontSize: fontSize,
       fontFamily: arabicFontFamily,
     );
+
+    // Build paragraph
     ui.Paragraph paragraph;
     try {
+      _d(debug, '_arabicTextLineAsRaster() → building paragraph...');
       final builder = ui.ParagraphBuilder(paragraphStyle)..pushStyle(textStyle);
       builder.addText(text);
       paragraph = builder.build()
         ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+      _d(debug,
+          '_arabicTextLineAsRaster() ✓ paragraph built (height: ${paragraph.height}px)');
     } catch (e, st) {
-      _e(debug, '_arabicTextLineAsRaster() ✗ build/layout failed: $e\n$st');
+      _e(debug,
+          '_arabicTextLineAsRaster() ✗ FAILED to build/layout paragraph: $e\n$st');
       rethrow;
     }
+
     final double paraH = paragraph.height;
     final int height = (paraH + verticalPadding * 2).ceil().clamp(24, 4096);
-    // Paint & draw
+    _d(debug,
+        '_arabicTextLineAsRaster() → rendering to ${widthPx}x${height}px canvas');
+
+    // Rasterize to PNG
     Uint8List pngBytes;
     try {
       final rec = ui.PictureRecorder();
@@ -352,25 +442,51 @@ class ReceiptBuilder {
       final double dy = ((height - paraH) / 2).clamp(0.0, height.toDouble());
       canvas.drawParagraph(paragraph, ui.Offset(0, dy));
       final picture = rec.endRecording();
+
+      _d(debug, '_arabicTextLineAsRaster() → converting to image...');
       final uiImg = await picture.toImage(widthPx, height);
       final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw StateError('toByteData returned null');
+
+      if (byteData == null) {
+        _e(debug, '_arabicTextLineAsRaster() ✗ toByteData returned null');
+        throw StateError('toByteData returned null');
+      }
+
       pngBytes = byteData.buffer.asUint8List();
+      _d(debug,
+          '_arabicTextLineAsRaster() ✓ rasterized to PNG (${pngBytes.length} bytes)');
     } catch (e, st) {
-      _e(debug, '_arabicTextLineAsRaster() ✗ rasterize failed: $e\n$st');
+      _e(debug, '_arabicTextLineAsRaster() ✗ FAILED to rasterize: $e\n$st');
       rethrow;
     }
-    // Decode → ESC/POS
+
+    // Decode PNG to image
+    _d(debug, '_arabicTextLineAsRaster() → decoding PNG...');
     final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes);
     if (decoded == null) {
+      _e(debug, '_arabicTextLineAsRaster() ✗ PNG decode returned null');
       throw StateError('PNG decode returned null');
     }
-    return g.imageRaster(
-      decoded,
-      align: align,
-      highDensityHorizontal: true,
-      highDensityVertical: true,
-    );
+    _d(debug,
+        '_arabicTextLineAsRaster() ✓ PNG decoded (${decoded.width}x${decoded.height})');
+
+    // Convert to ESC/POS raster
+    _d(debug, '_arabicTextLineAsRaster() → converting to ESC/POS raster...');
+    try {
+      final rasterBytes = g.imageRaster(
+        decoded,
+        align: align,
+        highDensityHorizontal: true,
+        highDensityVertical: true,
+      );
+      _d(debug,
+          '_arabicTextLineAsRaster() ✓ converted to ESC/POS (${rasterBytes.length} bytes)');
+      return rasterBytes;
+    } catch (e, st) {
+      _e(debug,
+          '_arabicTextLineAsRaster() ✗ FAILED to convert to ESC/POS raster: $e\n$st');
+      rethrow;
+    }
   }
 
   /// Two-column Arabic line: left label (RTL), right value (usually numbers).
