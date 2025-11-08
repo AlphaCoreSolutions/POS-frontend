@@ -381,6 +381,9 @@ class _MainPageState extends State<MainPage> {
       debugPrint(
           'Receipt generated: ${bytes.length} bytes in ${stopwatch.elapsedMilliseconds}ms');
 
+      // Convert Uint8List to List<int> for Android compatibility
+      final List<int> bytesList = bytes.toList();
+
       // Print with retry logic
       bool printSuccess = false;
       int retryCount = 0;
@@ -388,7 +391,7 @@ class _MainPageState extends State<MainPage> {
 
       while (!printSuccess && retryCount <= maxRetries) {
         try {
-          final ok = await PrintBluetoothThermal.writeBytes(bytes);
+          final ok = await PrintBluetoothThermal.writeBytes(bytesList);
           if (ok == true) {
             printSuccess = true;
             debugPrint('Print successful on attempt ${retryCount + 1}');

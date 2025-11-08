@@ -100,9 +100,12 @@ class ArabicReceiptExample {
     int retryCount = 2,
     Duration retryDelay = const Duration(seconds: 1),
   }) async {
+    // Convert Uint8List to List<int> for Android compatibility
+    final List<int> bytesList = bytes.toList();
+
     for (int attempt = 0; attempt <= retryCount; attempt++) {
       try {
-        final ok = await PrintBluetoothThermal.writeBytes(bytes);
+        final ok = await PrintBluetoothThermal.writeBytes(bytesList);
         if (ok == true) {
           developer.log(
               'Receipt printed successfully on attempt ${attempt + 1}',
