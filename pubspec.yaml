@@ -58,6 +58,7 @@ dependencies:
   path_provider: 
   pdfx: ^2.6.0
   share_plus: ^7.2.2
+  enough_convert: ^1.6.0
 
 
 dependency_overrides:

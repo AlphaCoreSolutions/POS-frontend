@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
+import 'package:enough_convert/enough_convert.dart';
 
 /// A receipt builder specifically optimized for the XP-P501A printer model.
 ///
@@ -201,7 +202,7 @@ class XpP501aReceiptBuilder {
     // Set text alignment
     bytes += generator.setStyles(styles.copyWith(align: styles.align));
     // Encode text to Windows-1256 and add to buffer
-    bytes += windows1256.encode(text);
+    bytes += const Windows1256Codec().encode(text);
     // Add a newline
     bytes += generator.text('');
     // Revert to default code page
@@ -216,8 +217,8 @@ class XpP501aReceiptBuilder {
     // Select Arabic code page
     bytes += [0x1b, 0x74, 0x16];
     // Encode texts
-    final encCol1 = windows1256.encode(col1);
-    final encCol2 = windows1256.encode(col2);
+    final encCol1 = const Windows1256Codec().encode(col1);
+    final encCol2 = const Windows1256Codec().encode(col2);
     // Use g.row to handle spacing and alignment.
     // We pass the raw encoded bytes to avoid re-encoding.
     bytes += generator.row([
