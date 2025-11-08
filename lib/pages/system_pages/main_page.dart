@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data'; // For Uint8List
 import 'dart:ui' as ui;
 import 'package:image/image.dart' as img; // for image raster
 import 'package:esc_pos_utils/esc_pos_utils.dart'; // you already use it
@@ -1278,91 +1279,32 @@ class _MainPageState extends State<MainPage> {
     final success = await ApiHandler().postOrder(order);
 
     if (success) {
-      // === Triple Printer: customer + kitchens ===
+      // === UNIFIED PRINTING: Customer + Kitchen (Arabic & Android Compatible) ===
       try {
-        // Build items for printing with Arabic names
-        final List<Map<String, dynamic>> printItems = selectedItems.map((it) {
-          final product = _getProductById(it.productId);
-
-          // Check if product name contains Arabic characters
-          final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
-              .hasMatch(product.productName);
-
-          // Use Arabic name - either from database or translation
-          String arabicName;
-          if (hasArabic) {
-            // Product name is already in Arabic
-            arabicName = product.productName;
-            debugPrint(
-                '✅ Kitchen Item (Arabic): $arabicName (Category: ${product.categoryId})');
-          } else {
-            // Product name is in English - needs translation
-            // IMPORTANT: Best practice is to store Arabic names in database!
-            // This is a fallback for English names.
-            arabicName = product.productName; // Keep original for now
-
-            debugPrint(
-                '⚠️ WARNING: Product "${product.productName}" is in English!');
-            debugPrint(
-                '   SOLUTION 1 (Recommended): Update database to use Arabic product names');
-            debugPrint(
-                '   SOLUTION 2: Use ProductNameTranslator.toArabic() for translation');
-            debugPrint('   SOLUTION 3: Add Arabic name field to Product model');
-            debugPrint('   See KITCHEN_ARABIC_SOLUTION.md for details');
-          }
-
-          return {
-            'name': arabicName, // Arabic name (e.g., شاورما دجاج)
-            'quantity': it.quantity,
-            'price': product.sellingPrice,
-            'categoryId': product.categoryId,
-            'notes': '', // Add notes if available
-          };
-        }).toList();
-
-        // Compute summary numbers
-        final double subtotal = printItems.fold(0.0,
-            (sum, it) => sum + (it['price'] as num) * (it['quantity'] as num));
+        // Calculate totals
+        final double subtotal = _calculateSubtotal(selectedItems);
         final double tax = _calculateTaxes(selectedItems);
-        final double tip =
-            tips; // reuse existing tips variable if present, else 0
         final double total = subtotal + tax + tips;
 
-        final orderMap = {
-          'orderNumber': order.id, // or your returned order number
-          'paymentMethod': paymentMethod == 1 ? 'CASH' : 'VISA',
-          'subtotal': subtotal,
-          'tax': tax,
-          'tips': tip,
-          'total': total,
-          'items': printItems,
-        };
-
-        // Init Bluetooth printers
-        final bt = BluetoothPrinterManager();
-        await bt.load();
-
-        final router = KitchenRouter(
-          falafelCategoryIds: {7}, // <-- set your Falafel categories here
-          shawarmaSnacksCategoryIds: {
-            6,
-            8,
-            9,
-            10
-          }, // <-- set your Shawarma & Snacks categories here
+        // Call unified print function - handles everything!
+        final printSuccess = await _printReceipts(
+          orderNumber: order.id.toString(),
+          paymentMethod: paymentMethod == 1 ? 'CASH' : 'VISA',
+          items: selectedItems,
+          subtotal: subtotal,
+          tax: tax,
+          tips: tips,
+          total: total,
         );
 
-        // Create unified builder (auto-configured with Arabic support)
-        final builder = await ReceiptBuilder.create();
-        final triple = TriplePrinter(bt: bt, builder: builder, router: router);
-
-        // Print all (customer + kitchens) - 100% Arabic compatible
-        await triple.printAll(orderMap);
+        if (!printSuccess) {
+          debugPrint('⚠️ Printing completed with errors (check logs)');
+        }
       } catch (e) {
         // Swallow printing errors to avoid blocking the POS
-        debugPrint('Printing error: $e');
+        debugPrint('❌ Printing error: $e');
       }
-      // === End Triple Printer ===
+      // === End Unified Printing ===
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Order submitted successfully!')),
@@ -2943,6 +2885,250 @@ void _chargeOrder() async {
 
     print("Found product: ${product.productName}, ID: ${product.productId}");
     return product;
+  }
+
+  // ===========================================================================
+  // UNIFIED PRINTING FUNCTION - Arabic & Android Compatible
+  // ===========================================================================
+
+  /// Unified printing function for customer and kitchen receipts.
+  ///
+  /// Features:
+  /// - ✅ 100% Arabic support (automatic raster rendering)
+  /// - ✅ 100% Android compatible (List<int> format)
+  /// - ✅ Automatic kitchen routing (Falafel, Shawarma, etc.)
+  /// - ✅ Auto-reconnect customer printer after kitchen printing
+  /// - ✅ Comprehensive error handling and logging
+  /// - ✅ Product name Arabic validation
+  ///
+  /// Usage:
+  /// ```dart
+  /// await _printReceipts(
+  ///   orderNumber: order.id.toString(),
+  ///   paymentMethod: 'CASH', // or 'VISA', 'CARD', etc.
+  ///   items: selectedItems,
+  ///   subtotal: subtotal,
+  ///   tax: tax,
+  ///   tips: tips,
+  ///   total: total,
+  /// );
+  /// ```
+  Future<bool> _printReceipts({
+    required String orderNumber,
+    required String paymentMethod,
+    required List<OrderItemDto> items,
+    required double subtotal,
+    required double tax,
+    required double tips,
+    required double total,
+  }) async {
+    try {
+      debugPrint('🖨️ ============================================');
+      debugPrint('🖨️ Starting Unified Print Function');
+      debugPrint('🖨️ Order: $orderNumber | Total: \$$total');
+      debugPrint('🖨️ ============================================');
+
+      // Step 1: Build print items with Arabic validation
+      final List<Map<String, dynamic>> printItems = items.map((it) {
+        final product = _getProductById(it.productId);
+
+        // Check if product name contains Arabic characters
+        final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
+            .hasMatch(product.productName);
+
+        // Use Arabic name - either from database or keep original
+        String arabicName;
+        if (hasArabic) {
+          // Product name is already in Arabic ✅
+          arabicName = product.productName;
+          debugPrint('   ✅ "${product.productName}" (Arabic)');
+        } else {
+          // Product name is in English - use as-is for now
+          // RECOMMENDED: Update database to use Arabic names
+          arabicName = product.productName;
+          debugPrint(
+              '   ⚠️  "${product.productName}" (English - consider translating)');
+        }
+
+        return {
+          'name': arabicName,
+          'quantity': it.quantity,
+          'price': product.sellingPrice,
+          'categoryId': product.categoryId,
+          'notes': '', // Add notes if available
+        };
+      }).toList();
+
+      debugPrint('🖨️ Total items: ${printItems.length}');
+
+      // Step 2: Prepare order data
+      final orderData = {
+        'orderNumber': orderNumber,
+        'paymentMethod': paymentMethod,
+        'subtotal': subtotal,
+        'tax': tax,
+        'tips': tips,
+        'total': total,
+        'items': printItems,
+      };
+
+      // Step 3: Initialize Bluetooth printer manager
+      debugPrint('🖨️ Initializing Bluetooth printers...');
+      final bt = BluetoothPrinterManager();
+      await bt.load();
+      debugPrint('🖨️ ✅ Bluetooth manager ready');
+
+      // Step 4: Setup kitchen router
+      final router = KitchenRouter(
+        falafelCategoryIds: {7}, // Configure your category IDs
+        shawarmaSnacksCategoryIds: {6, 8, 9, 10},
+      );
+      debugPrint('🖨️ ✅ Kitchen router configured');
+
+      // Step 5: Create receipt builder (auto-loads Arabic font)
+      debugPrint('🖨️ Creating receipt builder...');
+      final builder = await ReceiptBuilder.create();
+      debugPrint('🖨️ ✅ Receipt builder ready (Arabic font loaded)');
+
+      // Step 6: Create triple printer
+      final printer = TriplePrinter(
+        bt: bt,
+        builder: builder,
+        router: router,
+      );
+      debugPrint('🖨️ ✅ Triple printer initialized');
+
+      // Step 7: Print all receipts (customer + kitchens)
+      debugPrint('🖨️ ============================================');
+      debugPrint('🖨️ Starting print sequence...');
+      debugPrint('🖨️ ============================================');
+
+      await printer.printAll(orderData);
+
+      debugPrint('🖨️ ============================================');
+      debugPrint('🖨️ ✅ Print sequence completed successfully!');
+      debugPrint('🖨️ ============================================');
+
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('🖨️ ============================================');
+      debugPrint('🖨️ ❌ PRINT ERROR: $e');
+      debugPrint('🖨️ Stack trace: $stackTrace');
+      debugPrint('🖨️ ============================================');
+
+      // Don't throw - just return false to indicate failure
+      // This prevents blocking the POS system
+      return false;
+    }
+  }
+
+  /// Alternative: Print customer receipt only
+  /// Use this if you only need customer receipt without kitchen tickets
+  Future<bool> _printCustomerReceipt({
+    required String orderNumber,
+    required String paymentMethod,
+    required List<OrderItemDto> items,
+    required double subtotal,
+    required double tax,
+    required double tips,
+    required double total,
+  }) async {
+    try {
+      debugPrint('📄 Printing customer receipt only...');
+
+      // Build items
+      final printItems = items.map((it) {
+        final product = _getProductById(it.productId);
+        return {
+          'name': product.productName,
+          'quantity': it.quantity,
+          'price': product.sellingPrice,
+        };
+      }).toList();
+
+      final orderData = {
+        'orderNumber': orderNumber,
+        'paymentMethod': paymentMethod,
+        'subtotal': subtotal,
+        'tax': tax,
+        'tips': tips,
+        'total': total,
+        'items': printItems,
+      };
+
+      // Initialize printer
+      final bt = BluetoothPrinterManager();
+      await bt.load();
+
+      // Create builder
+      final builder = await ReceiptBuilder.create();
+
+      // Print customer receipt only
+      final bytes = await builder.printCustomer(orderData);
+
+      // Send to customer printer
+      final success = await bt.withPrinter(PrinterRole.customer, () async {
+        await bt.writeBytes(Uint8List.fromList(bytes));
+      });
+
+      debugPrint(success ? '✅ Customer receipt printed' : '❌ Failed to print');
+      return success;
+    } catch (e) {
+      debugPrint('❌ Customer receipt error: $e');
+      return false;
+    }
+  }
+
+  /// Alternative: Print kitchen ticket only
+  /// Use this for reprinting kitchen tickets
+  Future<bool> _printKitchenTicket({
+    required String orderNumber,
+    required String kitchenName,
+    required List<OrderItemDto> items,
+    required PrinterRole printerRole,
+  }) async {
+    try {
+      debugPrint('🍴 Printing kitchen ticket: $kitchenName');
+
+      // Build items
+      final printItems = items.map((it) {
+        final product = _getProductById(it.productId);
+        return {
+          'name': product.productName,
+          'quantity': it.quantity,
+          'notes': '',
+        };
+      }).toList();
+
+      final orderData = {
+        'orderNumber': orderNumber,
+      };
+
+      // Initialize printer
+      final bt = BluetoothPrinterManager();
+      await bt.load();
+
+      // Create builder
+      final builder = await ReceiptBuilder.create();
+
+      // Print kitchen ticket
+      final bytes = await builder.printKitchen(
+        orderData,
+        kitchenName: kitchenName,
+        items: printItems,
+      );
+
+      // Send to specific kitchen printer
+      final success = await bt.withPrinter(printerRole, () async {
+        await bt.writeBytes(Uint8List.fromList(bytes));
+      });
+
+      debugPrint(success ? '✅ Kitchen ticket printed' : '❌ Failed to print');
+      return success;
+    } catch (e) {
+      debugPrint('❌ Kitchen ticket error: $e');
+      return false;
+    }
   }
 }
 
