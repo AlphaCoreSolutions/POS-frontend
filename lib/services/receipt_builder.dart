@@ -494,15 +494,8 @@ class ReceiptBuilder {
     PosAlign align = PosAlign.center,
     double fontSize = 22,
   }) async {
-    if (useRasterFallback) {
-      return _arabicTextLineAsRaster(g, text, align: align, fontSize: fontSize);
-    }
-    try {
-      return await _arabicTextLine(g, text, align: align, fontSize: fontSize);
-    } catch (e) {
-      _w(debug, '_arabicTextLineHybrid() fallback to raster: $e');
-      return _arabicTextLineAsRaster(g, text, align: align, fontSize: fontSize);
-    }
+    // Force raster for Arabic text to ensure it prints correctly on all printers.
+    return _arabicTextLineAsRaster(g, text, align: align, fontSize: fontSize);
   }
 
   /// Try direct text for key-value, fallback to raster if fails or useRasterFallback is true.
@@ -512,18 +505,9 @@ class ReceiptBuilder {
     required String value,
     double fontSize = 22,
   }) async {
-    if (useRasterFallback) {
-      return _arabicKeyValueLineAsRaster(g,
-          label: label, value: value, fontSize: fontSize);
-    }
-    try {
-      return await _arabicKeyValueLine(g,
-          label: label, value: value, fontSize: fontSize);
-    } catch (e) {
-      _w(debug, '_arabicKeyValueLineHybrid() fallback to raster: $e');
-      return _arabicKeyValueLineAsRaster(g,
-          label: label, value: value, fontSize: fontSize);
-    }
+    // Force raster for Arabic text to ensure it prints correctly on all printers.
+    return _arabicKeyValueLineAsRaster(g,
+        label: label, value: value, fontSize: fontSize);
   }
 
   // ---------------------------------------------------------------------------
