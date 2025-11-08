@@ -6,7 +6,6 @@ import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/language_changing/constants.dart';
 import 'package:visionpos/pages/essential_pages/MyHttpOverrides.dart';
 import 'package:visionpos/pages/system_pages/login_page.dart';
-import 'package:visionpos/services/arabic_font_loader.dart';
 import 'package:visionpos/utils/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
