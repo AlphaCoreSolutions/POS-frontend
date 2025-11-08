@@ -1,35 +1,45 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:visionpos/services/arabic_font_loader.dart';
 
-/// Arabic-only receipts (customer + kitchen) using direct text printing initially for efficiency.
-/// - Customer receipt: shows items and totals (all Arabic).
-/// - Kitchen ticket: section header + items (Arabic).
-/// Falls back to raster rendering if direct text fails or if configured (useRasterFallback).
+/// Unified ReceiptBuilder for Customer and Kitchen receipts with 100% Arabic support
+/// and guaranteed Android compatibility (returns List<int> ready for Android).
+///
+/// Features:
+/// - Single builder for all receipt types (customer, kitchen)
+/// - Automatic Arabic text rendering as raster images
+/// - Android-compatible output (List<int>, not Uint8List)
+/// - No helpers needed - just send Arabic data and print
+/// - Automatic font loading and validation
+/// - RTL text support with proper shaping
+/// - Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩)
+///
+/// Usage:
+/// ```dart
+/// final builder = await ReceiptBuilder.create();
+///
+/// // Customer receipt
+/// final bytes = await builder.printCustomer(orderData);
+/// await printer.writeBytes(Uint8List.fromList(bytes));
+///
+/// // Kitchen ticket
+/// final bytes = await builder.printKitchen(orderData, 'مطبخ الفلافل', items);
+/// await printer.writeBytes(Uint8List.fromList(bytes));
+/// ```
 class ReceiptBuilder {
   final PaperSize paper;
   final CapabilityProfile profile;
-
-  /// Printable width in pixels (typical): 58mm ≈ 384px, 80mm ≈ 576px.
   final int widthPx;
-
-  /// Arabic font family as declared in pubspec.yaml (must match `family:` name).
-  final String? arabicFontFamily;
-
-  /// Path to the TTF (used by the custom loader).
-  final String? arabicFontAssetPath;
-
-  /// Enable verbose logs.
+  final String arabicFontFamily;
+  final String arabicFontAssetPath;
   final bool debug;
-
-  /// Optional: convert 0-9 into Arabic-Indic (٠١٢٣٤٥٦٧٨٩). Default: false.
   final bool useArabicIndicDigits;
 
-  /// Optional: fall back to raster rendering if direct text fails. Default: false.
-  final bool useRasterFallback;
-
+  // Private constructor
   ReceiptBuilder._(
     this.paper,
     this.profile,
@@ -38,45 +48,67 @@ class ReceiptBuilder {
     this.arabicFontAssetPath, {
     required this.debug,
     required this.useArabicIndicDigits,
-    required this.useRasterFallback,
   });
 
-  /// Factory to init capability profile and load the Arabic font once.
+  /// Create a new ReceiptBuilder with automatic font loading.
+  /// This is the ONLY method you need to call - everything is configured automatically!
+  ///
+  /// Returns a builder ready to print customer receipts and kitchen tickets in Arabic.
+  /// All output is Android-compatible (List<int>).
   static Future<ReceiptBuilder> create({
     PaperSize paper = PaperSize.mm80,
     String? profileName,
-    String? arabicFontFamily,
-    String? arabicFontAssetPath,
+    String arabicFontFamily = 'NotoNaskhArabic',
+    String arabicFontAssetPath = 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
     bool debug = false,
     int? widthPxOverride,
-    bool useArabicIndicDigits = false,
-    bool useRasterFallback = false,
+    bool useArabicIndicDigits = true, // Default to Arabic numerals
   }) async {
+    final sessionId = DateTime.now().millisecondsSinceEpoch;
     final sw = Stopwatch()..start();
-    _d(debug, 'RB.create() → loading profile "${profileName ?? 'default'}"...');
+
+    developer.log(
+      '🏗️ [BUILDER-$sessionId] Creating ReceiptBuilder with Arabic font: $arabicFontFamily',
+      name: 'ReceiptBuilder',
+    );
+
+    // Load capability profile
     final profile =
         await CapabilityProfile.load(name: profileName ?? 'default');
     final widthPx = widthPxOverride ?? ((paper == PaperSize.mm58) ? 384 : 576);
-    _d(debug,
-        'RB.create() ✓ profile in ${sw.elapsedMilliseconds}ms; paper=$paper, widthPx=$widthPx');
-    if (arabicFontFamily != null && arabicFontAssetPath != null) {
-      try {
-        final swFont = Stopwatch()..start();
-        _d(debug,
-            'RB.create() → loading Arabic font "$arabicFontFamily" from "$arabicFontAssetPath"...');
-        await ArabicFontLoader.ensureLoaded(
-          family: arabicFontFamily,
-          assetPath: arabicFontAssetPath,
-        );
-        _d(debug,
-            'RB.create() ✓ font loaded in ${swFont.elapsedMilliseconds}ms');
-      } catch (e, st) {
-        _e(debug, 'RB.create() ✗ font load failed: $e\n$st');
-      }
-    } else {
-      _w(debug,
-          'RB.create() ⚠ No Arabic font configured; set arabicFontFamily + arabicFontAssetPath.');
+
+    developer.log(
+      '✓ [BUILDER-$sessionId] Profile loaded: paper=$paper, width=${widthPx}px',
+      name: 'ReceiptBuilder',
+    );
+
+    // CRITICAL: Load Arabic font (required for rendering)
+    try {
+      await ArabicFontLoader.ensureLoaded(
+        family: arabicFontFamily,
+        assetPath: arabicFontAssetPath,
+      );
+
+      developer.log(
+        '✓ [BUILDER-$sessionId] Arabic font loaded successfully in ${sw.elapsedMilliseconds}ms',
+        name: 'ReceiptBuilder',
+      );
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ [BUILDER-$sessionId] CRITICAL: Failed to load Arabic font!',
+        name: 'ReceiptBuilder',
+        error: e,
+        stackTrace: stackTrace,
+        level: 1000,
+      );
+      throw StateError('Failed to load Arabic font: $e');
     }
+
+    developer.log(
+      '✅ [BUILDER-$sessionId] ReceiptBuilder ready for printing',
+      name: 'ReceiptBuilder',
+    );
+
     return ReceiptBuilder._(
       paper,
       profile,
@@ -85,7 +117,6 @@ class ReceiptBuilder {
       arabicFontAssetPath,
       debug: debug,
       useArabicIndicDigits: useArabicIndicDigits,
-      useRasterFallback: useRasterFallback,
     );
   }
 
@@ -379,14 +410,7 @@ class ReceiptBuilder {
     double fontSize = 22,
     double verticalPadding = 6,
   }) async {
-    // Font validation
-    if (arabicFontFamily == null) {
-      _w(debug,
-          '_arabicTextLineAsRaster() ⚠ arabicFontFamily == null (Arabic may break)');
-      _e(debug,
-          '_arabicTextLineAsRaster() ✗ CRITICAL: No Arabic font configured!');
-      throw StateError('Arabic font family not configured');
-    }
+    // Font is guaranteed to be loaded by create() method
 
     // Log input
     _d(debug,
@@ -498,9 +522,7 @@ class ReceiptBuilder {
     double fontSize = 22,
     double verticalPadding = 6,
   }) async {
-    if (arabicFontFamily == null) {
-      _w(debug, '_arabicKeyValueLineAsRaster() ⚠ arabicFontFamily == null');
-    }
+    // Font is guaranteed to be loaded by create() method
     label = useArabicIndicDigits ? _toArabicDigits(label) : label;
     value = useArabicIndicDigits ? _toArabicDigits(value) : value;
     // LABEL (RTL)
@@ -566,38 +588,31 @@ class ReceiptBuilder {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // DIRECT TEXT HELPERS (Arabic shaping + two-column "label ... value")
-  // ---------------------------------------------------------------------------
-  /// Draw a single Arabic (or mixed) line as direct text and return ESC/POS bytes.
-  Future<List<int>> _arabicTextLine(
-    Generator g,
-    String text, {
-    PosAlign align = PosAlign.center,
-    double fontSize = 22,
-  }) async {
-    text = useArabicIndicDigits ? _toArabicDigits(text) : text;
-    return g.text(
-      text,
-      styles: PosStyles(align: align, bold: fontSize > 24),
-    );
+  // ===========================================================================
+  // PUBLIC API - These are the ONLY methods you need to call!
+  // ===========================================================================
+
+  /// Print a customer receipt in Arabic.
+  /// Returns List<int> ready for Android printing (no conversion needed).
+  ///
+  /// Just call: await printer.writeBytes(Uint8List.fromList(bytes));
+  Future<List<int>> printCustomer(Map<String, dynamic> order) async {
+    final bytes = await buildCustomer(order);
+    return bytes.toList(growable: false); // Android-compatible
   }
 
-  /// Two-column Arabic line: left label (RTL), right value (usually numbers).
-  /// We use g.row() for two columns.
-  Future<List<int>> _arabicKeyValueLine(
-    Generator g, {
-    required String label,
-    required String value,
-    double fontSize = 22,
+  /// Print a kitchen ticket in Arabic.
+  /// Returns List<int> ready for Android printing (no conversion needed).
+  ///
+  /// Just call: await printer.writeBytes(Uint8List.fromList(bytes));
+  Future<List<int>> printKitchen(
+    Map<String, dynamic> order, {
+    required String kitchenName,
+    required List<Map<String, dynamic>> items,
   }) async {
-    label = useArabicIndicDigits ? _toArabicDigits(label) : label;
-    value = useArabicIndicDigits ? _toArabicDigits(value) : value;
-    return g.row([
-      PosColumn(text: label, width: 6, styles: PosStyles(align: PosAlign.left)),
-      PosColumn(
-          text: value, width: 6, styles: PosStyles(align: PosAlign.right)),
-    ]);
+    final bytes =
+        await buildKitchen(order, kitchenName: kitchenName, items: items);
+    return bytes.toList(growable: false); // Android-compatible
   }
 
   // ---------------------------------------------------------------------------

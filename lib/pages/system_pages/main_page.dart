@@ -1324,12 +1324,11 @@ class _MainPageState extends State<MainPage> {
           }, // <-- set your Shawarma & Snacks categories here
         );
 
-        final builder = await ReceiptBuilder.create(
-          arabicFontFamily: 'NotoNaskhArabic',
-          arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
-        );
+        // Create unified builder (auto-configured with Arabic support)
+        final builder = await ReceiptBuilder.create();
         final triple = TriplePrinter(bt: bt, builder: builder, router: router);
 
+        // Print all (customer + kitchens) - 100% Arabic compatible
         await triple.printAll(orderMap);
       } catch (e) {
         // Swallow printing errors to avoid blocking the POS

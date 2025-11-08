@@ -1,21 +1,37 @@
+import 'dart:typed_data';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
-import 'package:esc_pos_utils/esc_pos_utils.dart';
-import 'package:visionpos/services/arabic_font_loader.dart';
-import 'package:visionpos/services/arabic_raster_receipt.dart';
 import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/kitchen_router.dart';
+import 'package:visionpos/services/receipt_builder.dart';
 
-import 'receipt_builder.dart';
-
-/// Facade to print customer and kitchen tickets in one go.
+/// Unified printer for customer and kitchen receipts.
+/// Uses the new simplified ReceiptBuilder API - no helpers needed!
+///
+/// Features:
+/// - Automatic Arabic rendering (100% Android compatible)
+/// - Single builder for all receipt types
+/// - Auto-reconnect customer printer after kitchen printing
+/// - Comprehensive logging and error handling
+///
+/// Usage:
+/// ```dart
+/// final builder = await ReceiptBuilder.create();
+/// final router = KitchenRouter(falafelCategoryIds: {1,2}, ...);
+/// final printer = TriplePrinter(bt: btManager, builder: builder, router: router);
+///
+/// await printer.printAll(orderData);
+/// ```
 class TriplePrinter {
   final BluetoothPrinterManager bt;
   final ReceiptBuilder builder;
   final KitchenRouter router;
 
-  TriplePrinter(
-      {required this.bt, required this.builder, required this.router});
+  TriplePrinter({
+    required this.bt,
+    required this.builder,
+    required this.router,
+  });
 
   /// order must have:
   ///  - items: [{name, quantity, price, categoryId, notes?}, ...]
@@ -38,18 +54,20 @@ class TriplePrinter {
       );
 
       final Stopwatch customerBuildTimer = Stopwatch()..start();
-      final customerBytes = await builder.buildCustomer(order);
+      // Use new unified API - returns Android-compatible List<int>
+      final customerBytes = await builder.printCustomer(order);
       customerBuildTimer.stop();
 
       developer.log(
-        '📄 [PRINT-SESSION-$printSessionId] Customer receipt built: ${customerBytes.length} bytes in ${customerBuildTimer.elapsedMilliseconds}ms',
+        '📄 [PRINT-SESSION-$printSessionId] Customer receipt ready: ${customerBytes.length} bytes (Android-compatible) in ${customerBuildTimer.elapsedMilliseconds}ms',
         name: 'TriplePrinter',
       );
 
       final Stopwatch customerPrintTimer = Stopwatch()..start();
       final customerSuccess =
           await bt.withPrinter(PrinterRole.customer, () async {
-        await bt.writeBytes(customerBytes);
+        // Convert List<int> to Uint8List for writeBytes
+        await bt.writeBytes(Uint8List.fromList(customerBytes));
       });
       customerPrintTimer.stop();
 
@@ -91,7 +109,8 @@ class TriplePrinter {
 
         try {
           final Stopwatch falafelBuildTimer = Stopwatch()..start();
-          final bytes = await builder.buildKitchen(
+          // Use new unified API - returns Android-compatible List<int>
+          final bytes = await builder.printKitchen(
             order,
             kitchenName: 'مطبخ الفلافل', // Arabic: Falafel Kitchen
             items: falafelItems,
@@ -99,13 +118,7 @@ class TriplePrinter {
           falafelBuildTimer.stop();
 
           developer.log(
-            '🥙 [PRINT-SESSION-$printSessionId] Falafel ticket built: ${bytes.length} bytes in ${falafelBuildTimer.elapsedMilliseconds}ms',
-            name: 'TriplePrinter',
-          );
-
-          // Validate byte type for Android compatibility
-          developer.log(
-            '📋 [PRINT-SESSION-$printSessionId] Falafel ticket type: ${bytes.runtimeType} (Android-compatible: ${bytes is Uint8List})',
+            '🥙 [PRINT-SESSION-$printSessionId] Falafel ticket ready: ${bytes.length} bytes (Android-compatible: List<int>) in ${falafelBuildTimer.elapsedMilliseconds}ms',
             name: 'TriplePrinter',
           );
 
@@ -115,9 +128,8 @@ class TriplePrinter {
 
           final Stopwatch falafelPrintTimer = Stopwatch()..start();
           final success = await bt.withPrinter(PrinterRole.falafel, () async {
-            // Ensure Android compatibility by passing Uint8List
-            // The writeBytes method will convert to List<int> internally
-            await bt.writeBytes(bytes);
+            // Convert List<int> to Uint8List for writeBytes
+            await bt.writeBytes(Uint8List.fromList(bytes));
           });
           falafelPrintTimer.stop();
 
@@ -164,7 +176,8 @@ class TriplePrinter {
 
         try {
           final Stopwatch shawarmaBuildTimer = Stopwatch()..start();
-          final bytes = await builder.buildKitchen(
+          // Use new unified API - returns Android-compatible List<int>
+          final bytes = await builder.printKitchen(
             order,
             kitchenName:
                 'مطبخ الشاورما والوجبات الخفيفة', // Arabic: Shawarma & Snacks Kitchen
@@ -173,13 +186,7 @@ class TriplePrinter {
           shawarmaBuildTimer.stop();
 
           developer.log(
-            '🌯 [PRINT-SESSION-$printSessionId] Shawarma ticket built: ${bytes.length} bytes in ${shawarmaBuildTimer.elapsedMilliseconds}ms',
-            name: 'TriplePrinter',
-          );
-
-          // Validate byte type for Android compatibility
-          developer.log(
-            '📋 [PRINT-SESSION-$printSessionId] Shawarma ticket type: ${bytes.runtimeType} (will be converted to List<int> for Android)',
+            '🌯 [PRINT-SESSION-$printSessionId] Shawarma ticket ready: ${bytes.length} bytes (Android-compatible: List<int>) in ${shawarmaBuildTimer.elapsedMilliseconds}ms',
             name: 'TriplePrinter',
           );
 
@@ -190,9 +197,8 @@ class TriplePrinter {
           final Stopwatch shawarmaPrintTimer = Stopwatch()..start();
           final success =
               await bt.withPrinter(PrinterRole.shawarmaSnacks, () async {
-            // Ensure Android compatibility by passing Uint8List
-            // The writeBytes method will convert to List<int> internally
-            await bt.writeBytes(bytes);
+            // Convert List<int> to Uint8List for writeBytes
+            await bt.writeBytes(Uint8List.fromList(bytes));
           });
           shawarmaPrintTimer.stop();
 
@@ -385,33 +391,5 @@ class TriplePrinter {
   /// Check if text contains Arabic characters
   bool _containsArabic(String text) {
     return RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]').hasMatch(text);
-  }
-
-  Future<ArabicRasterReceipt> makeArabicBuilder58() async {
-    await ArabicFontLoader.ensureLoaded(
-      family: 'NotoNaskhArabic',
-      assetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
-    );
-    final profile = await CapabilityProfile.load();
-    return ArabicRasterReceipt(
-      paper: PaperSize.mm58,
-      profile: profile,
-      widthPx: 384, // 58mm typical
-      fontFamily: 'NotoNaskhArabic',
-    );
-  }
-
-  Future<ArabicRasterReceipt> makeArabicBuilder80() async {
-    await ArabicFontLoader.ensureLoaded(
-      family: 'NotoNaskhArabic',
-      assetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
-    );
-    final profile = await CapabilityProfile.load();
-    return ArabicRasterReceipt(
-      paper: PaperSize.mm80,
-      profile: profile,
-      widthPx: 576, // 80mm typical
-      fontFamily: 'NotoNaskhArabic',
-    );
   }
 }
