@@ -19,40 +19,89 @@ class TriplePrinter {
   ///  - items: [{name, quantity, price, categoryId, notes?}, ...]
   ///  - subtotal, tax, tips, total, paymentMethod, orderNumber
   Future<void> printAll(Map<String, dynamic> order) async {
-    // Customer
-    final customerBytes = await builder.buildCustomer(order);
-    await bt.withPrinter(PrinterRole.customer, () async {
-      await bt.writeBytes(customerBytes);
-    });
-    await Future.delayed(const Duration(milliseconds: 250));
-
-    // Falafel
-    final buckets = router.split(order);
-    final falafelItems = buckets['falafel']!;
-    if (falafelItems.isNotEmpty) {
-      final bytes = await builder.buildKitchen(
-        order,
-        kitchenName: 'Falafel',
-        items: falafelItems,
-      );
-      await bt.withPrinter(PrinterRole.falafel, () async {
-        await bt.writeBytes(bytes);
+    try {
+      // 1. Print Customer Receipt
+      final customerBytes = await builder.buildCustomer(order);
+      final customerSuccess =
+          await bt.withPrinter(PrinterRole.customer, () async {
+        await bt.writeBytes(customerBytes);
       });
-      await Future.delayed(const Duration(milliseconds: 250));
-    }
 
-    // Shawarma & Snacks
-    final shsnItems = buckets['shawarmaSnacks']!;
-    if (shsnItems.isNotEmpty) {
-      final bytes = await builder.buildKitchen(
-        order,
-        kitchenName: 'Shawarma & Snacks',
-        items: shsnItems,
-      );
-      await bt.withPrinter(PrinterRole.shawarmaSnacks, () async {
-        await bt.writeBytes(bytes);
-      });
-      await Future.delayed(const Duration(milliseconds: 250));
+      if (!customerSuccess) {
+        print('⚠️ Customer receipt failed to print');
+      }
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // 2. Print Kitchen Tickets
+      final buckets = router.split(order);
+
+      // Falafel Kitchen
+      final falafelItems = buckets['falafel']!;
+      if (falafelItems.isNotEmpty) {
+        final bytes = await builder.buildKitchen(
+          order,
+          kitchenName: 'مطبخ الفلافل', // Arabic: Falafel Kitchen
+          items: falafelItems,
+        );
+        final success = await bt.withPrinter(PrinterRole.falafel, () async {
+          await bt.writeBytes(bytes);
+        });
+
+        if (!success) {
+          print('⚠️ Falafel kitchen ticket failed to print');
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      // Shawarma & Snacks Kitchen
+      final shsnItems = buckets['shawarmaSnacks']!;
+      if (shsnItems.isNotEmpty) {
+        final bytes = await builder.buildKitchen(
+          order,
+          kitchenName:
+              'مطبخ الشاورما والوجبات الخفيفة', // Arabic: Shawarma & Snacks Kitchen
+          items: shsnItems,
+        );
+        final success =
+            await bt.withPrinter(PrinterRole.shawarmaSnacks, () async {
+          await bt.writeBytes(bytes);
+        });
+
+        if (!success) {
+          print('⚠️ Shawarma & Snacks kitchen ticket failed to print');
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      // 3. Reconnect to Customer Printer (ready for next order)
+      final customerPrinter = bt.getForRole(PrinterRole.customer);
+      if (customerPrinter != null) {
+        await Future.delayed(const Duration(
+            milliseconds: 500)); // Allow previous printer to fully disconnect
+        final reconnected = await bt.connect(customerPrinter.mac);
+        if (reconnected) {
+          print('✅ Customer printer reconnected and ready');
+        } else {
+          print('⚠️ Failed to reconnect customer printer');
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error in printAll: $e');
+      print('Stack trace: $stackTrace');
+
+      // Always try to reconnect customer printer even if there was an error
+      try {
+        final customerPrinter = bt.getForRole(PrinterRole.customer);
+        if (customerPrinter != null) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          await bt.connect(customerPrinter.mac);
+        }
+      } catch (reconnectError) {
+        print(
+            '⚠️ Failed to reconnect customer printer after error: $reconnectError');
+      }
+
+      rethrow;
     }
   }
 
