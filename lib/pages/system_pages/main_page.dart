@@ -1324,7 +1324,10 @@ class _MainPageState extends State<MainPage> {
           }, // <-- set your Shawarma & Snacks categories here
         );
 
-        final builder = await ReceiptBuilder.create();
+        final builder = await ReceiptBuilder.create(
+          arabicFontFamily: 'NotoNaskhArabic',
+          arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+        );
         final triple = TriplePrinter(bt: bt, builder: builder, router: router);
 
         await triple.printAll(orderMap);
