@@ -26,6 +26,7 @@ import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/receipt_builder.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
+import 'package:visionpos/examples/arabic_receipt_example.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -494,6 +495,121 @@ class _MainPageState extends State<MainPage> {
                 );
               },
             ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _printExampleReceipt() async {
+    try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('جاري طباعة نموذج الفاتورة...'),
+              ],
+            ),
+            duration: Duration(milliseconds: 800),
+          ),
+        );
+      }
+
+      // Call the production-ready example print method
+      final success = await ArabicReceiptExample.printReceiptProductionReady(
+        context: context,
+        order: {
+          'orderNumber': '0001',
+          'paymentMethod': 'CASH',
+          'subtotal': 150.00,
+          'tax': 15.00,
+          'tips': 10.00,
+          'total': 175.00,
+        },
+        items: [
+          {
+            'name': 'برجر دجاج',
+            'quantity': 2,
+            'unitPrice': 50.00,
+            'notes': 'بدون بصل',
+          },
+          {
+            'name': 'بطاطس مقلية',
+            'quantity': 1,
+            'unitPrice': 25.00,
+            'notes': '',
+          },
+          {
+            'name': 'كوكا كولا',
+            'quantity': 1,
+            'unitPrice': 25.00,
+            'notes': 'بارد',
+          },
+        ],
+        paperSize: PaperSize.mm80,
+        useArabicDigits: true,
+        showLoadingIndicator: false, // We handle our own loading indicator
+      );
+
+      // Show result feedback
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('✅ تم طباعة النموذج بنجاح'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('❌ فشل في طباعة النموذج'),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Example print error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('خطأ في طباعة النموذج: ${e.toString()}'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -1543,6 +1659,46 @@ class _MainPageState extends State<MainPage> {
                   style: TextStyle(
                     color: connected ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: _printReceipt,
+                  icon: const Icon(Icons.receipt_long, size: 16),
+                  label: const Text(
+                    'Test Print',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: _printExampleReceipt,
+                  icon: const Icon(Icons.description, size: 16),
+                  label: const Text(
+                    'Print Example',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF9800),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 IconButton(
