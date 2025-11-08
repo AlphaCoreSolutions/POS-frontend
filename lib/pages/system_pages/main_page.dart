@@ -1280,14 +1280,43 @@ class _MainPageState extends State<MainPage> {
     if (success) {
       // === Triple Printer: customer + kitchens ===
       try {
-        // Build items for printing
+        // Build items for printing with Arabic names
         final List<Map<String, dynamic>> printItems = selectedItems.map((it) {
           final product = _getProductById(it.productId);
+
+          // Check if product name contains Arabic characters
+          final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
+              .hasMatch(product.productName);
+
+          // Use Arabic name - either from database or translation
+          String arabicName;
+          if (hasArabic) {
+            // Product name is already in Arabic
+            arabicName = product.productName;
+            debugPrint(
+                '✅ Kitchen Item (Arabic): $arabicName (Category: ${product.categoryId})');
+          } else {
+            // Product name is in English - needs translation
+            // IMPORTANT: Best practice is to store Arabic names in database!
+            // This is a fallback for English names.
+            arabicName = product.productName; // Keep original for now
+
+            debugPrint(
+                '⚠️ WARNING: Product "${product.productName}" is in English!');
+            debugPrint(
+                '   SOLUTION 1 (Recommended): Update database to use Arabic product names');
+            debugPrint(
+                '   SOLUTION 2: Use ProductNameTranslator.toArabic() for translation');
+            debugPrint('   SOLUTION 3: Add Arabic name field to Product model');
+            debugPrint('   See KITCHEN_ARABIC_SOLUTION.md for details');
+          }
+
           return {
-            'name': product.productName,
+            'name': arabicName, // Arabic name (e.g., شاورما دجاج)
             'quantity': it.quantity,
             'price': product.sellingPrice,
             'categoryId': product.categoryId,
+            'notes': '', // Add notes if available
           };
         }).toList();
 
