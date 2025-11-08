@@ -277,70 +277,226 @@ class _MainPageState extends State<MainPage> {
 
   Future<void> _printReceipt() async {
     try {
+      // Validation: Check if cart has items
       if (selectedItems.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لا توجد عناصر للطباعة')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.shopping_cart_outlined, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('لا توجد عناصر للطباعة'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
         return;
       }
 
+      // Validation: Check printer connection
       final btConnected = await PrintBluetoothThermal.connectionStatus;
       if (!(connected == true && btConnected == true)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('الطابعة غير متصلة، الرجاء الاتصال أولاً')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.bluetooth_disabled, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('الطابعة غير متصلة، الرجاء الاتصال أولاً'),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
         return;
       }
 
-      // Create ReceiptBuilder for Arabic printing
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('جاري طباعة الفاتورة...'),
+              ],
+            ),
+            duration: Duration(milliseconds: 800),
+          ),
+        );
+      }
+
+      // Create ReceiptBuilder with optimized settings
       final builder = await ReceiptBuilder.create(
+        paper: PaperSize.mm80, // Configure based on your printer
         arabicFontFamily: 'NotoNaskhArabic',
         arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
-        useArabicIndicDigits: true,
-        debug: true, // Enable debug to log font loading and rendering issues
+        useArabicIndicDigits: true, // Use Arabic-Indic numerals
+        debug: false, // Set to true for debugging
       );
 
-      // Prepare order data for ReceiptBuilder
+      // Prepare items with proper validation
       final List<Map<String, dynamic>> items = selectedItems.map((item) {
         final product = _getProductById(item.productId);
         return {
-          'name': product.productName,
+          'name': product.productName.trim(),
           'quantity': item.quantity,
           'unitPrice': product.sellingPrice,
-          'notes': '', // Add notes if available
+          'notes': '', // Add item notes if available from cart
         };
       }).toList();
 
+      // Prepare order data with all required fields
       final orderMap = {
-        'orderNumber': orderCount.toString(),
+        'orderNumber': orderCount.toString().padLeft(4, '0'),
         'paymentMethod': paymentMethod == 1 ? 'Cash' : 'Card',
         'subtotal': _calculateSubtotal(selectedItems),
         'tax': _calculateTaxes(selectedItems),
         'tips': tips,
         'total': _calculateTotal(selectedItems),
-        'items': items,
       };
 
-      // Generate Arabic customer receipt
+      // Generate receipt with timing for performance monitoring
+      final stopwatch = Stopwatch()..start();
       final bytes = await builder.buildCustomer(orderMap, items: items);
-      final ok = await PrintBluetoothThermal.writeBytes(bytes);
+      stopwatch.stop();
 
-      if (ok == true) {
+      // Log performance metrics
+      debugPrint(
+          'Receipt generated: ${bytes.length} bytes in ${stopwatch.elapsedMilliseconds}ms');
+
+      // Print with retry logic
+      bool printSuccess = false;
+      int retryCount = 0;
+      const maxRetries = 2;
+
+      while (!printSuccess && retryCount <= maxRetries) {
+        try {
+          final ok = await PrintBluetoothThermal.writeBytes(bytes);
+          if (ok == true) {
+            printSuccess = true;
+            debugPrint('Print successful on attempt ${retryCount + 1}');
+          } else if (retryCount < maxRetries) {
+            debugPrint('Print failed, retrying...');
+            await Future.delayed(const Duration(seconds: 1));
+            retryCount++;
+          } else {
+            break;
+          }
+        } catch (printError) {
+          debugPrint('Print attempt ${retryCount + 1} error: $printError');
+          if (retryCount < maxRetries) {
+            await Future.delayed(const Duration(seconds: 1));
+            retryCount++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Show appropriate feedback
+      if (mounted) {
+        if (printSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('✅ تم إرسال الفاتورة للطابعة بنجاح'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.error_outline, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('❌ فشل في الطباعة بعد عدة محاولات'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'إعادة المحاولة',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Retry printing
+                  _printReceipt();
+                },
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      // Comprehensive error logging
+      debugPrint('Print error: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ تم إرسال الفاتورة للطابعة')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ فشل في الطباعة')),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'خطأ في الطباعة: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}...',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'تفاصيل',
+              textColor: Colors.white,
+              onPressed: () {
+                // Show error dialog with full details
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('تفاصيل الخطأ'),
+                    content: SingleChildScrollView(
+                      child: Text(e.toString()),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('إغلاق'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         );
       }
-    } catch (e) {
-      // ignore: avoid_print
-      print('print error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ أثناء الطباعة: $e')),
-      );
     }
   }
 
