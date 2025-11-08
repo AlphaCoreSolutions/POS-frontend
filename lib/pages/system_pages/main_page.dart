@@ -717,9 +717,9 @@ class _MainPageState extends State<MainPage> {
     List<Product> products,
   ) async {
     // ----- Adjust these to your printer -----
-    final bool is80mm = false; // set true if your printer is 80mm
-    final paper = is80mm ? PaperSize.mm80 : PaperSize.mm58;
-    final int widthPx = is80mm ? 576 : 384; // 58mm ≈ 384 px, 80mm ≈ 576 px
+// set true if your printer is 80mm
+    final paper = PaperSize.mm58;
+    final int widthPx = 384; // 58mm ≈ 384 px, 80mm ≈ 576 px
 
     // Arabic font must exist in pubspec with same family name
     const String arabicFontFamily = 'NotoNaskhArabic';
@@ -850,7 +850,6 @@ class _MainPageState extends State<MainPage> {
     await _line(text: '', size: 12, bold: false);
 
     // ---------- items ----------
-    double itemsTotal = 0.0;
     for (final it in order.orderItems) {
       final p = byId[it.productId];
       final name = p?.productName ?? 'غير معروف';
@@ -858,7 +857,6 @@ class _MainPageState extends State<MainPage> {
       final qty = it.quantity;
       final disc = it.discount;
       final lineTotal = (unit * qty) - disc;
-      itemsTotal += lineTotal;
 
       await _line(
         text: '$name ×${_fmtQty(qty)}  —  ${lineTotal.toStringAsFixed(2)}',
@@ -1320,7 +1318,8 @@ class _MainPageState extends State<MainPage> {
           shawarmaSnacksCategoryIds: {
             6,
             8,
-            9
+            9,
+            10
           }, // <-- set your Shawarma & Snacks categories here
         );
 
