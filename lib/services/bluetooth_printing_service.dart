@@ -82,30 +82,64 @@ class BluetoothPrinterManager with ChangeNotifier {
     return await PrintBluetoothThermal.pairedBluetooths;
   }
 
-  /// Connect to a MAC address.
-  Future<bool> connect(String macAddress) async {
-    try {
-      _isConnected = await PrintBluetoothThermal.connectionStatus;
-      if (_isConnected) {
-        await PrintBluetoothThermal.disconnect;
+  /// Connect to a MAC address with retry logic.
+  Future<bool> connect(String macAddress, {int maxRetries = 3}) async {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        debugPrint(
+            '🔌 Connection attempt $attempt/$maxRetries for $macAddress');
+
+        _isConnected = await PrintBluetoothThermal.connectionStatus;
+        if (_isConnected) {
+          debugPrint('⚠️ Already connected, disconnecting first...');
+          await PrintBluetoothThermal.disconnect;
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+
+        final devices = await PrintBluetoothThermal.pairedBluetooths;
+        final match = devices.firstWhere(
+          (d) => (d.macAdress) == macAddress,
+          orElse: () => throw Exception(
+              'Printer $macAddress not found in paired devices'),
+        );
+        if ((match.macAdress).isEmpty) {
+          debugPrint('❌ Printer MAC address is empty');
+          return false;
+        }
+
+        debugPrint(
+            '📡 Attempting to connect to ${match.name} ($macAddress)...');
+        await PrintBluetoothThermal.connect(macPrinterAddress: match.macAdress);
+
+        // Wait a bit for connection to stabilize
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        _isConnected = await PrintBluetoothThermal.connectionStatus;
+
+        if (_isConnected) {
+          debugPrint('✅ Connected successfully on attempt $attempt');
+          notifyListeners();
+          return true;
+        } else {
+          debugPrint('⚠️ Connection status false on attempt $attempt');
+          if (attempt < maxRetries) {
+            debugPrint('🔄 Retrying in 1 second...');
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+      } catch (e) {
+        debugPrint('❌ Connection attempt $attempt failed: $e');
+        if (attempt < maxRetries) {
+          debugPrint('🔄 Retrying in 1 second...');
+          await Future.delayed(const Duration(seconds: 1));
+        }
       }
-
-      final devices = await PrintBluetoothThermal.pairedBluetooths;
-      final match = devices.firstWhere(
-        (d) => (d.macAdress) == macAddress,
-      );
-      if ((match.macAdress).isEmpty) return false;
-
-      await PrintBluetoothThermal.connect(macPrinterAddress: match.macAdress);
-      _isConnected = await PrintBluetoothThermal.connectionStatus;
-      notifyListeners();
-      return _isConnected;
-    } catch (e) {
-      _isConnected = false;
-      notifyListeners();
-      debugPrint('BT connect error: $e');
-      return false;
     }
+
+    _isConnected = false;
+    notifyListeners();
+    debugPrint('❌ All connection attempts failed for $macAddress');
+    return false;
   }
 
   Future<void> disconnect() async {
