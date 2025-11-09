@@ -486,9 +486,9 @@ class ReceiptBuilder {
     // ═══════════════════════════════════════════════════════════════
     // ITEMS TABLE SECTION - With Borders
     // ═══════════════════════════════════════════════════════════════
-    bytes.addAll(g.hr(ch: '═')); // Top border
+    bytes.addAll(g.hr(ch: '=')); // Top border
     bytes.addAll(await _arabicTableHeaderLine(g));
-    bytes.addAll(g.hr(ch: '─')); // Header separator
+    bytes.addAll(g.hr(ch: '-')); // Header separator
 
     for (int i = 0; i < list.length; i++) {
       final it = list[i];
@@ -519,7 +519,7 @@ class ReceiptBuilder {
       }
     }
 
-    bytes.addAll(g.hr(ch: '═')); // Bottom border of table
+    bytes.addAll(g.hr(ch: '=')); // Bottom border of table
 
     // ═══════════════════════════════════════════════════════════════
     // TOTALS SECTION - Right-aligned format
@@ -674,9 +674,9 @@ class ReceiptBuilder {
       // ═══════════════════════════════════════════════════════════════
       // ITEMS TABLE SECTION - With Borders
       // ═══════════════════════════════════════════════════════════════
-      bytes.addAll(g.hr(ch: '═')); // Top border
+      bytes.addAll(g.hr(ch: '=')); // Top border
       bytes.addAll(await _arabicKitchenTableHeaderLine(g));
-      bytes.addAll(g.hr(ch: '─')); // Header separator
+      bytes.addAll(g.hr(ch: '-')); // Header separator
 
       // Items
       for (int i = 0; i < items.length; i++) {
@@ -732,7 +732,7 @@ class ReceiptBuilder {
         }
       }
 
-      bytes.addAll(g.hr(ch: '═')); // Bottom border of table
+      bytes.addAll(g.hr(ch: '=')); // Bottom border of table
 
       // ═══════════════════════════════════════════════════════════════
       // FOOTER - DateTime and Cut
