@@ -2990,7 +2990,8 @@ void _chargeOrder() async {
         bt: bt,
         router: router,
       );
-      debugPrint('🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
+      debugPrint(
+          '🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
 
       // Step 7: Print all receipts (customer + kitchens)
       debugPrint('🖨️ ============================================');
