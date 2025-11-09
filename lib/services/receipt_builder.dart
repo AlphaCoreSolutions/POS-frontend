@@ -424,6 +424,11 @@ class ReceiptBuilder {
     _d(debug, 'buildCustomer() → items=${list.length}');
 
     // ═══════════════════════════════════════════════════════════════
+    // INITIALIZATION - Reset printer state
+    // ═══════════════════════════════════════════════════════════════
+    bytes.addAll(g.reset()); // Reset printer to ensure clean state
+
+    // ═══════════════════════════════════════════════════════════════
     // HEADER SECTION - Store Name & Receipt Title
     // ═══════════════════════════════════════════════════════════════
     bytes.addAll(g.emptyLines(1));
@@ -606,9 +611,15 @@ class ReceiptBuilder {
       fontSize: 20,
     ));
 
-    bytes.addAll(g.emptyLines(1));
-    bytes.addAll(g.feed(2));
-    bytes.addAll(g.cut());
+    bytes.addAll(g.emptyLines(2));
+    bytes.addAll(g.feed(5)); // Feed 5 lines to ensure paper advances before cut
+
+    // Multiple cut commands for better compatibility
+    bytes.addAll(g.cut()); // Standard cut
+    bytes.addAll(g.cut(mode: PosCutMode.partial)); // Partial cut as backup
+
+    bytes.addAll(g.feed(2)); // Feed after cut for paper separation
+    bytes.addAll(g.reset()); // Final reset to clear printer state
 
     final out = Uint8List.fromList(bytes);
     _d(debug,
@@ -631,6 +642,11 @@ class ReceiptBuilder {
         'buildKitchen() → start; kitchen="$kitchenName", items=${items.length}');
 
     try {
+      // ═══════════════════════════════════════════════════════════════
+      // INITIALIZATION - Reset printer state
+      // ═══════════════════════════════════════════════════════════════
+      bytes.addAll(g.reset()); // Reset printer to ensure clean state
+
       // ═══════════════════════════════════════════════════════════════
       // KITCHEN HEADER SECTION
       // ═══════════════════════════════════════════════════════════════
@@ -751,8 +767,15 @@ class ReceiptBuilder {
       ));
 
       bytes.addAll(g.emptyLines(2));
-      bytes.addAll(g.feed(2));
-      bytes.addAll(g.cut());
+      bytes.addAll(
+          g.feed(5)); // Feed 5 lines to ensure paper advances before cut
+
+      // Multiple cut commands for better compatibility
+      bytes.addAll(g.cut()); // Standard cut
+      bytes.addAll(g.cut(mode: PosCutMode.partial)); // Partial cut as backup
+
+      bytes.addAll(g.feed(2)); // Feed after cut for paper separation
+      bytes.addAll(g.reset()); // Final reset to clear printer state
 
       final out = Uint8List.fromList(bytes);
       _d(debug,
