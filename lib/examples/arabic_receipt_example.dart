@@ -106,8 +106,7 @@ class ArabicReceiptExample {
     for (int attempt = 0; attempt <= retryCount; attempt++) {
       try {
         await bluetooth.writeBytes(bytes);
-        developer.log(
-            'Receipt printed successfully on attempt ${attempt + 1}',
+        developer.log('Receipt printed successfully on attempt ${attempt + 1}',
             name: 'ArabicReceiptExample');
         return true;
       } catch (e, stackTrace) {

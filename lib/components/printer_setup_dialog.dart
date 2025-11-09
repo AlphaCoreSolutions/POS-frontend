@@ -72,7 +72,8 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
     final bluetooth = BlueThermalPrinter.instance;
     final devices = await bluetooth.getBondedDevices();
     _paired = devices
-        .map<Map<String, dynamic>>((d) => {'name': d.name ?? 'Unknown', 'mac': d.address ?? ''})
+        .map<Map<String, dynamic>>(
+            (d) => {'name': d.name ?? 'Unknown', 'mac': d.address ?? ''})
         .toList();
   }
 

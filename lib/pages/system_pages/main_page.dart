@@ -267,9 +267,9 @@ class _MainPageState extends State<MainPage> {
 
       // Connect with timeout
       await _bluetooth.connect(device).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw TimeoutException('Connection timeout'),
-      );
+            const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('Connection timeout'),
+          );
 
       setState(() {
         connected = true;
