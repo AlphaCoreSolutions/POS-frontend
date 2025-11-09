@@ -131,7 +131,7 @@ class ReceiptBuilder {
       right: 'الصنف',
       center: 'الكمية',
       left: 'المجموع',
-      fontSize: 14, // Decreased for better fitting
+      fontSize: 20, // Optimized for 80mm professional look
     );
   }
 
@@ -147,7 +147,7 @@ class ReceiptBuilder {
       right: item,
       center: quantity,
       left: total,
-      fontSize: 14, // Decreased for better fitting
+      fontSize: 18, // Optimized for 80mm professional look
     );
   }
 
@@ -157,7 +157,7 @@ class ReceiptBuilder {
       g,
       right: 'الصنف',
       left: 'الكمية',
-      fontSize: 14, // Decreased for better fitting
+      fontSize: 16, // Optimized for 58mm professional look
     );
   }
 
@@ -171,7 +171,7 @@ class ReceiptBuilder {
       g,
       right: item,
       left: quantity,
-      fontSize: 16, // Decreased for better fitting
+      fontSize: 18, // Optimized for 58mm professional look
     );
   }
 
@@ -443,7 +443,7 @@ class ReceiptBuilder {
         g,
         storeName,
         align: PosAlign.center,
-        fontSize: 20,
+        fontSize: 26, // Increased for 80mm
       ));
     }
 
@@ -452,7 +452,7 @@ class ReceiptBuilder {
       g,
       'فاتورة البيع',
       align: PosAlign.center,
-      fontSize: 22,
+      fontSize: 28, // Increased for 80mm
     ));
 
     // Order Number - Second line centered
@@ -464,7 +464,7 @@ class ReceiptBuilder {
         g,
         'رقم الطلب: ${_digits(orderNo)}',
         align: PosAlign.center,
-        fontSize: 18,
+        fontSize: 24, // Increased for 80mm
       ));
     }
 
@@ -477,7 +477,7 @@ class ReceiptBuilder {
         g,
         'طريقة الدفع: $payAr',
         align: PosAlign.center,
-        fontSize: 16,
+        fontSize: 20, // Increased for 80mm
       ));
     }
 
@@ -514,7 +514,7 @@ class ReceiptBuilder {
           g,
           '   ← $notes',
           align: PosAlign.right,
-          fontSize: 14,
+          fontSize: 16, // Increased for 80mm
         ));
       }
     }
@@ -541,7 +541,7 @@ class ReceiptBuilder {
         g,
         'الإجمالي الفرعي: ${_digits(_money(subtotal - discount))}',
         align: PosAlign.right,
-        fontSize: 16,
+        fontSize: 20, // Increased for 80mm
       ));
     }
 
@@ -551,7 +551,7 @@ class ReceiptBuilder {
         g,
         'الخصم: ${_digits('- ${_money(discount)}')}',
         align: PosAlign.right,
-        fontSize: 16,
+        fontSize: 20, // Increased for 80mm
       ));
     }
 
@@ -561,7 +561,7 @@ class ReceiptBuilder {
         g,
         'الضريبة: ${_digits(_money(tax))}',
         align: PosAlign.right,
-        fontSize: 16,
+        fontSize: 20, // Increased for 80mm
       ));
     }
 
@@ -571,7 +571,7 @@ class ReceiptBuilder {
         g,
         'الإكرامية: ${_digits(_money(tips))}',
         align: PosAlign.right,
-        fontSize: 16,
+        fontSize: 20, // Increased for 80mm
       ));
     }
 
@@ -582,7 +582,7 @@ class ReceiptBuilder {
       g,
       'الإجمالي: ${_digits(_money(total))}',
       align: PosAlign.right,
-      fontSize: 20,
+      fontSize: 26, // Increased for 80mm - most important line
     ));
 
     bytes.addAll(g.hr(ch: '='));
@@ -594,7 +594,7 @@ class ReceiptBuilder {
       g,
       'شكراً لزيارتكم',
       align: PosAlign.center,
-      fontSize: 16,
+      fontSize: 22, // Increased for 80mm
     ));
 
     // Print datetime in footer
@@ -603,7 +603,7 @@ class ReceiptBuilder {
       g,
       _digits(DateFormat('yyyy/MM/dd - hh:mm a').format(now)),
       align: PosAlign.center,
-      fontSize: 14,
+      fontSize: 18, // Increased for 80mm
     ));
 
     // Minimal spacing before cut - no excessive white space
@@ -650,7 +650,7 @@ class ReceiptBuilder {
         g,
         kitchenName,
         align: PosAlign.center,
-        fontSize: 22, // Reduced for better fitting
+        fontSize: 24, // Optimized for 58mm professional look
       );
       _d(debug,
           'buildKitchen() ✓ kitchen name rendered: ${nameBytes.length} bytes');
@@ -665,7 +665,7 @@ class ReceiptBuilder {
           g,
           'طلب رقم: ${_digits(orderNo)}',
           align: PosAlign.center,
-          fontSize: 18,
+          fontSize: 20, // Optimized for 58mm professional look
         ));
       }
 
@@ -713,7 +713,7 @@ class ReceiptBuilder {
               g,
               '   ★ $notes',
               align: PosAlign.right,
-              fontSize: 16,
+              fontSize: 17, // Optimized for 58mm professional look
             );
             _d(debug,
                 'buildKitchen() ✓ notes rendered: ${notesBytes.length} bytes');
@@ -743,7 +743,7 @@ class ReceiptBuilder {
         g,
         _digits(DateFormat('yyyy/MM/dd - hh:mm a').format(now)),
         align: PosAlign.center,
-        fontSize: 14,
+        fontSize: 18, // Optimized for 58mm professional look
       ));
 
       // Minimal spacing before cut - no excessive white space
@@ -940,7 +940,7 @@ class ReceiptBuilder {
     }
   }
 
-  String _money(num v) => '\$${v.toStringAsFixed(2)}';
+  String _money(num v) => v.toStringAsFixed(2);
 
   num _asNum(dynamic v, {num fallback = 0}) {
     if (v is num) return v;
