@@ -212,12 +212,10 @@ class _MainPageState extends State<MainPage> {
 
   Future<void> initPlatformState() async {
     String platformVersion;
-    int batteryPercentage = 0;
 
     try {
       // blue_thermal_printer doesn't provide platform version or battery level
       platformVersion = 'BlueThermal v1.2.3';
-      batteryPercentage = 0;
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
@@ -3025,115 +3023,6 @@ void _chargeOrder() async {
 
       // Don't throw - just return false to indicate failure
       // This prevents blocking the POS system
-      return false;
-    }
-  }
-
-  /// Alternative: Print customer receipt only
-  /// Use this if you only need customer receipt without kitchen tickets
-  Future<bool> _printCustomerReceipt({
-    required String orderNumber,
-    required String paymentMethod,
-    required List<OrderItemDto> items,
-    required double subtotal,
-    required double tax,
-    required double tips,
-    required double total,
-  }) async {
-    try {
-      debugPrint('📄 Printing customer receipt only...');
-
-      // Build items
-      final printItems = items.map((it) {
-        final product = _getProductById(it.productId);
-        return {
-          'name': product.productName,
-          'quantity': it.quantity,
-          'price': product.sellingPrice,
-        };
-      }).toList();
-
-      final orderData = {
-        'orderNumber': orderNumber,
-        'paymentMethod': paymentMethod,
-        'subtotal': subtotal,
-        'tax': tax,
-        'tips': tips,
-        'total': total,
-        'items': printItems,
-      };
-
-      // Initialize printer
-      final bt = BluetoothPrinterManager();
-      await bt.load();
-
-      // Create builder
-      final builder = await ReceiptBuilder.create();
-
-      // Print customer receipt only
-      final bytes = await builder.printCustomer(orderData);
-
-      // Send to customer printer
-      final success = await bt.withPrinter(PrinterRole.customer, () async {
-        await bt.writeBytes(Uint8List.fromList(bytes));
-      });
-
-      debugPrint(success ? '✅ Customer receipt printed' : '❌ Failed to print');
-      return success;
-    } catch (e) {
-      debugPrint('❌ Customer receipt error: $e');
-      return false;
-    }
-  }
-
-  /// Alternative: Print kitchen ticket only
-  /// Use this for reprinting kitchen tickets
-  Future<bool> _printKitchenTicket({
-    required String orderNumber,
-    required String kitchenName,
-    required List<OrderItemDto> items,
-    required PrinterRole printerRole,
-  }) async {
-    try {
-      debugPrint('🍴 Printing kitchen ticket: $kitchenName');
-
-      // Build items
-      final printItems = items.map((it) {
-        final product = _getProductById(it.productId);
-        return {
-          'name': product.productName,
-          'quantity': it.quantity,
-          'notes': '',
-        };
-      }).toList();
-
-      final orderData = {
-        'orderNumber': orderNumber,
-      };
-
-      // Initialize printer
-      final bt = BluetoothPrinterManager();
-      await bt.load();
-
-      // Create builder
-      final builder = await ReceiptBuilder.create();
-
-      // Print kitchen ticket
-      final bytes = await builder.printKitchen(
-        orderData,
-        kitchenName: kitchenName,
-        items: printItems,
-      );
-
-      // Send to specific kitchen printer
-      final success = await bt.withPrinter(printerRole, () async {
-        await bt.writeBytes(Uint8List.fromList(bytes));
-      });
-
-      debugPrint(success ? '✅ Kitchen ticket printed' : '❌ Failed to print');
-      return success;
-    } catch (e) {
-      debugPrint('❌ Kitchen ticket error: $e');
       return false;
     }
   }
