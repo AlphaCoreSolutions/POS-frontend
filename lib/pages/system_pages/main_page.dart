@@ -29,7 +29,6 @@ import 'package:visionpos/services/receipt_builder.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
 import 'package:visionpos/examples/arabic_receipt_example.dart';
-import 'package:visionpos/components/print_preview_dialog.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -55,6 +54,20 @@ class _MainPageState extends State<MainPage> {
   int? _orgId;
   // ignore: unused_field
   List<Category> _categories = [];
+
+  // One-shot print guard
+  bool _isPrinting = false;
+  late final TriplePrinter printer;
+
+  Future<void> _printOnce(Map<String, dynamic> payload) async {
+    if (_isPrinting) return;
+    _isPrinting = true;
+    try {
+      await printer.printAll(payload); // TriplePrinter only
+    } finally {
+      _isPrinting = false;
+    }
+  }
 
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
@@ -394,7 +407,7 @@ class _MainPageState extends State<MainPage> {
 
       // Generate receipt with timing for performance monitoring
       final stopwatch = Stopwatch()..start();
-      final bytes = await builder.buildCustomer(orderMap, items: items);
+      final bytes = await builder.printCustomer(orderMap);
       stopwatch.stop();
 
       // Log performance metrics
@@ -2735,35 +2748,8 @@ class _MainPageState extends State<MainPage> {
                                         ),
                                       ),
                                     ),
-                                    ElevatedButton.icon(
-                                      onPressed: () {
-                                        if (selectedItems.isEmpty) {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'لا توجد عناصر للطباعة',
-                                              ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-
-                                        // Show print preview
-                                        _showPrintPreview(
-                                          orderNumber: 'ORD-${orderCount + 1}',
-                                          paymentMethod: paymentMethod == 1
-                                              ? 'CASH'
-                                              : 'VISA',
-                                          items: selectedItems,
-                                          subtotal:
-                                              _calculateSubtotal(selectedItems),
-                                          tax: _calculateTaxes(selectedItems),
-                                          tips: tips,
-                                          total: _calculateTotal(selectedItems),
-                                        );
-                                      },
-                                      icon: Icon(Icons.preview, size: 20),
+                                    ElevatedButton(
+                                      onPressed: () {},
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Color(0xFF8B5C42),
                                         foregroundColor: Colors.white,
@@ -2774,7 +2760,7 @@ class _MainPageState extends State<MainPage> {
                                         ),
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 16,
-                                          horizontal: 24,
+                                          horizontal: 30,
                                         ),
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
@@ -2782,8 +2768,11 @@ class _MainPageState extends State<MainPage> {
                                           ),
                                         ),
                                       ),
-                                      label: Text(
-                                        'معاينة الطباعة',
+                                      child: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!
+                                            .printReceipt,
                                         style: TextStyle(
                                           fontSize: screenWidth * 0.011,
                                         ),
@@ -3022,7 +3011,7 @@ void _chargeOrder() async {
 
       // Step 5: Create triple printer (will create per-printer builders automatically)
       final printer = TriplePrinter(
-        bt: bt,
+        btManager: bt,
         router: router,
       );
       debugPrint(
@@ -3050,71 +3039,6 @@ void _chargeOrder() async {
       // This prevents blocking the POS system
       return false;
     }
-  }
-
-  /// Show Print Preview Dialog
-  Future<void> _showPrintPreview({
-    required String orderNumber,
-    required String paymentMethod,
-    required List<OrderItemDto> items,
-    required double subtotal,
-    required double tax,
-    required double tips,
-    required double total,
-  }) async {
-    // Build print items with Arabic validation
-    final List<Map<String, dynamic>> printItems = items.map((it) {
-      final product = _getProductById(it.productId);
-      return {
-        'productName': product.productName,
-        'name': product.productName,
-        'quantity': it.quantity,
-        'price': product.sellingPrice,
-        'total': product.sellingPrice * it.quantity,
-        'totalAfterTax': product.sellingPrice * it.quantity,
-        'categoryId': product.categoryId,
-        'notes': '',
-      };
-    }).toList();
-
-    // Prepare order data
-    final orderData = {
-      'storeName': 'POS System', // You can make this dynamic
-      'orderNumber': orderNumber,
-      'paymentMethod': paymentMethod,
-      'items': printItems,
-      'data': {
-        'orderNumber': orderNumber,
-        'paymentMethod': paymentMethod,
-        'orderDate': DateTime.now().toIso8601String(),
-        'totalAfterDiscount': subtotal,
-        'discountTotal': discount,
-        'taxTotal': tax,
-        'tips': tips,
-        'totalAfterTax': total,
-        'grandTotal': total,
-      },
-    };
-
-    // Show preview dialog
-    showDialog(
-      context: context,
-      builder: (context) => PrintPreviewDialog(
-        orderData: orderData,
-        onPrint: () {
-          // Execute actual print after preview confirmation
-          _printReceipts(
-            orderNumber: orderNumber,
-            paymentMethod: paymentMethod,
-            items: items,
-            subtotal: subtotal,
-            tax: tax,
-            tips: tips,
-            total: total,
-          );
-        },
-      ),
-    );
   }
 }
 

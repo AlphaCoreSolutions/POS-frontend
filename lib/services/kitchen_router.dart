@@ -1,3 +1,7 @@
+import 'package:visionpos/models/order_dto.dart';
+import 'package:visionpos/models/order_item_dto.dart';
+import 'package:visionpos/models/product_model.dart';
+
 /// Splits an order's items by category IDs into kitchen buckets.
 class KitchenRouter {
   final Set<int> falafelCategoryIds;
@@ -22,5 +26,27 @@ class KitchenRouter {
       }
     }
     return {'falafel': falafel, 'shawarmaSnacks': shsn};
+  }
+
+  Map<String, List<OrderItemDto>> splitOrder(
+    OrderDto order,
+    Map<int, Product> productsById,
+  ) {
+    final falafel = <OrderItemDto>[];
+    final shawarma = <OrderItemDto>[];
+
+    for (final it in order.orderItems) {
+      final p = productsById[it.productId];
+      if (p == null) continue;
+      if (p.categoryId == 7) {
+        falafel.add(it);
+      } else if ({6, 8, 9}.contains(p.categoryId)) {
+        shawarma.add(it);
+      }
+    }
+    return {
+      'falafel': falafel,
+      'shawarmaSnacks': shawarma,
+    };
   }
 }
