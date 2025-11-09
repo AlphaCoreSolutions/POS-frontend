@@ -417,10 +417,14 @@ class ReceiptBuilder {
     final g = Generator(paper, profile);
     final List<int> bytes = [];
     final sw = Stopwatch()..start();
-    final List<Map<String, dynamic>> list =
-        (items ?? (order['items'] as List?)?.cast<Map<String, dynamic>>() ?? [])
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
+
+    // Extract items from API response structure (data.orderItems or direct items)
+    final List<Map<String, dynamic>> list = items ??
+        (order['data']?['orderItems'] as List?)?.cast<Map<String, dynamic>>() ??
+        (order['orderItems'] as List?)?.cast<Map<String, dynamic>>() ??
+        (order['items'] as List?)?.cast<Map<String, dynamic>>() ??
+        [];
+
     _d(debug, 'buildCustomer() → items=${list.length}');
 
     // ═══════════════════════════════════════════════════════════════
@@ -431,7 +435,6 @@ class ReceiptBuilder {
     // ═══════════════════════════════════════════════════════════════
     // HEADER SECTION - Store Name & Receipt Title
     // ═══════════════════════════════════════════════════════════════
-    bytes.addAll(g.emptyLines(1));
 
     // Store name (if provided)
     final storeName = (order['storeName'] ?? '').toString();
@@ -452,12 +455,14 @@ class ReceiptBuilder {
       fontSize: 32,
     ));
     bytes.addAll(g.hr(ch: '='));
-    bytes.addAll(g.emptyLines(1));
 
     // ═══════════════════════════════════════════════════════════════
     // ORDER INFORMATION SECTION
     // ═══════════════════════════════════════════════════════════════
-    final orderNo = (order['orderNumber'] ?? '').toString();
+    // Extract order number from API response
+    final orderNo =
+        (order['data']?['orderNumber'] ?? order['orderNumber'] ?? '')
+            .toString();
     if (orderNo.isNotEmpty) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
@@ -467,13 +472,34 @@ class ReceiptBuilder {
       ));
     }
 
-    // Date and Time
-    bytes.addAll(await _arabicKeyValueLineHybrid(
-      g,
-      label: 'التاريخ',
-      value: _digits(DateFormat('yyyy/MM/dd').format(DateTime.now())),
-      fontSize: 20,
-    ));
+    // Date and Time - use API orderDate if available
+    final orderDate = order['data']?['orderDate'] ?? order['orderDate'];
+    if (orderDate != null) {
+      try {
+        final date = DateTime.parse(orderDate.toString());
+        bytes.addAll(await _arabicKeyValueLineHybrid(
+          g,
+          label: 'التاريخ',
+          value: _digits(DateFormat('yyyy/MM/dd').format(date)),
+          fontSize: 20,
+        ));
+      } catch (e) {
+        bytes.addAll(await _arabicKeyValueLineHybrid(
+          g,
+          label: 'التاريخ',
+          value: _digits(DateFormat('yyyy/MM/dd').format(DateTime.now())),
+          fontSize: 20,
+        ));
+      }
+    } else {
+      bytes.addAll(await _arabicKeyValueLineHybrid(
+        g,
+        label: 'التاريخ',
+        value: _digits(DateFormat('yyyy/MM/dd').format(DateTime.now())),
+        fontSize: 20,
+      ));
+    }
+
     bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
       label: 'الوقت',
@@ -481,9 +507,10 @@ class ReceiptBuilder {
       fontSize: 20,
     ));
 
-    // Payment Method
-    final payAr =
-        _paymentMethodArabic((order['paymentMethod'] ?? '').toString());
+    // Payment Method - from API
+    final paymentMethod =
+        order['data']?['paymentMethod'] ?? order['paymentMethod'];
+    final payAr = _paymentMethodArabic(paymentMethod?.toString() ?? '');
     if (payAr.isNotEmpty) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
@@ -494,7 +521,6 @@ class ReceiptBuilder {
     }
 
     bytes.addAll(g.hr());
-    bytes.addAll(g.emptyLines(1));
 
     // ═══════════════════════════════════════════════════════════════
     // ITEMS TABLE SECTION
@@ -502,14 +528,14 @@ class ReceiptBuilder {
     bytes.addAll(await _arabicTableHeaderLine(g));
     bytes.addAll(g.hr(ch: '-'));
 
-    num computedSubtotal = 0;
     for (int i = 0; i < list.length; i++) {
       final it = list[i];
-      final String name = (it['name'] ?? 'صنف').toString();
+      // API response uses 'productName' or 'name'
+      final String name = (it['productName'] ?? it['name'] ?? 'صنف').toString();
       final num qty = _asNum(it['quantity'], fallback: 1);
-      final num unit = _pickPrice(it);
-      final num lineTotal = unit * qty;
-      computedSubtotal += lineTotal;
+      // API response uses 'totalAfterTax' or 'total' for line total
+      final num lineTotal =
+          _asNum(it['totalAfterTax'] ?? it['total'], fallback: 0);
 
       // Item Row
       bytes.addAll(await _arabicTableRowLine(
@@ -532,25 +558,30 @@ class ReceiptBuilder {
     }
 
     bytes.addAll(g.hr(ch: '-'));
-    bytes.addAll(g.emptyLines(1));
 
     // ═══════════════════════════════════════════════════════════════
-    // TOTALS SECTION
+    // TOTALS SECTION - Using API response data
     // ═══════════════════════════════════════════════════════════════
-    num subtotal = _asNum(order['subtotal'], fallback: computedSubtotal);
-    num tax = _asNum(order['tax'], fallback: 0);
-    num tips = _asNum(order['tips'], fallback: 0);
-    num discount = _asNum(order['discount'], fallback: 0);
-    num total =
-        _asNum(order['total'], fallback: subtotal + tax + tips - discount);
+    final apiData = order['data'] ?? order;
 
-    // Subtotal
-    bytes.addAll(await _arabicKeyValueLineHybrid(
-      g,
-      label: 'الإجمالي الفرعي',
-      value: _digits(_money(subtotal)),
-      fontSize: 22,
-    ));
+    num subtotal = _asNum(
+        apiData['totalAfterDiscount'] ?? apiData['grandTotal'],
+        fallback: 0);
+    num discount = _asNum(apiData['discountTotal'], fallback: 0);
+    num tax = _asNum(apiData['taxTotal'], fallback: 0);
+    num tips = _asNum(apiData['tips'], fallback: 0);
+    num total = _asNum(apiData['totalAfterTax'] ?? apiData['grandTotal'],
+        fallback: subtotal);
+
+    // Subtotal (only show if different from total)
+    if (discount > 0 || tax > 0) {
+      bytes.addAll(await _arabicKeyValueLineHybrid(
+        g,
+        label: 'الإجمالي الفرعي',
+        value: _digits(_money(subtotal - discount)),
+        fontSize: 22,
+      ));
+    }
 
     // Discount (if any)
     if (discount > 0) {
@@ -593,33 +624,23 @@ class ReceiptBuilder {
     ));
 
     bytes.addAll(g.hr(ch: '='));
-    bytes.addAll(g.emptyLines(2));
 
     // ═══════════════════════════════════════════════════════════════
-    // FOOTER SECTION
+    // FOOTER SECTION - Minimized white space
     // ═══════════════════════════════════════════════════════════════
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'شكراً لزيارتكم',
       align: PosAlign.center,
-      fontSize: 24,
-    ));
-    bytes.addAll(await _arabicTextLineHybrid(
-      g,
-      'نتطلع لخدمتكم مرة أخرى',
-      align: PosAlign.center,
-      fontSize: 20,
+      fontSize: 22,
     ));
 
-    bytes.addAll(g.emptyLines(2));
-    bytes.addAll(g.feed(5)); // Feed 5 lines to ensure paper advances before cut
+    // Minimal spacing before cut - no excessive white space
+    bytes.addAll(g.feed(3)); // Just 3 lines to ensure paper advances before cut
 
-    // Multiple cut commands for better compatibility
+    // Cut commands
     bytes.addAll(g.cut()); // Standard cut
     bytes.addAll(g.cut(mode: PosCutMode.partial)); // Partial cut as backup
-
-    bytes.addAll(g.feed(2)); // Feed after cut for paper separation
-    bytes.addAll(g.reset()); // Final reset to clear printer state
 
     final out = Uint8List.fromList(bytes);
     _d(debug,
@@ -668,7 +689,10 @@ class ReceiptBuilder {
       // ═══════════════════════════════════════════════════════════════
       // ORDER INFO SECTION
       // ═══════════════════════════════════════════════════════════════
-      final orderNo = (order['orderNumber'] ?? '').toString();
+      // Extract order number from API response
+      final orderNo =
+          (order['data']?['orderNumber'] ?? order['orderNumber'] ?? '')
+              .toString();
       if (orderNo.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
           g,
@@ -688,7 +712,6 @@ class ReceiptBuilder {
       ));
 
       bytes.addAll(g.hr());
-      bytes.addAll(g.emptyLines(1));
 
       // ═══════════════════════════════════════════════════════════════
       // ITEMS TABLE SECTION
@@ -699,7 +722,9 @@ class ReceiptBuilder {
       // Items
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
-        final String name = (item['name'] ?? 'صنف').toString();
+        // API response uses 'productName' or 'name'
+        final String name =
+            (item['productName'] ?? item['name'] ?? 'صنف').toString();
         final num qty = _asNum(item['quantity'], fallback: 1);
         final String notes = (item['notes'] ?? '').toString().trim();
 
@@ -749,33 +774,18 @@ class ReceiptBuilder {
       }
 
       bytes.addAll(g.hr(ch: '='));
-      bytes.addAll(g.emptyLines(1));
 
       // ═══════════════════════════════════════════════════════════════
-      // FOOTER - Total Item Count
+      // FOOTER - Minimal white space, no totals needed for kitchen
       // ═══════════════════════════════════════════════════════════════
-      final totalQty = items.fold<num>(
-        0,
-        (sum, item) => sum + _asNum(item['quantity'], fallback: 1),
-      );
 
-      bytes.addAll(await _arabicTextLineHybrid(
-        g,
-        'إجمالي الأصناف: ${_digits(totalQty.toString())}',
-        align: PosAlign.center,
-        fontSize: 26,
-      ));
-
-      bytes.addAll(g.emptyLines(2));
+      // Minimal spacing before cut - no excessive white space
       bytes.addAll(
-          g.feed(5)); // Feed 5 lines to ensure paper advances before cut
+          g.feed(3)); // Just 3 lines to ensure paper advances before cut
 
-      // Multiple cut commands for better compatibility
+      // Cut commands
       bytes.addAll(g.cut()); // Standard cut
       bytes.addAll(g.cut(mode: PosCutMode.partial)); // Partial cut as backup
-
-      bytes.addAll(g.feed(2)); // Feed after cut for paper separation
-      bytes.addAll(g.reset()); // Final reset to clear printer state
 
       final out = Uint8List.fromList(bytes);
       _d(debug,
@@ -1066,24 +1076,6 @@ class ReceiptBuilder {
       if (p != null) return p;
     }
     return fallback;
-  }
-
-  num _pickPrice(Map<String, dynamic> it) {
-    // Flexible keys to support various item payloads
-    final keys = [
-      'unitPrice',
-      'price',
-      'unit_price',
-      'unit_price_amount',
-      'amount'
-    ];
-    for (final k in keys) {
-      if (it.containsKey(k)) {
-        final v = _asNum(it[k]);
-        if (v > 0) return v;
-      }
-    }
-    return 0;
   }
 
   bool _containsArabic(String s) =>
