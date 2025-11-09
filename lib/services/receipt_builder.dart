@@ -122,6 +122,261 @@ class ReceiptBuilder {
   }
 
   // ---------------------------------------------------------------------------
+  // TABLE RENDERING HELPERS
+  // ---------------------------------------------------------------------------
+  /// Render table header: الصنف | الكمية | المجموع
+  Future<List<int>> _arabicTableHeaderLine(Generator g) async {
+    return await _arabicThreeColumnLine(
+      g,
+      right: 'الصنف',
+      center: 'الكمية',
+      left: 'المجموع',
+      fontSize: 22,
+    );
+  }
+
+  /// Render table row with three columns
+  Future<List<int>> _arabicTableRowLine(
+    Generator g, {
+    required String item,
+    required String quantity,
+    required String total,
+  }) async {
+    return await _arabicThreeColumnLine(
+      g,
+      right: item,
+      center: quantity,
+      left: total,
+      fontSize: 22,
+    );
+  }
+
+  /// Render kitchen table header: الصنف | الكمية
+  Future<List<int>> _arabicKitchenTableHeaderLine(Generator g) async {
+    return await _arabicTwoColumnLine(
+      g,
+      right: 'الصنف',
+      left: 'الكمية',
+      fontSize: 24,
+    );
+  }
+
+  /// Render kitchen table row with two columns
+  Future<List<int>> _arabicKitchenTableRowLine(
+    Generator g, {
+    required String item,
+    required String quantity,
+  }) async {
+    return await _arabicTwoColumnLine(
+      g,
+      right: item,
+      left: quantity,
+      fontSize: 26,
+    );
+  }
+
+  /// Render two-column line for kitchen table display
+  Future<List<int>> _arabicTwoColumnLine(
+    Generator g, {
+    required String right,
+    required String left,
+    double fontSize = 24,
+    double verticalPadding = 2,
+  }) async {
+    right = useArabicIndicDigits ? _toArabicDigits(right) : right;
+    left = useArabicIndicDigits ? _toArabicDigits(left) : left;
+
+    // Define column widths (in pixels)
+    final int rightColWidth = (widthPx * 0.70).toInt(); // 70% for item name
+    final int leftColWidth = (widthPx * 0.30).toInt(); // 30% for quantity
+
+    // Right column (item name) - RTL
+    final pStyleRight = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.right,
+      textDirection: ui.TextDirection.rtl,
+      maxLines: 3,
+      locale: const ui.Locale('ar'),
+    );
+    final tStyle = ui.TextStyle(
+      color: const ui.Color(0xFF000000),
+      fontSize: fontSize,
+      fontFamily: arabicFontFamily,
+    );
+    final builderRight = ui.ParagraphBuilder(pStyleRight)..pushStyle(tStyle);
+    builderRight.addText(right);
+    final pRight = builderRight.build()
+      ..layout(ui.ParagraphConstraints(width: rightColWidth.toDouble()));
+
+    // Left column (quantity) - Center aligned
+    final pStyleLeft = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.center,
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+      locale: const ui.Locale('ar'),
+    );
+    final builderLeft = ui.ParagraphBuilder(pStyleLeft)..pushStyle(tStyle);
+    builderLeft.addText(left);
+    final pLeft = builderLeft.build()
+      ..layout(ui.ParagraphConstraints(width: leftColWidth.toDouble()));
+
+    // Calculate height based on tallest paragraph
+    final double maxHeight =
+        [pRight.height, pLeft.height].reduce((a, b) => a > b ? a : b);
+    final int height = (maxHeight + verticalPadding * 2).ceil().clamp(24, 4096);
+
+    // Render to canvas
+    Uint8List pngBytes;
+    try {
+      final rec = ui.PictureRecorder();
+      final canvas = ui.Canvas(rec);
+      final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF);
+      canvas.drawRect(
+          ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
+
+      final double dy =
+          ((height - maxHeight) / 2).clamp(0.0, height.toDouble());
+
+      // Draw right column at x=0
+      canvas.drawParagraph(pRight, ui.Offset(0, dy));
+
+      // Draw left column
+      canvas.drawParagraph(pLeft, ui.Offset(rightColWidth.toDouble(), dy));
+
+      final picture = rec.endRecording();
+      final uiImg = await picture.toImage(widthPx, height);
+      final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) throw StateError('toByteData returned null');
+      pngBytes = byteData.buffer.asUint8List();
+    } catch (e, st) {
+      _e(debug, '_arabicTwoColumnLine() ✗ rasterize failed: $e\n$st');
+      rethrow;
+    }
+
+    // Decode and convert to ESC/POS raster
+    final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes);
+    if (decoded == null) {
+      throw StateError('PNG decode returned null');
+    }
+    return g.imageRaster(
+      decoded,
+      align: PosAlign.left,
+      highDensityHorizontal: true,
+      highDensityVertical: true,
+    );
+  }
+
+  /// Render three-column line for table display
+  Future<List<int>> _arabicThreeColumnLine(
+    Generator g, {
+    required String right,
+    required String center,
+    required String left,
+    double fontSize = 22,
+    double verticalPadding = 2,
+  }) async {
+    right = useArabicIndicDigits ? _toArabicDigits(right) : right;
+    center = useArabicIndicDigits ? _toArabicDigits(center) : center;
+    left = useArabicIndicDigits ? _toArabicDigits(left) : left;
+
+    // Define column widths (in pixels)
+    final int rightColWidth = (widthPx * 0.50).toInt(); // 50% for item name
+    final int centerColWidth = (widthPx * 0.25).toInt(); // 25% for quantity
+    final int leftColWidth = (widthPx * 0.25).toInt(); // 25% for total
+
+    // Right column (item name) - RTL
+    final pStyleRight = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.right,
+      textDirection: ui.TextDirection.rtl,
+      maxLines: 3,
+      locale: const ui.Locale('ar'),
+    );
+    final tStyle = ui.TextStyle(
+      color: const ui.Color(0xFF000000),
+      fontSize: fontSize,
+      fontFamily: arabicFontFamily,
+    );
+    final builderRight = ui.ParagraphBuilder(pStyleRight)..pushStyle(tStyle);
+    builderRight.addText(right);
+    final pRight = builderRight.build()
+      ..layout(ui.ParagraphConstraints(width: rightColWidth.toDouble()));
+
+    // Center column (quantity) - Center aligned
+    final pStyleCenter = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.center,
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+      locale: const ui.Locale('ar'),
+    );
+    final builderCenter = ui.ParagraphBuilder(pStyleCenter)..pushStyle(tStyle);
+    builderCenter.addText(center);
+    final pCenter = builderCenter.build()
+      ..layout(ui.ParagraphConstraints(width: centerColWidth.toDouble()));
+
+    // Left column (total) - LTR, left aligned
+    final pStyleLeft = ui.ParagraphStyle(
+      textAlign: ui.TextAlign.left,
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+      locale: const ui.Locale('en'),
+    );
+    final builderLeft = ui.ParagraphBuilder(pStyleLeft)..pushStyle(tStyle);
+    builderLeft.addText(left);
+    final pLeft = builderLeft.build()
+      ..layout(ui.ParagraphConstraints(width: leftColWidth.toDouble()));
+
+    // Calculate height based on tallest paragraph
+    final double maxHeight = [pRight.height, pCenter.height, pLeft.height]
+        .reduce((a, b) => a > b ? a : b);
+    final int height = (maxHeight + verticalPadding * 2).ceil().clamp(24, 4096);
+
+    // Render to canvas
+    Uint8List pngBytes;
+    try {
+      final rec = ui.PictureRecorder();
+      final canvas = ui.Canvas(rec);
+      final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF);
+      canvas.drawRect(
+          ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
+
+      final double dy =
+          ((height - maxHeight) / 2).clamp(0.0, height.toDouble());
+
+      // Draw right column at x=0
+      canvas.drawParagraph(pRight, ui.Offset(0, dy));
+
+      // Draw center column
+      canvas.drawParagraph(pCenter, ui.Offset(rightColWidth.toDouble(), dy));
+
+      // Draw left column
+      canvas.drawParagraph(
+          pLeft, ui.Offset((rightColWidth + centerColWidth).toDouble(), dy));
+
+      final picture = rec.endRecording();
+      final uiImg = await picture.toImage(widthPx, height);
+      final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) throw StateError('toByteData returned null');
+      pngBytes = byteData.buffer.asUint8List();
+    } catch (e, st) {
+      _e(debug, '_arabicThreeColumnLine() ✗ rasterize failed: $e\n$st');
+      rethrow;
+    }
+
+    // Decode and convert to ESC/POS raster
+    final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes);
+    if (decoded == null) {
+      throw StateError('PNG decode returned null');
+    }
+    return g.imageRaster(
+      decoded,
+      align: PosAlign.left,
+      highDensityHorizontal: true,
+      highDensityVertical: true,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // CUSTOMER RECEIPT (Arabic, with items)
   // ---------------------------------------------------------------------------
   /// Expects:
@@ -135,7 +390,7 @@ class ReceiptBuilder {
   /// ...
   /// ]
   ///
-  /// If totals not provided, they’ll be computed from items (unitPrice * qty).
+  /// If totals not provided, they'll be computed from items (unitPrice * qty).
   Future<Uint8List> buildCustomer(
     Map<String, dynamic> order, {
     List<Map<String, dynamic>>? items,
@@ -148,24 +403,29 @@ class ReceiptBuilder {
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
     _d(debug, 'buildCustomer() → items=${list.length}');
+
     // ---- Header ----
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'فاتورة',
       align: PosAlign.center,
-      fontSize: 28,
+      fontSize: 30,
     ));
     bytes.addAll(g.hr());
-    // ---- Order info ----
+
+    // ---- Order Number (Prominent) ----
     final orderNo = (order['orderNumber'] ?? '').toString();
     if (orderNo.isNotEmpty) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'رقم الطلب',
         value: _digits(orderNo),
-        fontSize: 22,
+        fontSize: 26,
       ));
+      bytes.addAll(g.hr());
     }
+
+    // ---- Order info ----
     final payAr =
         _paymentMethodArabic((order['paymentMethod'] ?? '').toString());
     if (payAr.isNotEmpty) {
@@ -173,7 +433,7 @@ class ReceiptBuilder {
         g,
         label: 'طريقة الدفع',
         value: payAr,
-        fontSize: 22,
+        fontSize: 20,
       ));
     }
     bytes.addAll(await _arabicKeyValueLineHybrid(
@@ -183,7 +443,12 @@ class ReceiptBuilder {
       fontSize: 20,
     ));
     bytes.addAll(g.hr());
-    // ---- Items (Arabic) ----
+
+    // ---- Table Header ----
+    bytes.addAll(await _arabicTableHeaderLine(g));
+    bytes.addAll(g.hr());
+
+    // ---- Items Table ----
     num computedSubtotal = 0;
     for (int i = 0; i < list.length; i++) {
       final it = list[i];
@@ -192,49 +457,47 @@ class ReceiptBuilder {
       final num unit = _pickPrice(it);
       final num lineTotal = unit * qty;
       computedSubtotal += lineTotal;
-      // Line 1: " × " ....... ""
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+
+      // Table Row: Item | Quantity | Total
+      bytes.addAll(await _arabicTableRowLine(
         g,
-        label: '${_digits(qty.toString())} × $name',
-        value: _digits(_money(lineTotal)),
-        fontSize: 22,
+        item: name,
+        quantity: _digits(qty.toString()),
+        total: _digits(_money(lineTotal)),
       ));
-      // Optional Line 2: "سعر الوحدة .... "
-      bytes.addAll(await _arabicKeyValueLineHybrid(
-        g,
-        label: 'سعر الوحدة',
-        value: _digits(_money(unit)),
-        fontSize: 18,
-      ));
-      // Notes (if any)
+
+      // Notes (if any) - indented below item
       final notes = (it['notes'] ?? '').toString().trim();
       if (notes.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
           g,
-          'ملاحظات: $notes',
-          align: PosAlign.left,
+          '  ملاحظات: $notes',
+          align: PosAlign.right,
           fontSize: 18,
         ));
       }
     }
     bytes.addAll(g.hr());
-    // ---- Money section ----
+    bytes.addAll(g.emptyLines(1));
+
+    // ---- Totals Section (Professional) ----
     num subtotal = _asNum(order['subtotal'], fallback: computedSubtotal);
     num tax = _asNum(order['tax'], fallback: 0);
     num tips = _asNum(order['tips'], fallback: 0);
     num total = _asNum(order['total'], fallback: subtotal + tax + tips);
+
     bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
       label: 'الإجمالي الفرعي',
       value: _digits(_money(subtotal)),
-      fontSize: 22,
+      fontSize: 24,
     ));
     if (tax > 0) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'الضريبة',
         value: _digits(_money(tax)),
-        fontSize: 22,
+        fontSize: 24,
       ));
     }
     if (tips > 0) {
@@ -242,23 +505,25 @@ class ReceiptBuilder {
         g,
         label: 'الإكرامية',
         value: _digits(_money(tips)),
-        fontSize: 22,
+        fontSize: 24,
       ));
     }
-    bytes.addAll(g.hr());
+    bytes.addAll(g.hr(ch: '='));
     bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
-      label: 'الإجمالي',
+      label: 'الإجمالي النهائي',
       value: _digits(_money(total)),
-      fontSize: 26,
+      fontSize: 28,
     ));
-    bytes.addAll(g.hr());
+    bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.emptyLines(1));
+
     // Footer
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'شكراً لكم',
       align: PosAlign.center,
-      fontSize: 22,
+      fontSize: 24,
     ));
     bytes.addAll(g.feed(2));
     bytes.addAll(g.cut());
@@ -289,32 +554,39 @@ class ReceiptBuilder {
         g,
         kitchenName,
         align: PosAlign.center,
-        fontSize: 30, // Increased font size
+        fontSize: 32, // Larger font for kitchen name
       );
       _d(debug,
           'buildKitchen() ✓ kitchen name rendered: ${nameBytes.length} bytes');
       bytes.addAll(nameBytes);
       bytes.addAll(g.hr());
 
-      // Order Number and Time
+      // Order Number (Prominent - Large)
       final orderNo = (order['orderNumber'] ?? '').toString();
       if (orderNo.isNotEmpty) {
-        bytes.addAll(await _arabicKeyValueLineHybrid(
+        bytes.addAll(await _arabicTextLineHybrid(
           g,
-          label: 'رقم الطلب',
-          value: _digits(orderNo),
-          fontSize: 24,
+          'رقم الطلب: ${_digits(orderNo)}',
+          align: PosAlign.center,
+          fontSize: 28,
         ));
+        bytes.addAll(g.hr());
       }
+
+      // Time
       bytes.addAll(await _arabicTextLineHybrid(
         g,
         _digits(DateFormat('hh:mm a').format(DateTime.now())),
         align: PosAlign.center,
-        fontSize: 22,
+        fontSize: 24,
       ));
       bytes.addAll(g.hr());
 
-      // Items
+      // Table Header for Kitchen
+      bytes.addAll(await _arabicKitchenTableHeaderLine(g));
+      bytes.addAll(g.hr());
+
+      // Items Table
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
         final String name = (item['name'] ?? 'صنف').toString();
@@ -324,25 +596,22 @@ class ReceiptBuilder {
         _d(debug,
             'buildKitchen() → rendering item ${i + 1}/${items.length}: "$name" (qty: $qty)');
 
-        // Item line: "quantity × name"
-        final itemLine = '${_digits(qty.toString())} × $name';
+        // Table Row: Item | Quantity
         try {
-          final itemBytes = await _arabicTextLineHybrid(
+          final itemBytes = await _arabicKitchenTableRowLine(
             g,
-            itemLine,
-            align: PosAlign.left,
-            fontSize: 28, // Increased font size
+            item: name,
+            quantity: _digits(qty.toString()),
           );
           _d(debug,
               'buildKitchen() ✓ item rendered: ${itemBytes.length} bytes');
           bytes.addAll(itemBytes);
         } catch (e, st) {
-          _e(debug,
-              'buildKitchen() ✗ FAILED to render item "$itemLine": $e\n$st');
+          _e(debug, 'buildKitchen() ✗ FAILED to render item "$name": $e\n$st');
           rethrow;
         }
 
-        // Notes (if present)
+        // Notes (if present) - indented below item
         if (notes.isNotEmpty) {
           _d(debug, 'buildKitchen() → rendering notes: "$notes"');
           try {
@@ -350,8 +619,8 @@ class ReceiptBuilder {
             final notesBytes = await _arabicTextLineHybrid(
               g,
               notesLine,
-              align: PosAlign.left,
-              fontSize: 24, // Increased font size
+              align: PosAlign.right,
+              fontSize: 22,
             );
             _d(debug,
                 'buildKitchen() ✓ notes rendered: ${notesBytes.length} bytes');
