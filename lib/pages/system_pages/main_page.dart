@@ -55,20 +55,6 @@ class _MainPageState extends State<MainPage> {
   // ignore: unused_field
   List<Category> _categories = [];
 
-  // One-shot print guard
-  bool _isPrinting = false;
-  late final TriplePrinter printer;
-
-  Future<void> _printOnce(Map<String, dynamic> payload) async {
-    if (_isPrinting) return;
-    _isPrinting = true;
-    try {
-      await printer.printAll(payload); // TriplePrinter only
-    } finally {
-      _isPrinting = false;
-    }
-  }
-
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
     setState(() => _orgId = orgId);
@@ -384,17 +370,6 @@ class _MainPageState extends State<MainPage> {
         debug: false, // Set to true for debugging
       );
 
-      // Prepare items with proper validation
-      final List<Map<String, dynamic>> items = selectedItems.map((item) {
-        final product = _getProductById(item.productId);
-        return {
-          'name': product.productName.trim(),
-          'quantity': item.quantity,
-          'unitPrice': product.sellingPrice,
-          'notes': '', // Add item notes if available from cart
-        };
-      }).toList();
-
       // Prepare order data with all required fields
       final orderMap = {
         'orderNumber': orderCount.toString().padLeft(4, '0'),
@@ -403,6 +378,16 @@ class _MainPageState extends State<MainPage> {
         'tax': _calculateTaxes(selectedItems),
         'tips': tips,
         'total': _calculateTotal(selectedItems),
+        'items': selectedItems.map((item) {
+          final product = _getProductById(item.productId);
+          return {
+            'productId': item.productId,
+            'name': product.productName.trim(),
+            'quantity': item.quantity,
+            'unitPrice': product.sellingPrice,
+            'notes': '',
+          };
+        }).toList(),
       };
 
       // Generate receipt with timing for performance monitoring
@@ -1300,43 +1285,110 @@ class _MainPageState extends State<MainPage> {
       tip: tips,
     );
 
-    final success = await ApiHandler().postOrder(order);
+    try {
+      // Post order and get response with order ID
+      final orderResponse = await ApiHandler().postOrderWithResponse(order);
 
-    if (success) {
-      // === UNIFIED PRINTING: Customer + Kitchen (Arabic & Android Compatible) ===
-      try {
-        // Calculate totals
-        final double subtotal = _calculateSubtotal(selectedItems);
-        final double tax = _calculateTaxes(selectedItems);
-        final double total = subtotal + tax + tips;
+      if (orderResponse != null) {
+        // === UNIFIED PRINTING: Customer + Kitchen (Modern Arabic Design) ===
+        try {
+          // Calculate totals
+          final double subtotal = _calculateSubtotal(selectedItems);
+          final double tax = _calculateTaxes(selectedItems);
+          final double total = subtotal + tax + tips;
 
-        // Call unified print function - handles everything!
-        final printSuccess = await _printReceipts(
-          orderNumber: order.id.toString(),
-          paymentMethod: paymentMethod == 1 ? 'CASH' : 'VISA',
-          items: selectedItems,
-          subtotal: subtotal,
-          tax: tax,
-          tips: tips,
-          total: total,
-        );
+          // Extract order number from API response
+          final orderNumber = (orderResponse['id'] ??
+                  orderResponse['Id'] ??
+                  orderResponse['orderNumber'] ??
+                  orderResponse['OrderNumber'] ??
+                  '')
+              .toString();
 
-        if (!printSuccess) {
-          debugPrint('⚠️ Printing completed with errors (check logs)');
+          // Get store name (you can customize this)
+          final storeName = 'مطعم فيجن'; // Vision Restaurant in Arabic
+
+          // Build print items with product details
+          final List<Map<String, dynamic>> printItems = selectedItems.map((it) {
+            final product = _getProductById(it.productId);
+            final price = _getProductPrice(it.productId);
+            final lineTotal = price * it.quantity;
+
+            return {
+              'productId': it.productId,
+              'ProductId': it.productId,
+              'productName': product.productName,
+              'name': product.productName,
+              'quantity': it.quantity,
+              'Quantity': it.quantity,
+              'unitPrice': price,
+              'price': price,
+              'sellingPrice': price,
+              'total': lineTotal,
+              'totalAfterTax': lineTotal,
+              'categoryId': product.categoryId,
+              'notes': '',
+            };
+          }).toList();
+
+          // Prepare order data for printing
+          final printOrderData = {
+            'id': orderNumber,
+            'Id': orderNumber,
+            'orderNumber': orderNumber,
+            'OrderNumber': orderNumber,
+            'organizationId': _orgId,
+            'paymentMethod': paymentMethod,
+            'PaymentMethod': paymentMethod,
+            'orderPlaced': DateTime.now().toIso8601String(),
+            'OrderPlaced': DateTime.now().toIso8601String(),
+            'orderItems': printItems,
+            'OrderItems': printItems,
+            'items': printItems,
+            'grandTotal': total,
+            'GrandTotal': total,
+            'totalAfterTax': total,
+            'totalAfterDiscount': subtotal,
+            'taxTotal': tax,
+            'tips': tips,
+            'tip': tips,
+            'discount': discount,
+            'discountTotal': discount,
+          };
+
+          // Call unified print function with store name
+          final printSuccess = await _printReceipts(
+            orderData: printOrderData,
+            storeName: storeName,
+          );
+
+          if (!printSuccess) {
+            debugPrint('⚠️ Printing completed with errors (check logs)');
+          }
+        } catch (e, stackTrace) {
+          // Swallow printing errors to avoid blocking the POS
+          debugPrint('❌ Printing error: $e');
+          debugPrint('Stack trace: $stackTrace');
         }
-      } catch (e) {
-        // Swallow printing errors to avoid blocking the POS
-        debugPrint('❌ Printing error: $e');
-      }
-      // === End Unified Printing ===
+        // === End Unified Printing ===
 
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Order submitted successfully!')),
+        );
+        setState(() {
+          selectedItems.clear();
+          discount = 0.0;
+          tips = 0.0;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ Failed to submit order')),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Submit order error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Order submitted successfully!')),
-      );
-      setState(() => selectedItems.clear());
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('❌ Failed to submit order')),
+        SnackBar(content: Text('❌ Error: $e')),
       );
     }
   }
@@ -2915,114 +2967,79 @@ void _chargeOrder() async {
   // UNIFIED PRINTING FUNCTION - Arabic & Android Compatible
   // ===========================================================================
 
-  /// Unified printing function for customer and kitchen receipts.
+  /// Modern unified printing function for customer and kitchen receipts.
   ///
   /// Features:
-  /// - ✅ 100% Arabic support (automatic raster rendering)
-  /// - ✅ 100% Android compatible (List<int> format)
-  /// - ✅ Automatic kitchen routing (Falafel, Shawarma, etc.)
-  /// - ✅ Auto-reconnect customer printer after kitchen printing
-  /// - ✅ Comprehensive error handling and logging
-  /// - ✅ Product name Arabic validation
+  /// - ✅ 100% Arabic support with modern design
+  /// - ✅ Customer receipt (80mm): Store name, order number, date, items table, totals, thank you
+  /// - ✅ Kitchen receipt (58mm): Kitchen name, order number, date, items table
+  /// - ✅ Center-aligned headers and tables
+  /// - ✅ Right-aligned totals
+  /// - ✅ Automatic kitchen routing
+  /// - ✅ Uses API response data
   ///
   /// Usage:
   /// ```dart
   /// await _printReceipts(
-  ///   orderNumber: order.id.toString(),
-  ///   paymentMethod: 'CASH', // or 'VISA', 'CARD', etc.
-  ///   items: selectedItems,
-  ///   subtotal: subtotal,
-  ///   tax: tax,
-  ///   tips: tips,
-  ///   total: total,
+  ///   orderData: orderResponseFromAPI,
+  ///   storeName: 'مطعم فيجن',
   /// );
   /// ```
   Future<bool> _printReceipts({
-    required String orderNumber,
-    required String paymentMethod,
-    required List<OrderItemDto> items,
-    required double subtotal,
-    required double tax,
-    required double tips,
-    required double total,
+    required Map<String, dynamic> orderData,
+    String storeName = '',
   }) async {
     try {
+      final orderNumber = (orderData['orderNumber'] ??
+              orderData['OrderNumber'] ??
+              orderData['id'] ??
+              orderData['Id'] ??
+              '')
+          .toString();
+      final total = orderData['total'] ??
+          orderData['grandTotal'] ??
+          orderData['GrandTotal'] ??
+          0.0;
+
       debugPrint('🖨️ ============================================');
-      debugPrint('🖨️ Starting Unified Print Function');
+      debugPrint('🖨️ Starting Modern Print Function');
       debugPrint('🖨️ Order: $orderNumber | Total: \$$total');
+      debugPrint('🖨️ Store: $storeName');
       debugPrint('🖨️ ============================================');
 
-      // Step 1: Build print items with Arabic validation
-      final List<Map<String, dynamic>> printItems = items.map((it) {
-        final product = _getProductById(it.productId);
-
-        // Check if product name contains Arabic characters
-        final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
-            .hasMatch(product.productName);
-
-        // Use Arabic name - either from database or keep original
-        String arabicName;
-        if (hasArabic) {
-          // Product name is already in Arabic ✅
-          arabicName = product.productName;
-          debugPrint('   ✅ "${product.productName}" (Arabic)');
-        } else {
-          // Product name is in English - use as-is for now
-          // RECOMMENDED: Update database to use Arabic names
-          arabicName = product.productName;
-          debugPrint(
-              '   ⚠️  "${product.productName}" (English - consider translating)');
-        }
-
-        return {
-          'name': arabicName,
-          'quantity': it.quantity,
-          'price': product.sellingPrice,
-          'categoryId': product.categoryId,
-          'notes': '', // Add notes if available
-        };
-      }).toList();
-
-      debugPrint('🖨️ Total items: ${printItems.length}');
-
-      // Step 2: Prepare order data
-      final orderData = {
-        'orderNumber': orderNumber,
-        'paymentMethod': paymentMethod,
-        'subtotal': subtotal,
-        'tax': tax,
-        'tips': tips,
-        'total': total,
-        'items': printItems,
-      };
-
-      // Step 3: Initialize Bluetooth printer manager
+      // Initialize Bluetooth printer manager
       debugPrint('🖨️ Initializing Bluetooth printers...');
       final bt = BluetoothPrinterManager();
       await bt.load();
       debugPrint('🖨️ ✅ Bluetooth manager ready');
 
-      // Step 4: Setup kitchen router
+      // Setup kitchen router with category IDs
       final router = KitchenRouter(
         falafelCategoryIds: {7}, // Configure your category IDs
         shawarmaSnacksCategoryIds: {6, 8, 9, 10},
       );
       debugPrint('🖨️ ✅ Kitchen router configured');
 
-      // Step 5: Create triple printer (will create per-printer builders automatically)
+      // Build products map for kitchen routing
+      final productsById = <int, Product>{};
+      for (final product in products) {
+        productsById[product.productId] = product;
+      }
+
+      // Create triple printer with modern receipt builder
       final printer = TriplePrinter(
         btManager: bt,
         router: router,
+        productsById: productsById,
       );
-      debugPrint(
-          '🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
+      debugPrint('🖨️ ✅ Triple printer initialized with modern design');
 
-      // Step 7: Print all receipts (customer + kitchens)
+      // Print all receipts (customer + kitchens) with store name
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ Starting print sequence...');
       debugPrint('🖨️ ============================================');
 
-      await printer.printAll(orderData);
+      await printer.printAll(orderData, storeName: storeName);
 
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ ✅ Print sequence completed successfully!');

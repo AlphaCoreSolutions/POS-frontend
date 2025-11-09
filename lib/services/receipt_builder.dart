@@ -9,6 +9,15 @@ import 'package:visionpos/services/arabic_font_loader.dart';
 
 typedef ProductResolver = dynamic Function(int productId);
 
+/// Modern Receipt Builder for Triple Printer System
+///
+/// Features:
+/// - Customer Receipt (80mm): Store name, order number, order date, items table, totals, thank you, datetime
+/// - Kitchen Receipt (58mm): Kitchen name, order number, order date, items table, current date
+/// - Full Arabic support with proper RTL text rendering
+/// - Center-aligned headers and tables
+/// - Right-aligned totals
+/// - High-quality raster rendering for perfect Arabic text
 class ReceiptBuilder {
   final PaperSize paper;
   final CapabilityProfile profile;
@@ -209,23 +218,20 @@ class ReceiptBuilder {
     final sw = Stopwatch()..start();
 
     bytes.addAll(g.reset());
+    bytes.addAll(g.emptyLines(1));
 
+    // 1. STORE NAME (Center-aligned)
     if (storeName.trim().isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
         storeName,
         align: PosAlign.center,
-        fontSize: 26,
+        fontSize: 32,
       ));
+      bytes.addAll(g.emptyLines(1));
     }
 
-    bytes.addAll(await _arabicTextLineHybrid(
-      g,
-      'فاتورة البيع',
-      align: PosAlign.center,
-      fontSize: 28,
-    ));
-
+    // 2. ORDER NUMBER (Center-aligned)
     final extracted = _extractOrderNumber(order);
     final orderNoStr =
         (orderNumberOverride != null && orderNumberOverride.trim().isNotEmpty)
@@ -237,25 +243,30 @@ class ReceiptBuilder {
         g,
         'رقم الطلب: ${_digits(orderNoStr)}',
         align: PosAlign.center,
+        fontSize: 28,
+      ));
+    }
+
+    // 3. ORDER DATE (Center-aligned)
+    final orderDate = _extractOrderDate(order);
+    if (orderDate.isNotEmpty) {
+      bytes.addAll(await _arabicTextLineHybrid(
+        g,
+        'تاريخ الطلب: ${_digits(orderDate)}',
+        align: PosAlign.center,
         fontSize: 24,
       ));
     }
 
-    final payAr = _extractPaymentMethodArabic(order);
-    if (payAr.isNotEmpty) {
-      bytes.addAll(await _arabicTextLineHybrid(
-        g,
-        'طريقة الدفع: $payAr',
-        align: PosAlign.center,
-        fontSize: 20,
-      ));
-    }
+    bytes.addAll(g.emptyLines(1));
+    bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.hr(ch: '='));
 
-    bytes.addAll(g.hr(ch: '='));
-    bytes.addAll(g.hr(ch: '='));
+    // 4. ITEMS TABLE HEADER (Center-aligned)
     bytes.addAll(await _arabicThreeColumnHeader(g));
-    bytes.addAll(g.hr(ch: '-')); // <- fixed (no extra parenthesis)
+    bytes.addAll(g.hr(ch: '-'));
 
+    // ITEMS TABLE ROWS (Center-aligned table)
     final orderItems = items ?? _extractItems(order);
     for (final it in orderItems) {
       final int productId = _asInt(_pick(it, ['productId', 'ProductId']), 0);
@@ -298,20 +309,22 @@ class ReceiptBuilder {
           g,
           '   ← $notes',
           align: PosAlign.right,
-          fontSize: 16,
+          fontSize: 18,
         ));
       }
     }
 
     bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.hr(ch: '='));
 
+    // 6. TOTALS (Right-aligned)
     final totals = _extractTotals(order);
     if (totals.subtotalShown) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
         'الإجمالي الفرعي: ${_digits(_money(totals.subtotalForPrint))}',
         align: PosAlign.right,
-        fontSize: 20,
+        fontSize: 22,
       ));
     }
     if (totals.discount > 0) {
@@ -319,7 +332,7 @@ class ReceiptBuilder {
         g,
         'الخصم: ${_digits('- ${_money(totals.discount)}')}',
         align: PosAlign.right,
-        fontSize: 20,
+        fontSize: 22,
       ));
     }
     if (totals.tax > 0) {
@@ -327,7 +340,7 @@ class ReceiptBuilder {
         g,
         'الضريبة: ${_digits(_money(totals.tax))}',
         align: PosAlign.right,
-        fontSize: 20,
+        fontSize: 22,
       ));
     }
     if (totals.tips > 0) {
@@ -335,42 +348,50 @@ class ReceiptBuilder {
         g,
         'الإكرامية: ${_digits(_money(totals.tips))}',
         align: PosAlign.right,
-        fontSize: 20,
+        fontSize: 22,
       ));
     }
 
     bytes.addAll(g.hr(ch: '='));
     bytes.addAll(await _arabicTextLineHybrid(
       g,
-      'الإجمالي: ${_digits(_money(totals.total))}',
+      'الإجمالي النهائي: ${_digits(_money(totals.total))}',
       align: PosAlign.right,
-      fontSize: 26,
+      fontSize: 28,
     ));
     bytes.addAll(g.hr(ch: '='));
 
+    bytes.addAll(g.emptyLines(1));
+
+    // 7. THANK YOU (Center-aligned)
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'شكراً لزيارتكم',
       align: PosAlign.center,
-      fontSize: 22,
+      fontSize: 26,
     ));
 
+    bytes.addAll(g.emptyLines(1));
+
+    // 8. CURRENT DATE TIME (Center-aligned)
     final now = DateTime.now();
     bytes.addAll(await _arabicTextLineHybrid(
       g,
-      _digits(DateFormat('yyyy/MM/dd - hh:mm a').format(now)),
+      _digits(DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(now)),
       align: PosAlign.center,
-      fontSize: 18,
+      fontSize: 20,
     ));
 
-    // extra feed, then one partial cut: avoids end-of-receipt retries
+    bytes.addAll(g.emptyLines(2));
+
+    // Feed and cut
     final feedLines = (paper == PaperSize.mm80) ? 5 : 4;
     bytes.addAll(g.feed(feedLines));
     bytes.addAll(g.cut(mode: PosCutMode.partial));
 
     final out = Uint8List.fromList(bytes);
     developer.log(
-      '🧾 Customer bytes=${out.length} in ${sw.elapsedMilliseconds}ms',
+      '🧾 Customer receipt: ${out.length} bytes in ${sw.elapsedMilliseconds}ms',
       name: 'ReceiptBuilder',
     );
     return out;
@@ -388,15 +409,19 @@ class ReceiptBuilder {
     final sw = Stopwatch()..start();
 
     bytes.addAll(g.reset());
-
     bytes.addAll(g.emptyLines(1));
+
+    // 1. KITCHEN NAME (Center-aligned)
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       kitchenName,
       align: PosAlign.center,
-      fontSize: 24,
+      fontSize: 28,
     ));
 
+    bytes.addAll(g.emptyLines(1));
+
+    // 2. ORDER NUMBER (Center-aligned)
     final extracted = _extractOrderNumber(order);
     final orderNoStr =
         (orderNumberOverride != null && orderNumberOverride.trim().isNotEmpty)
@@ -406,14 +431,28 @@ class ReceiptBuilder {
     if (orderNoStr.isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
-        'طلب رقم: ${_digits(orderNoStr)}',
+        'رقم الطلب: ${_digits(orderNoStr)}',
         align: PosAlign.center,
         fontSize: 24,
       ));
     }
 
+    // 3. ORDER DATE (Center-aligned)
+    final orderDate = _extractOrderDate(order);
+    if (orderDate.isNotEmpty) {
+      bytes.addAll(await _arabicTextLineHybrid(
+        g,
+        'تاريخ الطلب: ${_digits(orderDate)}',
+        align: PosAlign.center,
+        fontSize: 20,
+      ));
+    }
+
+    bytes.addAll(g.emptyLines(1));
     bytes.addAll(g.hr(ch: '='));
     bytes.addAll(g.hr(ch: '='));
+
+    // 4. ITEMS TABLE (Center-aligned)
     bytes.addAll(await _arabicTwoColumnHeader(g));
     bytes.addAll(g.hr(ch: '-'));
 
@@ -440,21 +479,26 @@ class ReceiptBuilder {
           g,
           '   ★ $notes',
           align: PosAlign.right,
-          fontSize: 17,
+          fontSize: 18,
         ));
         bytes.addAll(g.emptyLines(1));
       }
     }
 
     bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.emptyLines(1));
 
+    // 5. CURRENT DATE (Center-aligned)
     final now = DateTime.now();
     bytes.addAll(await _arabicTextLineHybrid(
       g,
-      _digits(DateFormat('yyyy/MM/dd - hh:mm a').format(now)),
+      _digits(DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(now)),
       align: PosAlign.center,
-      fontSize: 18,
+      fontSize: 20,
     ));
+
+    bytes.addAll(g.emptyLines(2));
 
     final feedLines = (paper == PaperSize.mm58) ? 4 : 5;
     bytes.addAll(g.feed(feedLines));
@@ -462,7 +506,7 @@ class ReceiptBuilder {
 
     final out = Uint8List.fromList(bytes);
     developer.log(
-      '🍳 Kitchen bytes=${out.length} in ${sw.elapsedMilliseconds}ms',
+      '🍳 Kitchen receipt: ${out.length} bytes in ${sw.elapsedMilliseconds}ms',
       name: 'ReceiptBuilder',
     );
     return out;
@@ -477,7 +521,7 @@ class ReceiptBuilder {
       right: 'الصنف',
       center: 'الكمية',
       left: 'المجموع',
-      fontSize: 20,
+      fontSize: 24,
     );
   }
 
@@ -486,7 +530,7 @@ class ReceiptBuilder {
       g,
       right: 'الصنف',
       left: 'الكمية',
-      fontSize: 16,
+      fontSize: 22,
     );
   }
 
@@ -494,16 +538,16 @@ class ReceiptBuilder {
     Generator g, {
     required String right,
     required String left,
-    double fontSize = 24,
-    double verticalPadding = 2,
+    double fontSize = 22,
+    double verticalPadding = 3,
   }) async {
     right = useArabicIndicDigits ? _toArabicDigits(right) : right;
     left = useArabicIndicDigits ? _toArabicDigits(left) : left;
 
     const int horizontalMargin = 8;
     final int usableWidth = widthPx - (horizontalMargin * 2);
-    final int rightColWidth = (usableWidth * 0.65).toInt();
-    final int leftColWidth = (usableWidth * 0.35).toInt();
+    final int rightColWidth = (usableWidth * 0.70).toInt();
+    final int leftColWidth = (usableWidth * 0.30).toInt();
 
     final pStyleRight = ui.ParagraphStyle(
       textAlign: ui.TextAlign.right,
@@ -773,41 +817,43 @@ class ReceiptBuilder {
     return '';
   }
 
-  String _extractPaymentMethodArabic(dynamic order) {
-    final d = (order is Map<String, dynamic>)
-        ? order['data'] as Map<String, dynamic>?
-        : null;
-    final pm = (d?['paymentMethod'] ?? order['paymentMethod'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-    switch (pm) {
-      case '1':
-      case 'cash':
-      case 'cash on delivery':
-        return 'نقداً';
-      case '2':
-      case 'card':
-      case 'credit':
-      case 'debit':
-      case 'visa':
-      case 'mastercard':
-        return 'بطاقة';
-      case '3':
-      case 'wallet':
-      case 'ewallet':
-      case 'e-wallet':
-        return 'محفظة إلكترونية';
-      case '4':
-      case 'online':
-      case 'gateway':
-      case 'stripe':
-      case 'paytabs':
-      case 'paypal':
-        return 'دفع إلكتروني';
-      default:
-        return pm.isEmpty ? '' : pm;
+  String _extractOrderDate(dynamic order) {
+    if (order == null) return '';
+
+    final candidates = <dynamic>[
+      _pick(order, ['data.orderPlaced']),
+      _pick(order, ['data.OrderPlaced']),
+      _pick(order, ['data.createdDate']),
+      _pick(order, ['data.CreatedDate']),
+      _pick(order, ['data.orderDate']),
+      _pick(order, ['data.OrderDate']),
+      _pick(order, ['data.date']),
+      _pick(order, ['data.Date']),
+      _pick(order, ['orderPlaced']),
+      _pick(order, ['OrderPlaced']),
+      _pick(order, ['createdDate']),
+      _pick(order, ['CreatedDate']),
+      _pick(order, ['orderDate']),
+      _pick(order, ['OrderDate']),
+      _pick(order, ['date']),
+      _pick(order, ['Date']),
+    ];
+
+    for (final c in candidates) {
+      if (c == null) continue;
+      final s = c.toString().trim();
+      if (s.isEmpty || s.toLowerCase() == 'null') continue;
+
+      // Try to parse as DateTime and format nicely
+      try {
+        final dt = DateTime.parse(s);
+        return DateFormat('yyyy/MM/dd', 'ar').format(dt);
+      } catch (_) {
+        // If parsing fails, return as-is (might already be formatted)
+        return s;
+      }
     }
+    return '';
   }
 
   _Totals _extractTotals(dynamic order) {

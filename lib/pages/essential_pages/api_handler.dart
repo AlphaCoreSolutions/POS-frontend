@@ -211,6 +211,48 @@ class ApiHandler {
     }
   }
 
+  /// Posts an order and returns the created order data with ID
+  Future<Map<String, dynamic>?> postOrderWithResponse(OrderDto order) async {
+    try {
+      final url = Uri.parse(ordersUri);
+      final headers = {'Content-Type': 'application/json'};
+      final body = json.encode(order.toJson());
+
+      print("Posting order to: $url");
+      final response = await http.post(url, headers: headers, body: body);
+
+      print("Response Status Code: ${response.statusCode}");
+      print("Response Body: ${response.body}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = json.decode(response.body);
+
+        if (responseData is Map<String, dynamic>) {
+          // Check if API uses success wrapper
+          if (responseData.containsKey('success')) {
+            if (responseData['success'] == true) {
+              print("Order posted successfully!");
+              return responseData['data'] ?? responseData;
+            } else {
+              print("API returned error: ${responseData['message']}");
+              throw Exception('API Error: ${responseData['message']}');
+            }
+          }
+          // Direct response
+          return responseData;
+        }
+
+        return null;
+      } else {
+        print("Failed to post order. Status Code: ${response.statusCode}");
+        throw Exception('Failed to post order');
+      }
+    } catch (e) {
+      print("Error posting order: $e");
+      throw Exception('Error: $e');
+    }
+  }
+
   Future<List<OrderDto>> fetchOrderHistory() async {
     try {
       // API endpoint for fetching orders
