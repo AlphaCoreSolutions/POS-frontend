@@ -131,7 +131,7 @@ class ReceiptBuilder {
       right: 'الصنف',
       center: 'الكمية',
       left: 'المجموع',
-      fontSize: 18, // Optimized for border fitting
+      fontSize: 14, // Decreased for better fitting
     );
   }
 
@@ -147,7 +147,7 @@ class ReceiptBuilder {
       right: item,
       center: quantity,
       left: total,
-      fontSize: 18, // Optimized for border fitting
+      fontSize: 14, // Decreased for better fitting
     );
   }
 
@@ -157,7 +157,7 @@ class ReceiptBuilder {
       g,
       right: 'الصنف',
       left: 'الكمية',
-      fontSize: 20, // Optimized for border fitting
+      fontSize: 14, // Decreased for better fitting
     );
   }
 
@@ -171,7 +171,7 @@ class ReceiptBuilder {
       g,
       right: item,
       left: quantity,
-      fontSize: 22, // Optimized for border fitting
+      fontSize: 16, // Decreased for better fitting
     );
   }
 
@@ -433,7 +433,7 @@ class ReceiptBuilder {
     bytes.addAll(g.reset()); // Reset printer to ensure clean state
 
     // ═══════════════════════════════════════════════════════════════
-    // HEADER SECTION - Store Name & Receipt Title
+    // HEADER SECTION - Centered Section Name & Order Number
     // ═══════════════════════════════════════════════════════════════
 
     // Store name (if provided)
@@ -443,90 +443,52 @@ class ReceiptBuilder {
         g,
         storeName,
         align: PosAlign.center,
-        fontSize: 28,
+        fontSize: 20,
       ));
     }
 
-    // Receipt Title
+    // Receipt Title - First line centered
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'فاتورة البيع',
       align: PosAlign.center,
-      fontSize: 32,
+      fontSize: 22,
     ));
-    bytes.addAll(g.hr(ch: '='));
 
-    // ═══════════════════════════════════════════════════════════════
-    // ORDER INFORMATION SECTION
-    // ═══════════════════════════════════════════════════════════════
-    // Extract order number from API response
+    // Order Number - Second line centered
     final orderNo =
         (order['data']?['orderNumber'] ?? order['orderNumber'] ?? '')
             .toString();
     if (orderNo.isNotEmpty) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
-        label: 'رقم الطلب',
-        value: _digits(orderNo),
-        fontSize: 26,
+        'رقم الطلب: ${_digits(orderNo)}',
+        align: PosAlign.center,
+        fontSize: 18,
       ));
     }
 
-    // Date and Time - use API orderDate if available
-    final orderDate = order['data']?['orderDate'] ?? order['orderDate'];
-    if (orderDate != null) {
-      try {
-        final date = DateTime.parse(orderDate.toString());
-        bytes.addAll(await _arabicKeyValueLineHybrid(
-          g,
-          label: 'التاريخ',
-          value: _digits(DateFormat('yyyy/MM/dd').format(date)),
-          fontSize: 20,
-        ));
-      } catch (e) {
-        bytes.addAll(await _arabicKeyValueLineHybrid(
-          g,
-          label: 'التاريخ',
-          value: _digits(DateFormat('yyyy/MM/dd').format(DateTime.now())),
-          fontSize: 20,
-        ));
-      }
-    } else {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
-        g,
-        label: 'التاريخ',
-        value: _digits(DateFormat('yyyy/MM/dd').format(DateTime.now())),
-        fontSize: 20,
-      ));
-    }
-
-    bytes.addAll(await _arabicKeyValueLineHybrid(
-      g,
-      label: 'الوقت',
-      value: _digits(DateFormat('hh:mm a').format(DateTime.now())),
-      fontSize: 20,
-    ));
-
-    // Payment Method - from API
+    // Payment Method - Centered
     final paymentMethod =
         order['data']?['paymentMethod'] ?? order['paymentMethod'];
     final payAr = _paymentMethodArabic(paymentMethod?.toString() ?? '');
     if (payAr.isNotEmpty) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
-        label: 'طريقة الدفع',
-        value: payAr,
-        fontSize: 20,
+        'طريقة الدفع: $payAr',
+        align: PosAlign.center,
+        fontSize: 16,
       ));
     }
 
-    bytes.addAll(g.hr());
+    bytes.addAll(g.hr(ch: '='));
 
     // ═══════════════════════════════════════════════════════════════
-    // ITEMS TABLE SECTION
+    // ITEMS TABLE SECTION - With Borders
     // ═══════════════════════════════════════════════════════════════
+    bytes.addAll(g.hr(ch: '═')); // Top border
     bytes.addAll(await _arabicTableHeaderLine(g));
-    bytes.addAll(g.hr(ch: '-'));
+    bytes.addAll(g.hr(ch: '─')); // Header separator
 
     for (int i = 0; i < list.length; i++) {
       final it = list[i];
@@ -552,15 +514,15 @@ class ReceiptBuilder {
           g,
           '   ← $notes',
           align: PosAlign.right,
-          fontSize: 18,
+          fontSize: 14,
         ));
       }
     }
 
-    bytes.addAll(g.hr(ch: '-'));
+    bytes.addAll(g.hr(ch: '═')); // Bottom border of table
 
     // ═══════════════════════════════════════════════════════════════
-    // TOTALS SECTION - Using API response data
+    // TOTALS SECTION - Right-aligned format
     // ═══════════════════════════════════════════════════════════════
     final apiData = order['data'] ?? order;
 
@@ -575,64 +537,73 @@ class ReceiptBuilder {
 
     // Subtotal (only show if different from total)
     if (discount > 0 || tax > 0) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
-        label: 'الإجمالي الفرعي',
-        value: _digits(_money(subtotal - discount)),
-        fontSize: 22,
+        'الإجمالي الفرعي: ${_digits(_money(subtotal - discount))}',
+        align: PosAlign.right,
+        fontSize: 16,
       ));
     }
 
     // Discount (if any)
     if (discount > 0) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
-        label: 'الخصم',
-        value: _digits('- ${_money(discount)}'),
-        fontSize: 22,
+        'الخصم: ${_digits('- ${_money(discount)}')}',
+        align: PosAlign.right,
+        fontSize: 16,
       ));
     }
 
     // Tax (if any)
     if (tax > 0) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
-        label: 'الضريبة',
-        value: _digits(_money(tax)),
-        fontSize: 22,
+        'الضريبة: ${_digits(_money(tax))}',
+        align: PosAlign.right,
+        fontSize: 16,
       ));
     }
 
     // Tips (if any)
     if (tips > 0) {
-      bytes.addAll(await _arabicKeyValueLineHybrid(
+      bytes.addAll(await _arabicTextLineHybrid(
         g,
-        label: 'الإكرامية',
-        value: _digits(_money(tips)),
-        fontSize: 22,
+        'الإكرامية: ${_digits(_money(tips))}',
+        align: PosAlign.right,
+        fontSize: 16,
       ));
     }
 
     bytes.addAll(g.hr(ch: '='));
 
     // Grand Total
-    bytes.addAll(await _arabicKeyValueLineHybrid(
+    bytes.addAll(await _arabicTextLineHybrid(
       g,
-      label: 'الإجمالي',
-      value: _digits(_money(total)),
-      fontSize: 30,
+      'الإجمالي: ${_digits(_money(total))}',
+      align: PosAlign.right,
+      fontSize: 20,
     ));
 
     bytes.addAll(g.hr(ch: '='));
 
     // ═══════════════════════════════════════════════════════════════
-    // FOOTER SECTION - Minimized white space
+    // FOOTER SECTION - Thank you & DateTime
     // ═══════════════════════════════════════════════════════════════
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'شكراً لزيارتكم',
       align: PosAlign.center,
-      fontSize: 22,
+      fontSize: 16,
+    ));
+
+    // Print datetime in footer
+    final now = DateTime.now();
+    bytes.addAll(await _arabicTextLineHybrid(
+      g,
+      _digits(DateFormat('yyyy/MM/dd - hh:mm a').format(now)),
+      align: PosAlign.center,
+      fontSize: 14,
     ));
 
     // Minimal spacing before cut - no excessive white space
@@ -669,27 +640,23 @@ class ReceiptBuilder {
       bytes.addAll(g.reset()); // Reset printer to ensure clean state
 
       // ═══════════════════════════════════════════════════════════════
-      // KITCHEN HEADER SECTION
+      // KITCHEN HEADER SECTION - Centered Section Name & Order Number
       // ═══════════════════════════════════════════════════════════════
       bytes.addAll(g.emptyLines(1));
 
+      // Kitchen Name - First line centered
       _d(debug, 'buildKitchen() → rendering kitchen name: "$kitchenName"');
       final nameBytes = await _arabicTextLineHybrid(
         g,
         kitchenName,
         align: PosAlign.center,
-        fontSize: 36, // Extra large for kitchen visibility
+        fontSize: 22, // Reduced for better fitting
       );
       _d(debug,
           'buildKitchen() ✓ kitchen name rendered: ${nameBytes.length} bytes');
       bytes.addAll(nameBytes);
-      bytes.addAll(g.hr(ch: '='));
-      bytes.addAll(g.emptyLines(1));
 
-      // ═══════════════════════════════════════════════════════════════
-      // ORDER INFO SECTION
-      // ═══════════════════════════════════════════════════════════════
-      // Extract order number from API response
+      // Order Number - Second line centered
       final orderNo =
           (order['data']?['orderNumber'] ?? order['orderNumber'] ?? '')
               .toString();
@@ -698,26 +665,18 @@ class ReceiptBuilder {
           g,
           'طلب رقم: ${_digits(orderNo)}',
           align: PosAlign.center,
-          fontSize: 32,
+          fontSize: 18,
         ));
       }
 
-      // Time - Large and Clear
-      final now = DateTime.now();
-      bytes.addAll(await _arabicTextLineHybrid(
-        g,
-        _digits(DateFormat('hh:mm a').format(now)),
-        align: PosAlign.center,
-        fontSize: 28,
-      ));
-
-      bytes.addAll(g.hr());
+      bytes.addAll(g.hr(ch: '='));
 
       // ═══════════════════════════════════════════════════════════════
-      // ITEMS TABLE SECTION
+      // ITEMS TABLE SECTION - With Borders
       // ═══════════════════════════════════════════════════════════════
+      bytes.addAll(g.hr(ch: '═')); // Top border
       bytes.addAll(await _arabicKitchenTableHeaderLine(g));
-      bytes.addAll(g.hr(ch: '-'));
+      bytes.addAll(g.hr(ch: '─')); // Header separator
 
       // Items
       for (int i = 0; i < items.length; i++) {
@@ -754,7 +713,7 @@ class ReceiptBuilder {
               g,
               '   ★ $notes',
               align: PosAlign.right,
-              fontSize: 24,
+              fontSize: 16,
             );
             _d(debug,
                 'buildKitchen() ✓ notes rendered: ${notesBytes.length} bytes');
@@ -773,11 +732,19 @@ class ReceiptBuilder {
         }
       }
 
-      bytes.addAll(g.hr(ch: '='));
+      bytes.addAll(g.hr(ch: '═')); // Bottom border of table
 
       // ═══════════════════════════════════════════════════════════════
-      // FOOTER - Minimal white space, no totals needed for kitchen
+      // FOOTER - DateTime and Cut
       // ═══════════════════════════════════════════════════════════════
+      // Print datetime
+      final now = DateTime.now();
+      bytes.addAll(await _arabicTextLineHybrid(
+        g,
+        _digits(DateFormat('yyyy/MM/dd - hh:mm a').format(now)),
+        align: PosAlign.center,
+        fontSize: 14,
+      ));
 
       // Minimal spacing before cut - no excessive white space
       bytes.addAll(
@@ -917,88 +884,6 @@ class ReceiptBuilder {
     }
   }
 
-  /// Two-column Arabic line: left label (RTL), right value (usually numbers).
-  /// We render two separate paragraphs on the same row; the value is right-aligned to the paper edge.
-  Future<List<int>> _arabicKeyValueLineAsRaster(
-    Generator g, {
-    required String label,
-    required String value,
-    double fontSize = 22,
-    double verticalPadding = 2, // Default padding
-  }) async {
-    // Font is guaranteed to be loaded by create() method
-    label = useArabicIndicDigits ? _toArabicDigits(label) : label;
-    value = useArabicIndicDigits ? _toArabicDigits(value) : value;
-
-    // Apply margins for proper paper fitting
-    const int horizontalMargin = 8;
-    final int usableWidth = widthPx - (horizontalMargin * 2);
-
-    // LABEL (RTL)
-    final pStyleLabel = ui.ParagraphStyle(
-      textAlign: ui.TextAlign.left,
-      textDirection: ui.TextDirection.rtl,
-      maxLines: 2,
-      locale: const ui.Locale('ar'),
-    );
-    final tStyle = ui.TextStyle(
-      color: const ui.Color(0xFF000000),
-      fontSize: fontSize,
-      fontFamily: arabicFontFamily,
-    );
-    final builderL = ui.ParagraphBuilder(pStyleLabel)..pushStyle(tStyle);
-    builderL.addText(label);
-    final pLabel = builderL.build()
-      ..layout(ui.ParagraphConstraints(width: usableWidth.toDouble()));
-    // VALUE (LTR, right aligned across the usable width)
-    final pStyleVal = ui.ParagraphStyle(
-      textAlign: ui.TextAlign.right,
-      textDirection: ui.TextDirection.ltr,
-      maxLines: 1,
-      locale: const ui.Locale('en'),
-    );
-    final builderV = ui.ParagraphBuilder(pStyleVal)..pushStyle(tStyle);
-    builderV.addText(value);
-    final pValue = builderV.build()
-      ..layout(ui.ParagraphConstraints(width: usableWidth.toDouble()));
-    final double h =
-        [pLabel.height, pValue.height].reduce((a, b) => a > b ? a : b);
-    final int height = (h + verticalPadding * 2).ceil().clamp(24, 4096);
-    Uint8List pngBytes;
-    try {
-      final rec = ui.PictureRecorder();
-      final canvas = ui.Canvas(rec);
-      final bg = ui.Paint()..color = const ui.Color(0xFFFFFFFF);
-      canvas.drawRect(
-          ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
-      final double dy = ((height - h) / 2).clamp(0.0, height.toDouble());
-      // Apply horizontal margins for proper fitting
-      const double marginOffset = 8.0;
-      // Draw label with margin (RTL inside its own paragraph box)
-      canvas.drawParagraph(pLabel, ui.Offset(marginOffset, dy));
-      // Draw value with margin (right-aligned within usable width)
-      canvas.drawParagraph(pValue, ui.Offset(marginOffset, dy));
-      final picture = rec.endRecording();
-      final uiImg = await picture.toImage(widthPx, height);
-      final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) throw StateError('toByteData returned null');
-      pngBytes = byteData.buffer.asUint8List();
-    } catch (e, st) {
-      _e(debug, '_arabicKeyValueLineAsRaster() ✗ rasterize failed: $e\n$st');
-      rethrow;
-    }
-    final decoded = img.decodePng(pngBytes) ?? img.decodeImage(pngBytes);
-    if (decoded == null) {
-      throw StateError('PNG decode returned null');
-    }
-    return g.imageRaster(
-      decoded,
-      align: PosAlign.left,
-      highDensityHorizontal: true,
-      highDensityVertical: true,
-    );
-  }
-
   // ===========================================================================
   // PUBLIC API - These are the ONLY methods you need to call!
   // ===========================================================================
@@ -1039,18 +924,6 @@ class ReceiptBuilder {
     // Force raster for Arabic text to ensure it prints correctly on all printers.
     return _arabicTextLineAsRaster(g, text,
         align: align, fontSize: fontSize, verticalPadding: 2);
-  }
-
-  /// Try direct text for key-value, fallback to raster if fails or useRasterFallback is true.
-  Future<List<int>> _arabicKeyValueLineHybrid(
-    Generator g, {
-    required String label,
-    required String value,
-    double fontSize = 22,
-  }) async {
-    // Force raster for Arabic text to ensure it prints correctly on all printers.
-    return _arabicKeyValueLineAsRaster(g,
-        label: label, value: value, fontSize: fontSize, verticalPadding: 2);
   }
 
   // ---------------------------------------------------------------------------
@@ -1104,7 +977,7 @@ class ReceiptBuilder {
       case 'paypal':
         return 'دفع إلكتروني';
       default:
-        return en.isEmpty ? '' : en; // fallback to original
+        return en.isEmpty ? '' : en;
     }
   }
 
