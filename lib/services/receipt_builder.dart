@@ -131,7 +131,7 @@ class ReceiptBuilder {
       right: 'الصنف',
       center: 'الكمية',
       left: 'المجموع',
-      fontSize: 22,
+      fontSize: 18, // Optimized for border fitting
     );
   }
 
@@ -147,7 +147,7 @@ class ReceiptBuilder {
       right: item,
       center: quantity,
       left: total,
-      fontSize: 22,
+      fontSize: 18, // Optimized for border fitting
     );
   }
 
@@ -157,7 +157,7 @@ class ReceiptBuilder {
       g,
       right: 'الصنف',
       left: 'الكمية',
-      fontSize: 24,
+      fontSize: 20, // Optimized for border fitting
     );
   }
 
@@ -171,7 +171,7 @@ class ReceiptBuilder {
       g,
       right: item,
       left: quantity,
-      fontSize: 26,
+      fontSize: 22, // Optimized for border fitting
     );
   }
 
@@ -186,9 +186,14 @@ class ReceiptBuilder {
     right = useArabicIndicDigits ? _toArabicDigits(right) : right;
     left = useArabicIndicDigits ? _toArabicDigits(left) : left;
 
-    // Define column widths (in pixels)
-    final int rightColWidth = (widthPx * 0.70).toInt(); // 70% for item name
-    final int leftColWidth = (widthPx * 0.30).toInt(); // 30% for quantity
+    // Define margins and usable width for proper paper fitting
+    const int horizontalMargin = 8; // 8px margin on each side
+    final int usableWidth = widthPx - (horizontalMargin * 2);
+
+    // Define column widths (in pixels) - Optimized for kitchen readability with margins
+    final int rightColWidth = (usableWidth * 0.65).toInt(); // 65% for item name
+    final int leftColWidth = (usableWidth * 0.35)
+        .toInt(); // 35% for quantity (larger for visibility)
 
     // Right column (item name) - RTL
     final pStyleRight = ui.ParagraphStyle(
@@ -236,11 +241,15 @@ class ReceiptBuilder {
       final double dy =
           ((height - maxHeight) / 2).clamp(0.0, height.toDouble());
 
-      // Draw right column at x=0
-      canvas.drawParagraph(pRight, ui.Offset(0, dy));
+      // Apply horizontal margins for proper fitting
+      const double marginOffset = 8.0;
+
+      // Draw right column with margin
+      canvas.drawParagraph(pRight, ui.Offset(marginOffset, dy));
 
       // Draw left column
-      canvas.drawParagraph(pLeft, ui.Offset(rightColWidth.toDouble(), dy));
+      canvas.drawParagraph(
+          pLeft, ui.Offset(marginOffset + rightColWidth.toDouble(), dy));
 
       final picture = rec.endRecording();
       final uiImg = await picture.toImage(widthPx, height);
@@ -279,10 +288,14 @@ class ReceiptBuilder {
     center = useArabicIndicDigits ? _toArabicDigits(center) : center;
     left = useArabicIndicDigits ? _toArabicDigits(left) : left;
 
-    // Define column widths (in pixels)
-    final int rightColWidth = (widthPx * 0.50).toInt(); // 50% for item name
-    final int centerColWidth = (widthPx * 0.25).toInt(); // 25% for quantity
-    final int leftColWidth = (widthPx * 0.25).toInt(); // 25% for total
+    // Define margins and usable width for proper paper fitting
+    const int horizontalMargin = 8; // 8px margin on each side
+    final int usableWidth = widthPx - (horizontalMargin * 2);
+
+    // Define column widths (in pixels) - Optimized for 80mm paper with margins
+    final int rightColWidth = (usableWidth * 0.45).toInt(); // 45% for item name
+    final int centerColWidth = (usableWidth * 0.20).toInt(); // 20% for quantity
+    final int leftColWidth = (usableWidth * 0.35).toInt(); // 35% for total
 
     // Right column (item name) - RTL
     final pStyleRight = ui.ParagraphStyle(
@@ -342,15 +355,21 @@ class ReceiptBuilder {
       final double dy =
           ((height - maxHeight) / 2).clamp(0.0, height.toDouble());
 
-      // Draw right column at x=0
-      canvas.drawParagraph(pRight, ui.Offset(0, dy));
+      // Apply horizontal margins for proper fitting
+      const double marginOffset = 8.0;
+
+      // Draw right column with margin
+      canvas.drawParagraph(pRight, ui.Offset(marginOffset, dy));
 
       // Draw center column
-      canvas.drawParagraph(pCenter, ui.Offset(rightColWidth.toDouble(), dy));
+      canvas.drawParagraph(
+          pCenter, ui.Offset(marginOffset + rightColWidth.toDouble(), dy));
 
       // Draw left column
       canvas.drawParagraph(
-          pLeft, ui.Offset((rightColWidth + centerColWidth).toDouble(), dy));
+          pLeft,
+          ui.Offset(
+              marginOffset + (rightColWidth + centerColWidth).toDouble(), dy));
 
       final picture = rec.endRecording();
       final uiImg = await picture.toImage(widthPx, height);
@@ -404,16 +423,35 @@ class ReceiptBuilder {
             .toList();
     _d(debug, 'buildCustomer() → items=${list.length}');
 
-    // ---- Header ----
+    // ═══════════════════════════════════════════════════════════════
+    // HEADER SECTION - Store Name & Receipt Title
+    // ═══════════════════════════════════════════════════════════════
+    bytes.addAll(g.emptyLines(1));
+
+    // Store name (if provided)
+    final storeName = (order['storeName'] ?? '').toString();
+    if (storeName.isNotEmpty) {
+      bytes.addAll(await _arabicTextLineHybrid(
+        g,
+        storeName,
+        align: PosAlign.center,
+        fontSize: 28,
+      ));
+    }
+
+    // Receipt Title
     bytes.addAll(await _arabicTextLineHybrid(
       g,
-      'فاتورة',
+      'فاتورة البيع',
       align: PosAlign.center,
-      fontSize: 30,
+      fontSize: 32,
     ));
-    bytes.addAll(g.hr());
+    bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.emptyLines(1));
 
-    // ---- Order Number (Prominent) ----
+    // ═══════════════════════════════════════════════════════════════
+    // ORDER INFORMATION SECTION
+    // ═══════════════════════════════════════════════════════════════
     final orderNo = (order['orderNumber'] ?? '').toString();
     if (orderNo.isNotEmpty) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
@@ -422,10 +460,23 @@ class ReceiptBuilder {
         value: _digits(orderNo),
         fontSize: 26,
       ));
-      bytes.addAll(g.hr());
     }
 
-    // ---- Order info ----
+    // Date and Time
+    bytes.addAll(await _arabicKeyValueLineHybrid(
+      g,
+      label: 'التاريخ',
+      value: _digits(DateFormat('yyyy/MM/dd').format(DateTime.now())),
+      fontSize: 20,
+    ));
+    bytes.addAll(await _arabicKeyValueLineHybrid(
+      g,
+      label: 'الوقت',
+      value: _digits(DateFormat('hh:mm a').format(DateTime.now())),
+      fontSize: 20,
+    ));
+
+    // Payment Method
     final payAr =
         _paymentMethodArabic((order['paymentMethod'] ?? '').toString());
     if (payAr.isNotEmpty) {
@@ -436,19 +487,16 @@ class ReceiptBuilder {
         fontSize: 20,
       ));
     }
-    bytes.addAll(await _arabicKeyValueLineHybrid(
-      g,
-      label: 'التاريخ والوقت',
-      value: _digits(_formatNow()),
-      fontSize: 20,
-    ));
-    bytes.addAll(g.hr());
 
-    // ---- Table Header ----
+    bytes.addAll(g.hr());
+    bytes.addAll(g.emptyLines(1));
+
+    // ═══════════════════════════════════════════════════════════════
+    // ITEMS TABLE SECTION
+    // ═══════════════════════════════════════════════════════════════
     bytes.addAll(await _arabicTableHeaderLine(g));
-    bytes.addAll(g.hr());
+    bytes.addAll(g.hr(ch: '-'));
 
-    // ---- Items Table ----
     num computedSubtotal = 0;
     for (int i = 0; i < list.length; i++) {
       final it = list[i];
@@ -458,7 +506,7 @@ class ReceiptBuilder {
       final num lineTotal = unit * qty;
       computedSubtotal += lineTotal;
 
-      // Table Row: Item | Quantity | Total
+      // Item Row
       bytes.addAll(await _arabicTableRowLine(
         g,
         item: name,
@@ -466,67 +514,102 @@ class ReceiptBuilder {
         total: _digits(_money(lineTotal)),
       ));
 
-      // Notes (if any) - indented below item
+      // Item Notes (if any)
       final notes = (it['notes'] ?? '').toString().trim();
       if (notes.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
           g,
-          '  ملاحظات: $notes',
+          '   ← $notes',
           align: PosAlign.right,
           fontSize: 18,
         ));
       }
     }
-    bytes.addAll(g.hr());
+
+    bytes.addAll(g.hr(ch: '-'));
     bytes.addAll(g.emptyLines(1));
 
-    // ---- Totals Section (Professional) ----
+    // ═══════════════════════════════════════════════════════════════
+    // TOTALS SECTION
+    // ═══════════════════════════════════════════════════════════════
     num subtotal = _asNum(order['subtotal'], fallback: computedSubtotal);
     num tax = _asNum(order['tax'], fallback: 0);
     num tips = _asNum(order['tips'], fallback: 0);
-    num total = _asNum(order['total'], fallback: subtotal + tax + tips);
+    num discount = _asNum(order['discount'], fallback: 0);
+    num total =
+        _asNum(order['total'], fallback: subtotal + tax + tips - discount);
 
+    // Subtotal
     bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
       label: 'الإجمالي الفرعي',
       value: _digits(_money(subtotal)),
-      fontSize: 24,
+      fontSize: 22,
     ));
+
+    // Discount (if any)
+    if (discount > 0) {
+      bytes.addAll(await _arabicKeyValueLineHybrid(
+        g,
+        label: 'الخصم',
+        value: _digits('- ${_money(discount)}'),
+        fontSize: 22,
+      ));
+    }
+
+    // Tax (if any)
     if (tax > 0) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'الضريبة',
         value: _digits(_money(tax)),
-        fontSize: 24,
+        fontSize: 22,
       ));
     }
+
+    // Tips (if any)
     if (tips > 0) {
       bytes.addAll(await _arabicKeyValueLineHybrid(
         g,
         label: 'الإكرامية',
         value: _digits(_money(tips)),
-        fontSize: 24,
+        fontSize: 22,
       ));
     }
+
     bytes.addAll(g.hr(ch: '='));
+
+    // Grand Total
     bytes.addAll(await _arabicKeyValueLineHybrid(
       g,
-      label: 'الإجمالي النهائي',
+      label: 'الإجمالي',
       value: _digits(_money(total)),
-      fontSize: 28,
+      fontSize: 30,
     ));
-    bytes.addAll(g.hr(ch: '='));
-    bytes.addAll(g.emptyLines(1));
 
-    // Footer
+    bytes.addAll(g.hr(ch: '='));
+    bytes.addAll(g.emptyLines(2));
+
+    // ═══════════════════════════════════════════════════════════════
+    // FOOTER SECTION
+    // ═══════════════════════════════════════════════════════════════
     bytes.addAll(await _arabicTextLineHybrid(
       g,
-      'شكراً لكم',
+      'شكراً لزيارتكم',
       align: PosAlign.center,
       fontSize: 24,
     ));
+    bytes.addAll(await _arabicTextLineHybrid(
+      g,
+      'نتطلع لخدمتكم مرة أخرى',
+      align: PosAlign.center,
+      fontSize: 20,
+    ));
+
+    bytes.addAll(g.emptyLines(1));
     bytes.addAll(g.feed(2));
     bytes.addAll(g.cut());
+
     final out = Uint8List.fromList(bytes);
     _d(debug,
         'buildCustomer() ✓ ${out.length} bytes in ${sw.elapsedMilliseconds}ms');
@@ -548,45 +631,56 @@ class ReceiptBuilder {
         'buildKitchen() → start; kitchen="$kitchenName", items=${items.length}');
 
     try {
-      // Kitchen name header (Arabic)
+      // ═══════════════════════════════════════════════════════════════
+      // KITCHEN HEADER SECTION
+      // ═══════════════════════════════════════════════════════════════
+      bytes.addAll(g.emptyLines(1));
+
       _d(debug, 'buildKitchen() → rendering kitchen name: "$kitchenName"');
       final nameBytes = await _arabicTextLineHybrid(
         g,
         kitchenName,
         align: PosAlign.center,
-        fontSize: 32, // Larger font for kitchen name
+        fontSize: 36, // Extra large for kitchen visibility
       );
       _d(debug,
           'buildKitchen() ✓ kitchen name rendered: ${nameBytes.length} bytes');
       bytes.addAll(nameBytes);
-      bytes.addAll(g.hr());
+      bytes.addAll(g.hr(ch: '='));
+      bytes.addAll(g.emptyLines(1));
 
-      // Order Number (Prominent - Large)
+      // ═══════════════════════════════════════════════════════════════
+      // ORDER INFO SECTION
+      // ═══════════════════════════════════════════════════════════════
       final orderNo = (order['orderNumber'] ?? '').toString();
       if (orderNo.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
           g,
-          'رقم الطلب: ${_digits(orderNo)}',
+          'طلب رقم: ${_digits(orderNo)}',
           align: PosAlign.center,
-          fontSize: 28,
+          fontSize: 32,
         ));
-        bytes.addAll(g.hr());
       }
 
-      // Time
+      // Time - Large and Clear
+      final now = DateTime.now();
       bytes.addAll(await _arabicTextLineHybrid(
         g,
-        _digits(DateFormat('hh:mm a').format(DateTime.now())),
+        _digits(DateFormat('hh:mm a').format(now)),
         align: PosAlign.center,
-        fontSize: 24,
+        fontSize: 28,
       ));
-      bytes.addAll(g.hr());
 
-      // Table Header for Kitchen
+      bytes.addAll(g.hr());
+      bytes.addAll(g.emptyLines(1));
+
+      // ═══════════════════════════════════════════════════════════════
+      // ITEMS TABLE SECTION
+      // ═══════════════════════════════════════════════════════════════
       bytes.addAll(await _arabicKitchenTableHeaderLine(g));
-      bytes.addAll(g.hr());
+      bytes.addAll(g.hr(ch: '-'));
 
-      // Items Table
+      // Items
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
         final String name = (item['name'] ?? 'صنف').toString();
@@ -596,7 +690,7 @@ class ReceiptBuilder {
         _d(debug,
             'buildKitchen() → rendering item ${i + 1}/${items.length}: "$name" (qty: $qty)');
 
-        // Table Row: Item | Quantity
+        // Item Row
         try {
           final itemBytes = await _arabicKitchenTableRowLine(
             g,
@@ -611,24 +705,23 @@ class ReceiptBuilder {
           rethrow;
         }
 
-        // Notes (if present) - indented below item
+        // Special Instructions/Notes (if present)
         if (notes.isNotEmpty) {
           _d(debug, 'buildKitchen() → rendering notes: "$notes"');
           try {
-            final notesLine = '  ** $notes'; // Indent notes
             final notesBytes = await _arabicTextLineHybrid(
               g,
-              notesLine,
+              '   ★ $notes',
               align: PosAlign.right,
-              fontSize: 22,
+              fontSize: 24,
             );
             _d(debug,
                 'buildKitchen() ✓ notes rendered: ${notesBytes.length} bytes');
             bytes.addAll(notesBytes);
+            bytes.addAll(g.emptyLines(1));
           } catch (e, st) {
             _e(debug,
                 'buildKitchen() ✗ FAILED to render notes "$notes": $e\n$st');
-            // Don't rethrow for notes - just log and skip them
             developer.log(
               '⚠️ buildKitchen() - Failed to render notes, continuing without them.',
               name: 'ReceiptBuilder',
@@ -639,7 +732,26 @@ class ReceiptBuilder {
         }
       }
 
-      bytes.addAll(g.feed(1));
+      bytes.addAll(g.hr(ch: '='));
+      bytes.addAll(g.emptyLines(1));
+
+      // ═══════════════════════════════════════════════════════════════
+      // FOOTER - Total Item Count
+      // ═══════════════════════════════════════════════════════════════
+      final totalQty = items.fold<num>(
+        0,
+        (sum, item) => sum + _asNum(item['quantity'], fallback: 1),
+      );
+
+      bytes.addAll(await _arabicTextLineHybrid(
+        g,
+        'إجمالي الأصناف: ${_digits(totalQty.toString())}',
+        align: PosAlign.center,
+        fontSize: 26,
+      ));
+
+      bytes.addAll(g.emptyLines(2));
+      bytes.addAll(g.feed(2));
       bytes.addAll(g.cut());
 
       final out = Uint8List.fromList(bytes);
@@ -675,6 +787,10 @@ class ReceiptBuilder {
     _d(debug,
         '_arabicTextLineAsRaster() → Arabic detected: $hasArabic, font: $arabicFontFamily');
 
+    // Apply margins for proper paper fitting
+    const int horizontalMargin = 8;
+    final int usableWidth = widthPx - (horizontalMargin * 2);
+
     final paragraphStyle = ui.ParagraphStyle(
       textAlign: _mapAlign(align),
       textDirection: hasArabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
@@ -687,14 +803,14 @@ class ReceiptBuilder {
       fontFamily: arabicFontFamily,
     );
 
-    // Build paragraph
+    // Build paragraph with usable width (excluding margins)
     ui.Paragraph paragraph;
     try {
       _d(debug, '_arabicTextLineAsRaster() → building paragraph...');
       final builder = ui.ParagraphBuilder(paragraphStyle)..pushStyle(textStyle);
       builder.addText(text);
       paragraph = builder.build()
-        ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+        ..layout(ui.ParagraphConstraints(width: usableWidth.toDouble()));
       _d(debug,
           '_arabicTextLineAsRaster() ✓ paragraph built (height: ${paragraph.height}px)');
     } catch (e, st) {
@@ -717,7 +833,9 @@ class ReceiptBuilder {
       canvas.drawRect(
           ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
       final double dy = ((height - paraH) / 2).clamp(0.0, height.toDouble());
-      canvas.drawParagraph(paragraph, ui.Offset(0, dy));
+      // Draw paragraph with horizontal margin
+      const double marginOffset = 8.0;
+      canvas.drawParagraph(paragraph, ui.Offset(marginOffset, dy));
       final picture = rec.endRecording();
 
       _d(debug, '_arabicTextLineAsRaster() → converting to image...');
@@ -778,6 +896,11 @@ class ReceiptBuilder {
     // Font is guaranteed to be loaded by create() method
     label = useArabicIndicDigits ? _toArabicDigits(label) : label;
     value = useArabicIndicDigits ? _toArabicDigits(value) : value;
+
+    // Apply margins for proper paper fitting
+    const int horizontalMargin = 8;
+    final int usableWidth = widthPx - (horizontalMargin * 2);
+
     // LABEL (RTL)
     final pStyleLabel = ui.ParagraphStyle(
       textAlign: ui.TextAlign.left,
@@ -793,8 +916,8 @@ class ReceiptBuilder {
     final builderL = ui.ParagraphBuilder(pStyleLabel)..pushStyle(tStyle);
     builderL.addText(label);
     final pLabel = builderL.build()
-      ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
-    // VALUE (LTR, right aligned across the full width, so it hugs the right edge)
+      ..layout(ui.ParagraphConstraints(width: usableWidth.toDouble()));
+    // VALUE (LTR, right aligned across the usable width)
     final pStyleVal = ui.ParagraphStyle(
       textAlign: ui.TextAlign.right,
       textDirection: ui.TextDirection.ltr,
@@ -804,7 +927,7 @@ class ReceiptBuilder {
     final builderV = ui.ParagraphBuilder(pStyleVal)..pushStyle(tStyle);
     builderV.addText(value);
     final pValue = builderV.build()
-      ..layout(ui.ParagraphConstraints(width: widthPx.toDouble()));
+      ..layout(ui.ParagraphConstraints(width: usableWidth.toDouble()));
     final double h =
         [pLabel.height, pValue.height].reduce((a, b) => a > b ? a : b);
     final int height = (h + verticalPadding * 2).ceil().clamp(24, 4096);
@@ -816,10 +939,12 @@ class ReceiptBuilder {
       canvas.drawRect(
           ui.Rect.fromLTWH(0, 0, widthPx.toDouble(), height.toDouble()), bg);
       final double dy = ((height - h) / 2).clamp(0.0, height.toDouble());
-      // Draw label on the left (still RTL inside its own paragraph box)
-      canvas.drawParagraph(pLabel, ui.Offset(0, dy));
-      // Draw value right-aligned to the full width
-      canvas.drawParagraph(pValue, ui.Offset(0, dy));
+      // Apply horizontal margins for proper fitting
+      const double marginOffset = 8.0;
+      // Draw label with margin (RTL inside its own paragraph box)
+      canvas.drawParagraph(pLabel, ui.Offset(marginOffset, dy));
+      // Draw value with margin (right-aligned within usable width)
+      canvas.drawParagraph(pValue, ui.Offset(marginOffset, dy));
       final picture = rec.endRecording();
       final uiImg = await picture.toImage(widthPx, height);
       final byteData = await uiImg.toByteData(format: ui.ImageByteFormat.png);
@@ -936,12 +1061,6 @@ class ReceiptBuilder {
       }
     }
     return 0;
-  }
-
-  String _formatNow() {
-    final now = DateTime.now();
-    final two = (int n) => n.toString().padLeft(2, '0');
-    return '${now.year}-${two(now.month)}-${two(now.day)} ${two(now.hour)}:${two(now.minute)}:${two(now.second)}';
   }
 
   bool _containsArabic(String s) =>
