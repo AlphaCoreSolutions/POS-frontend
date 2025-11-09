@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 
 import 'package:visionpos/services/bluetooth_printing_service.dart'
     show BluetoothPrinterManager, SavedPrinter, PrinterRole, PrinterRoleX;
@@ -68,10 +68,11 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
   }
 
   Future<void> _loadPaired() async {
-    // For classic ESC/POS, "pairedBluetooths" is enough (plugin enumerates paired list)
-    final devices = await PrintBluetoothThermal.pairedBluetooths;
+    // For classic ESC/POS, get bonded devices from blue_thermal_printer
+    final bluetooth = BlueThermalPrinter.instance;
+    final devices = await bluetooth.getBondedDevices();
     _paired = devices
-        .map<Map<String, dynamic>>((d) => {'name': d.name, 'mac': d.macAdress})
+        .map<Map<String, dynamic>>((d) => {'name': d.name ?? 'Unknown', 'mac': d.address ?? ''})
         .toList();
   }
 

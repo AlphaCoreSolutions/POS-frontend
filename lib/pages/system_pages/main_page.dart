@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data'; // For Uint8List
 import 'dart:ui' as ui;
@@ -21,7 +22,7 @@ import 'package:visionpos/components/quick_api_switcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:intl/intl.dart';
 import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/receipt_builder.dart';
@@ -37,6 +38,7 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
+  final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
   final _barcodeController = TextEditingController();
   final _barcodeFocus = FocusNode();
   String _barcodeBuffer = '';
@@ -124,7 +126,7 @@ class _MainPageState extends State<MainPage> {
   // ignore: unused_field
   String _msj = '';
   bool connected = false;
-  List<BluetoothInfo> items = [];
+  List<BluetoothDevice> items = [];
   String optionprinttype = "58 mm";
   List<String> options = ["58 mm", "80 mm"];
   // ignore: unused_field
@@ -213,21 +215,22 @@ class _MainPageState extends State<MainPage> {
     int batteryPercentage = 0;
 
     try {
-      platformVersion = await PrintBluetoothThermal.platformVersion;
-      batteryPercentage = await PrintBluetoothThermal.batteryLevel;
+      // blue_thermal_printer doesn't provide platform version or battery level
+      platformVersion = 'BlueThermal v1.2.3';
+      batteryPercentage = 0;
     } on PlatformException {
       platformVersion = 'Failed to get platform version.';
     }
 
     if (!mounted) return;
 
-    final bool result = await PrintBluetoothThermal.bluetoothEnabled;
-    _msj = result
+    final bool? result = await _bluetooth.isAvailable;
+    _msj = (result == true)
         ? "Bluetooth enabled, please search and connect"
         : "Bluetooth not enabled";
 
     setState(() {
-      _info = "$platformVersion ($batteryPercentage% battery)";
+      _info = "$platformVersion";
     });
   }
 
@@ -238,8 +241,8 @@ class _MainPageState extends State<MainPage> {
       items = [];
     });
 
-    final List<BluetoothInfo> listResult =
-        await PrintBluetoothThermal.pairedBluetooths;
+    final List<BluetoothDevice> listResult =
+        await _bluetooth.getBondedDevices();
 
     setState(() {
       _progress = false;
@@ -254,13 +257,27 @@ class _MainPageState extends State<MainPage> {
       connected = false;
     });
 
-    final bool result = await PrintBluetoothThermal.connect(
-      macPrinterAddress: macAddress,
-    );
+    try {
+      // Find device by MAC address
+      final devices = await _bluetooth.getBondedDevices();
+      final device = devices.firstWhere(
+        (d) => d.address == macAddress,
+        orElse: () => throw Exception('Device not found'),
+      );
 
-    if (result) {
+      // Connect with timeout
+      await _bluetooth.connect(device).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('Connection timeout'),
+      );
+
       setState(() {
         connected = true;
+      });
+    } catch (e) {
+      debugPrint('Connection error: $e');
+      setState(() {
+        connected = false;
       });
     }
 
@@ -270,8 +287,11 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> disconnectPrinter() async {
-    // ignore: unused_local_variable
-    final bool status = await PrintBluetoothThermal.disconnect;
+    try {
+      await _bluetooth.disconnect();
+    } catch (e) {
+      debugPrint('Disconnect error: $e');
+    }
     setState(() {
       connected = false;
     });
@@ -300,7 +320,7 @@ class _MainPageState extends State<MainPage> {
       }
 
       // Validation: Check printer connection
-      final btConnected = await PrintBluetoothThermal.connectionStatus;
+      final btConnected = await _bluetooth.isConnected;
       if (!(connected == true && btConnected == true)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -392,17 +412,9 @@ class _MainPageState extends State<MainPage> {
 
       while (!printSuccess && retryCount <= maxRetries) {
         try {
-          final ok = await PrintBluetoothThermal.writeBytes(bytesList);
-          if (ok == true) {
-            printSuccess = true;
-            debugPrint('Print successful on attempt ${retryCount + 1}');
-          } else if (retryCount < maxRetries) {
-            debugPrint('Print failed, retrying...');
-            await Future.delayed(const Duration(seconds: 1));
-            retryCount++;
-          } else {
-            break;
-          }
+          await _bluetooth.writeBytes(Uint8List.fromList(bytesList));
+          printSuccess = true;
+          debugPrint('Print successful on attempt ${retryCount + 1}');
         } catch (printError) {
           debugPrint('Print attempt ${retryCount + 1} error: $printError');
           if (retryCount < maxRetries) {
@@ -622,7 +634,7 @@ class _MainPageState extends State<MainPage> {
 
   Future<void> printArabicSmokeTest() async {
     // Must be connected already
-    final connectedNow = await PrintBluetoothThermal.connectionStatus;
+    final connectedNow = await _bluetooth.isConnected;
     if (connectedNow != true) {
       // ignore: avoid_print
       print('SmokeTest: printer not connected');
@@ -690,7 +702,7 @@ class _MainPageState extends State<MainPage> {
     bytes.addAll(gen.feed(2));
     bytes.addAll(gen.cut());
 
-    await PrintBluetoothThermal.writeBytes(bytes);
+    await _bluetooth.writeBytes(Uint8List.fromList(bytes));
   }
 
   /*
@@ -998,7 +1010,7 @@ class _MainPageState extends State<MainPage> {
                                       borderRadius: BorderRadius.circular(8),
                                       onTap: () {
                                         Navigator.pop(context);
-                                        connectToPrinter(device.macAdress);
+                                        connectToPrinter(device.address ?? '');
                                       },
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
@@ -1014,14 +1026,14 @@ class _MainPageState extends State<MainPage> {
                                         child: ListTile(
                                           contentPadding: EdgeInsets.zero,
                                           title: Text(
-                                            device.name,
+                                            device.name ?? 'Unknown',
                                             style: TextStyle(
                                               color: Color(0xFF36454F),
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                           subtitle: Text(
-                                            device.macAdress,
+                                            device.address ?? '',
                                             style: TextStyle(
                                               color: Colors.grey[600],
                                             ),

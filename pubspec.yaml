@@ -43,10 +43,9 @@ dependencies:
   fl_chart:  # For charts
   intl: 
   #bluetooth_print: ^4.3.0
-  print_bluetooth_thermal: 
+  blue_thermal_printer: ^1.2.3
   esc_pos_utils: 
   permission_handler: 
-  flutter_blue_plus: 
   http: ^1.2.0
   provider:
   translator: ^1.0.4

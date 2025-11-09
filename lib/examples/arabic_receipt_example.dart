@@ -1,7 +1,7 @@
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:visionpos/services/receipt_builder.dart';
 
@@ -85,7 +85,8 @@ class ArabicReceiptExample {
   /// Check printer connection status
   static Future<bool> _checkPrinterConnection() async {
     try {
-      final connected = await PrintBluetoothThermal.connectionStatus;
+      final bluetooth = BlueThermalPrinter.instance;
+      final connected = await bluetooth.isConnected;
       return connected == true;
     } catch (e) {
       developer.log('Error checking printer connection',
@@ -100,24 +101,15 @@ class ArabicReceiptExample {
     int retryCount = 2,
     Duration retryDelay = const Duration(seconds: 1),
   }) async {
-    // Convert Uint8List to List<int> for Android compatibility
-    final List<int> bytesList = bytes.toList();
+    final bluetooth = BlueThermalPrinter.instance;
 
     for (int attempt = 0; attempt <= retryCount; attempt++) {
       try {
-        final ok = await PrintBluetoothThermal.writeBytes(bytesList);
-        if (ok == true) {
-          developer.log(
-              'Receipt printed successfully on attempt ${attempt + 1}',
-              name: 'ArabicReceiptExample');
-          return true;
-        }
-
-        if (attempt < retryCount) {
-          developer.log('Print failed, retrying in ${retryDelay.inSeconds}s...',
-              name: 'ArabicReceiptExample');
-          await Future.delayed(retryDelay);
-        }
+        await bluetooth.writeBytes(bytes);
+        developer.log(
+            'Receipt printed successfully on attempt ${attempt + 1}',
+            name: 'ArabicReceiptExample');
+        return true;
       } catch (e, stackTrace) {
         developer.log(
           'Print attempt ${attempt + 1} failed',
@@ -127,6 +119,8 @@ class ArabicReceiptExample {
         );
 
         if (attempt < retryCount) {
+          developer.log('Print failed, retrying in ${retryDelay.inSeconds}s...',
+              name: 'ArabicReceiptExample');
           await Future.delayed(retryDelay);
         }
       }
@@ -664,7 +658,8 @@ class ArabicReceiptExample {
   /// Utility: Get printer information for debugging
   static Future<Map<String, dynamic>> getPrinterInfo() async {
     try {
-      final connected = await PrintBluetoothThermal.connectionStatus;
+      final bluetooth = BlueThermalPrinter.instance;
+      final connected = await bluetooth.isConnected;
       // Add more printer info methods as available from the plugin
       return {
         'connected': connected,
