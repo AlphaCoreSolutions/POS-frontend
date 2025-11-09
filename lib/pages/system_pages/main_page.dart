@@ -2985,18 +2985,12 @@ void _chargeOrder() async {
       );
       debugPrint('🖨️ ✅ Kitchen router configured');
 
-      // Step 5: Create receipt builder (auto-loads Arabic font)
-      debugPrint('🖨️ Creating receipt builder...');
-      final builder = await ReceiptBuilder.create();
-      debugPrint('🖨️ ✅ Receipt builder ready (Arabic font loaded)');
-
-      // Step 6: Create triple printer
+      // Step 5: Create triple printer (will create per-printer builders automatically)
       final printer = TriplePrinter(
         bt: bt,
-        builder: builder,
         router: router,
       );
-      debugPrint('🖨️ ✅ Triple printer initialized');
+      debugPrint('🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
 
       // Step 7: Print all receipts (customer + kitchens)
       debugPrint('🖨️ ============================================');

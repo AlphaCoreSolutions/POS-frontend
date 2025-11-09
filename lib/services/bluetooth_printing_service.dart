@@ -123,6 +123,7 @@ class BluetoothPrinterManager with ChangeNotifier {
   /// Some plugin versions expect List<int> over the channel (not Uint8List).
   /// We also chunk to avoid BT buffer overflows.
   /// Send raw bytes to a connected printer, throttled for BT SPP stability.
+  /// Enhanced for multi-printer Arabic printing reliability.
   Future<void> writeBytes(Uint8List bytes) async {
     debugPrint('📤 Starting writeBytes: ${bytes.length} bytes total');
     debugPrint('📤 Input type: ${bytes.runtimeType}');
@@ -131,7 +132,7 @@ class BluetoothPrinterManager with ChangeNotifier {
     final init = <int>[0x1B, 0x40];
     await _sendList(init);
     await Future.delayed(
-        const Duration(milliseconds: 50)); // Allow init to process
+        const Duration(milliseconds: 100)); // Increased: Allow init to process
 
     // Convert Uint8List to List<int> for Android compatibility
     final list = bytes.toList(growable: false);
@@ -139,7 +140,7 @@ class BluetoothPrinterManager with ChangeNotifier {
         '📤 Converted to: ${list.runtimeType} for Android compatibility');
 
     const chunkSize = 256; // 128–512 is typical; 256 is a safe middle
-    const interChunkDelayMs = 20; // 10–30ms often works best
+    const interChunkDelayMs = 30; // Increased for Arabic image data
 
     final totalChunks = (list.length / chunkSize).ceil();
     debugPrint('📤 Sending $totalChunks chunks...');
@@ -160,8 +161,8 @@ class BluetoothPrinterManager with ChangeNotifier {
     await _sendList(List<int>.filled(4, 0x0A));
 
     // Critical: Wait for printer buffer to flush completely
-    // Calculate dynamic delay based on data size (more data = more time needed)
-    final flushDelayMs = math.min(500 + (list.length ~/ 100), 3000);
+    // Increased for Arabic raster images which require more processing time
+    final flushDelayMs = math.min(800 + (list.length ~/ 80), 4000);
     debugPrint('📤 Waiting ${flushDelayMs}ms for printer buffer to flush...');
     await Future.delayed(Duration(milliseconds: flushDelayMs));
 
@@ -178,6 +179,7 @@ class BluetoothPrinterManager with ChangeNotifier {
   SavedPrinter? getForRole(PrinterRole role) => _assigned[role];
 
   /// Connects to role's printer, runs the callback, then disconnects.
+  /// Enhanced timing for multi-printer Arabic printing reliability.
   Future<bool> withPrinter(
     PrinterRole role,
     FutureOr<void> Function() action,
@@ -191,8 +193,8 @@ class BluetoothPrinterManager with ChangeNotifier {
     debugPrint(
         '🔌 Connecting to ${role.label} printer (MAC: ${target.mac})...');
 
-    // small settle time before connect (especially when chaining printers)
-    await Future.delayed(const Duration(milliseconds: 150));
+    // Increased settle time before connect (especially when chaining printers)
+    await Future.delayed(const Duration(milliseconds: 300));
 
     final ok = await connect(target.mac);
     if (!ok) {
@@ -208,9 +210,9 @@ class BluetoothPrinterManager with ChangeNotifier {
       debugPrint('✅ Print action completed for ${role.label}');
 
       // CRITICAL: Additional wait to ensure printer finishes printing
-      // The writeBytes method already waits, but add safety margin
+      // Increased for Arabic raster images which need more processing
       debugPrint('⏳ Waiting for ${role.label} printer to finish printing...');
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 800));
       debugPrint('✅ ${role.label} printer should have completed printing');
 
       return true;
@@ -223,8 +225,8 @@ class BluetoothPrinterManager with ChangeNotifier {
       await disconnect();
       debugPrint('✅ Disconnected from ${role.label} printer');
 
-      // Avoid rapid reconnect to next printer
-      await Future.delayed(const Duration(milliseconds: 250));
+      // Increased delay to avoid rapid reconnect to next printer
+      await Future.delayed(const Duration(milliseconds: 400));
     }
   }
 }

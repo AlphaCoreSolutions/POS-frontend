@@ -10,26 +10,29 @@ import 'package:visionpos/services/receipt_builder.dart';
 ///
 /// Features:
 /// - Automatic Arabic rendering (100% Android compatible)
-/// - Single builder for all receipt types
+/// - Per-printer ReceiptBuilder instances for reliability
 /// - Auto-reconnect customer printer after kitchen printing
+/// - Enhanced timing controls for multi-printer stability
 /// - Comprehensive logging and error handling
 ///
 /// Usage:
 /// ```dart
-/// final builder = await ReceiptBuilder.create();
 /// final router = KitchenRouter(falafelCategoryIds: {1,2}, ...);
-/// final printer = TriplePrinter(bt: btManager, builder: builder, router: router);
+/// final printer = TriplePrinter(bt: btManager, router: router);
 ///
 /// await printer.printAll(orderData);
 /// ```
 class TriplePrinter {
   final BluetoothPrinterManager bt;
-  final ReceiptBuilder builder;
   final KitchenRouter router;
+
+  // Enhanced timing for multi-printer stability
+  static const Duration _printerDelayShort = Duration(milliseconds: 500);
+  static const Duration _printerDelayLong = Duration(milliseconds: 800);
+  static const Duration _reconnectDelay = Duration(milliseconds: 1000);
 
   TriplePrinter({
     required this.bt,
-    required this.builder,
     required this.router,
   });
 
@@ -39,7 +42,7 @@ class TriplePrinter {
   Future<void> printAll(Map<String, dynamic> order) async {
     final printSessionId = DateTime.now().millisecondsSinceEpoch;
     developer.log(
-      '🖨️ [PRINT-SESSION-$printSessionId] Starting print sequence',
+      '🖨️ [PRINT-SESSION-$printSessionId] Starting print sequence with per-printer builders',
       name: 'TriplePrinter',
     );
 
@@ -53,9 +56,21 @@ class TriplePrinter {
         name: 'TriplePrinter',
       );
 
+      // Create fresh builder for customer printer
+      developer.log(
+        '🏗️ [PRINT-SESSION-$printSessionId] Creating fresh ReceiptBuilder for customer printer',
+        name: 'TriplePrinter',
+      );
+      final customerBuilder = await ReceiptBuilder.create(
+        arabicFontFamily: 'NotoNaskhArabic',
+        arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+        useArabicIndicDigits: true,
+        debug: false,
+      );
+
       final Stopwatch customerBuildTimer = Stopwatch()..start();
       // Use new unified API - returns Android-compatible List<int>
-      final customerBytes = await builder.printCustomer(order);
+      final customerBytes = await customerBuilder.printCustomer(order);
       customerBuildTimer.stop();
 
       developer.log(
@@ -85,7 +100,7 @@ class TriplePrinter {
         );
         debugPrint('✅ Customer receipt printed successfully');
       }
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(_printerDelayShort);
 
       // 2. Print Kitchen Tickets
       developer.log(
@@ -108,9 +123,21 @@ class TriplePrinter {
         );
 
         try {
+          // Create fresh builder for Falafel printer
+          developer.log(
+            '🏗️ [PRINT-SESSION-$printSessionId] Creating fresh ReceiptBuilder for Falafel printer',
+            name: 'TriplePrinter',
+          );
+          final falafelBuilder = await ReceiptBuilder.create(
+            arabicFontFamily: 'NotoNaskhArabic',
+            arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+            useArabicIndicDigits: true,
+            debug: false,
+          );
+
           final Stopwatch falafelBuildTimer = Stopwatch()..start();
           // Use new unified API - returns Android-compatible List<int>
-          final bytes = await builder.printKitchen(
+          final bytes = await falafelBuilder.printKitchen(
             order,
             kitchenName: 'مطبخ الفلافل', // Arabic: Falafel Kitchen
             items: falafelItems,
@@ -158,7 +185,7 @@ class TriplePrinter {
           debugPrint('❌ Falafel kitchen ticket error: $e');
           rethrow;
         }
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(_printerDelayLong);
       } else {
         developer.log(
           '➖ [PRINT-SESSION-$printSessionId] No Falafel items, skipping',
@@ -175,9 +202,21 @@ class TriplePrinter {
         );
 
         try {
+          // Create fresh builder for Shawarma printer
+          developer.log(
+            '🏗️ [PRINT-SESSION-$printSessionId] Creating fresh ReceiptBuilder for Shawarma printer',
+            name: 'TriplePrinter',
+          );
+          final shawarmaBuilder = await ReceiptBuilder.create(
+            arabicFontFamily: 'NotoNaskhArabic',
+            arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
+            useArabicIndicDigits: true,
+            debug: false,
+          );
+
           final Stopwatch shawarmaBuildTimer = Stopwatch()..start();
           // Use new unified API - returns Android-compatible List<int>
-          final bytes = await builder.printKitchen(
+          final bytes = await shawarmaBuilder.printKitchen(
             order,
             kitchenName:
                 'مطبخ الشاورما والوجبات الخفيفة', // Arabic: Shawarma & Snacks Kitchen
@@ -227,7 +266,7 @@ class TriplePrinter {
           debugPrint('❌ Shawarma kitchen ticket error: $e');
           rethrow;
         }
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(_printerDelayLong);
       } else {
         developer.log(
           '➖ [PRINT-SESSION-$printSessionId] No Shawarma items, skipping',
@@ -243,8 +282,8 @@ class TriplePrinter {
 
       final customerPrinter = bt.getForRole(PrinterRole.customer);
       if (customerPrinter != null) {
-        await Future.delayed(const Duration(
-            milliseconds: 500)); // Allow previous printer to fully disconnect
+        await Future.delayed(
+            _reconnectDelay); // Allow previous printer to fully disconnect
 
         final Stopwatch reconnectTimer = Stopwatch()..start();
         final reconnected = await bt.connect(customerPrinter.mac);
@@ -295,7 +334,7 @@ class TriplePrinter {
             '🔄 [PRINT-SESSION-$printSessionId] Attempting emergency reconnection to customer printer',
             name: 'TriplePrinter',
           );
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(_reconnectDelay);
           final reconnected = await bt.connect(customerPrinter.mac);
           if (reconnected) {
             developer.log(
