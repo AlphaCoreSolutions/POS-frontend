@@ -1,20 +1,37 @@
 // android/build.gradle (project-level)
 
-subprojects { p ->
+subprojects { project ->
+  project.configurations.all {
+    resolutionStrategy.eachDependency { details ->
+      // Force namespace for plugins that don't have it
+    }
+  }
+  
   afterEvaluate {
-    if (p.plugins.hasPlugin('com.android.library')) {
-      def androidExt = p.extensions.findByName('android')
-      if (androidExt != null && !androidExt.hasProperty('namespace')) {
-        def manifestFile = file("${p.projectDir}/src/main/AndroidManifest.xml")
+    if (project.plugins.hasPlugin('com.android.library')) {
+      def androidExt = project.extensions.findByName('android')
+      
+      // Set namespace if not already set
+      if (androidExt != null && androidExt.namespace == null) {
+        // First try to get from AndroidManifest.xml
+        def manifestFile = file("${project.projectDir}/src/main/AndroidManifest.xml")
+        String namespace = null
+        
         if (manifestFile.exists()) {
           def text = manifestFile.getText('UTF-8')
-          def m = (text =~ /package="([^"]+)"/)
-          if (m.find()) {
-            def pkg = m.group(1)
-            androidExt.namespace = pkg
-            println("Set namespace '${pkg}' for module ${p.name}")
+          def matcher = (text =~ /package="([^"]+)"/)
+          if (matcher.find()) {
+            namespace = matcher.group(1)
           }
         }
+        
+        // Fallback: use a default namespace based on project name
+        if (namespace == null) {
+          namespace = "com.${project.name.replaceAll('-', '_')}"
+        }
+        
+        androidExt.namespace = namespace
+        println("✓ Set namespace '${namespace}' for ${project.name}")
       }
     }
   }
