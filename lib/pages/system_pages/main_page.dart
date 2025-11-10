@@ -55,6 +55,20 @@ class _MainPageState extends State<MainPage> {
   // ignore: unused_field
   List<Category> _categories = [];
 
+  // One-shot print guard
+  bool _isPrinting = false;
+  late final TriplePrinter printer;
+
+  Future<void> _printOnce(Map<String, dynamic> payload) async {
+    if (_isPrinting) return;
+    _isPrinting = true;
+    try {
+      await printer.printAll(payload); // TriplePrinter only
+    } finally {
+      _isPrinting = false;
+    }
+  }
+
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
     setState(() => _orgId = orgId);
@@ -297,7 +311,6 @@ class _MainPageState extends State<MainPage> {
 
   Future<void> _printReceipt() async {
     try {
-      // Validation: Check if cart has items
       if (selectedItems.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -317,7 +330,6 @@ class _MainPageState extends State<MainPage> {
         return;
       }
 
-      // Validation: Check printer connection
       final btConnected = await _bluetooth.isConnected;
       if (!(connected == true && btConnected == true)) {
         if (mounted) {
@@ -338,7 +350,6 @@ class _MainPageState extends State<MainPage> {
         return;
       }
 
-      // Show loading indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -361,69 +372,80 @@ class _MainPageState extends State<MainPage> {
         );
       }
 
-      // Create ReceiptBuilder with optimized settings
+      // 🛠️ Use mm58 paper size for testing
       final builder = await ReceiptBuilder.create(
-        paper: PaperSize.mm80, // Configure based on your printer
+        paper: PaperSize.mm80, // 👈 58mm for test
+        widthPxOverride: 512, // 👈 safe width for 58mm
         arabicFontFamily: 'NotoNaskhArabic',
         arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
-        useArabicIndicDigits: true, // Use Arabic-Indic numerals
-        debug: false, // Set to true for debugging
+        useArabicIndicDigits: true,
       );
 
-      // Prepare order data with all required fields
-      final orderMap = {
-        'orderNumber': orderCount.toString().padLeft(4, '0'),
-        'paymentMethod': paymentMethod == 1 ? 'Cash' : 'Card',
-        'subtotal': _calculateSubtotal(selectedItems),
-        'tax': _calculateTaxes(selectedItems),
-        'tips': tips,
-        'total': _calculateTotal(selectedItems),
-        'items': selectedItems.map((item) {
-          final product = _getProductById(item.productId);
-          return {
-            'productId': item.productId,
-            'name': product.productName.trim(),
-            'quantity': item.quantity,
-            'unitPrice': product.sellingPrice,
-            'notes': '',
-          };
-        }).toList(),
+      final List<Map<String, dynamic>> items = selectedItems.map((it) {
+        final p = _getProductById(it.productId);
+        return {
+          'productId': it.productId,
+          'productName': (p.productName ?? '').toString().trim(),
+          'quantity': it.quantity,
+          'unitPrice': p.sellingPrice,
+          'notes': '',
+        };
+      }).toList();
+
+      final double sub = _calculateSubtotal(selectedItems);
+      final double tax = _calculateTaxes(selectedItems);
+      final double tip = tips ?? 0.0;
+      final double grand = _calculateTotal(selectedItems);
+
+      final int pm = paymentMethod ?? 1;
+      final String orderNo =
+          (orderCount ?? 0).clamp(1, 999999).toString().padLeft(4, '0');
+
+      final Map<String, dynamic> orderMap = {
+        'data': {
+          'orderNumber': orderNo,
+          'paymentMethod': pm,
+          'orderItems': items,
+          'totalAfterDiscount': sub,
+          'discountTotal': 0.0,
+          'taxTotal': tax,
+          'tips': tip,
+          'totalAfterTax': grand,
+        },
       };
 
-      // Generate receipt with timing for performance monitoring
-      final stopwatch = Stopwatch()..start();
-      final bytes = await builder.printCustomer(orderMap);
-      stopwatch.stop();
-
-      // Log performance metrics
+      final sw = Stopwatch()..start();
+      final List<int> bytes = await builder.printCustomer(
+        orderMap,
+        items: items,
+        orderNumber: orderNo,
+        storeName: 'متجر رؤية',
+        resolve: (int id) => _getProductById(id),
+      );
+      sw.stop();
       debugPrint(
-          'Receipt generated: ${bytes.length} bytes in ${stopwatch.elapsedMilliseconds}ms');
+          'Receipt generated: ${bytes.length} bytes in ${sw.elapsedMilliseconds}ms');
 
-      // Convert Uint8List to List<int> for Android compatibility
-      final List<int> bytesList = bytes.toList();
-
-      // Print with retry logic
       bool printSuccess = false;
-      int retryCount = 0;
+      int retry = 0;
       const maxRetries = 2;
 
-      while (!printSuccess && retryCount <= maxRetries) {
+      while (!printSuccess && retry <= maxRetries) {
         try {
-          await _bluetooth.writeBytes(Uint8List.fromList(bytesList));
+          await _bluetooth.writeBytes(Uint8List.fromList(bytes));
           printSuccess = true;
-          debugPrint('Print successful on attempt ${retryCount + 1}');
-        } catch (printError) {
-          debugPrint('Print attempt ${retryCount + 1} error: $printError');
-          if (retryCount < maxRetries) {
+          debugPrint('Print successful on attempt ${retry + 1}');
+        } catch (err) {
+          debugPrint('Print attempt ${retry + 1} error: $err');
+          if (retry < maxRetries) {
             await Future.delayed(const Duration(seconds: 1));
-            retryCount++;
+            retry++;
           } else {
             break;
           }
         }
       }
 
-      // Show appropriate feedback
       if (mounted) {
         if (printSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -442,13 +464,11 @@ class _MainPageState extends State<MainPage> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Row(
-                children: const [
+              content: const Row(
+                children: [
                   Icon(Icons.error_outline, color: Colors.white),
                   SizedBox(width: 8),
-                  Expanded(
-                    child: Text('❌ فشل في الطباعة بعد عدة محاولات'),
-                  ),
+                  Expanded(child: Text('❌ فشل في الطباعة بعد عدة محاولات')),
                 ],
               ),
               backgroundColor: Colors.red,
@@ -456,20 +476,15 @@ class _MainPageState extends State<MainPage> {
               action: SnackBarAction(
                 label: 'إعادة المحاولة',
                 textColor: Colors.white,
-                onPressed: () {
-                  // Retry printing
-                  _printReceipt();
-                },
+                onPressed: _printReceipt,
               ),
             ),
           );
         }
       }
-    } catch (e, stackTrace) {
-      // Comprehensive error logging
+    } catch (e, st) {
       debugPrint('Print error: $e');
-      debugPrint('Stack trace: $stackTrace');
-
+      debugPrint('Stack trace: $st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -490,14 +505,11 @@ class _MainPageState extends State<MainPage> {
               label: 'تفاصيل',
               textColor: Colors.white,
               onPressed: () {
-                // Show error dialog with full details
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('تفاصيل الخطأ'),
-                    content: SingleChildScrollView(
-                      child: Text(e.toString()),
-                    ),
+                    content: SingleChildScrollView(child: Text(e.toString())),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
@@ -1285,110 +1297,43 @@ class _MainPageState extends State<MainPage> {
       tip: tips,
     );
 
-    try {
-      // Post order and get response with order ID
-      final orderResponse = await ApiHandler().postOrderWithResponse(order);
+    final success = await ApiHandler().postOrder(order);
 
-      if (orderResponse != null) {
-        // === UNIFIED PRINTING: Customer + Kitchen (Modern Arabic Design) ===
-        try {
-          // Calculate totals
-          final double subtotal = _calculateSubtotal(selectedItems);
-          final double tax = _calculateTaxes(selectedItems);
-          final double total = subtotal + tax + tips;
+    if (success) {
+      // === UNIFIED PRINTING: Customer + Kitchen (Arabic & Android Compatible) ===
+      try {
+        // Calculate totals
+        final double subtotal = _calculateSubtotal(selectedItems);
+        final double tax = _calculateTaxes(selectedItems);
+        final double total = subtotal + tax + tips;
 
-          // Extract order number from API response
-          final orderNumber = (orderResponse['id'] ??
-                  orderResponse['Id'] ??
-                  orderResponse['orderNumber'] ??
-                  orderResponse['OrderNumber'] ??
-                  '')
-              .toString();
+        // Call unified print function - handles everything!
+        final printSuccess = await _printReceipts(
+          orderNumber: order.id.toString(),
+          paymentMethod: paymentMethod == 1 ? 'CASH' : 'VISA',
+          items: selectedItems,
+          subtotal: subtotal,
+          tax: tax,
+          tips: tips,
+          total: total,
+        );
 
-          // Get store name (you can customize this)
-          final storeName = 'مطعم فيجن'; // Vision Restaurant in Arabic
-
-          // Build print items with product details
-          final List<Map<String, dynamic>> printItems = selectedItems.map((it) {
-            final product = _getProductById(it.productId);
-            final price = _getProductPrice(it.productId);
-            final lineTotal = price * it.quantity;
-
-            return {
-              'productId': it.productId,
-              'ProductId': it.productId,
-              'productName': product.productName,
-              'name': product.productName,
-              'quantity': it.quantity,
-              'Quantity': it.quantity,
-              'unitPrice': price,
-              'price': price,
-              'sellingPrice': price,
-              'total': lineTotal,
-              'totalAfterTax': lineTotal,
-              'categoryId': product.categoryId,
-              'notes': '',
-            };
-          }).toList();
-
-          // Prepare order data for printing
-          final printOrderData = {
-            'id': orderNumber,
-            'Id': orderNumber,
-            'orderNumber': orderNumber,
-            'OrderNumber': orderNumber,
-            'organizationId': _orgId,
-            'paymentMethod': paymentMethod,
-            'PaymentMethod': paymentMethod,
-            'orderPlaced': DateTime.now().toIso8601String(),
-            'OrderPlaced': DateTime.now().toIso8601String(),
-            'orderItems': printItems,
-            'OrderItems': printItems,
-            'items': printItems,
-            'grandTotal': total,
-            'GrandTotal': total,
-            'totalAfterTax': total,
-            'totalAfterDiscount': subtotal,
-            'taxTotal': tax,
-            'tips': tips,
-            'tip': tips,
-            'discount': discount,
-            'discountTotal': discount,
-          };
-
-          // Call unified print function with store name
-          final printSuccess = await _printReceipts(
-            orderData: printOrderData,
-            storeName: storeName,
-          );
-
-          if (!printSuccess) {
-            debugPrint('⚠️ Printing completed with errors (check logs)');
-          }
-        } catch (e, stackTrace) {
-          // Swallow printing errors to avoid blocking the POS
-          debugPrint('❌ Printing error: $e');
-          debugPrint('Stack trace: $stackTrace');
+        if (!printSuccess) {
+          debugPrint('⚠️ Printing completed with errors (check logs)');
         }
-        // === End Unified Printing ===
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Order submitted successfully!')),
-        );
-        setState(() {
-          selectedItems.clear();
-          discount = 0.0;
-          tips = 0.0;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Failed to submit order')),
-        );
+      } catch (e) {
+        // Swallow printing errors to avoid blocking the POS
+        debugPrint('❌ Printing error: $e');
       }
-    } catch (e) {
-      debugPrint('❌ Submit order error: $e');
+      // === End Unified Printing ===
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: $e')),
+        const SnackBar(content: Text('✅ Order submitted successfully!')),
+      );
+      setState(() => selectedItems.clear());
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ Failed to submit order')),
       );
     }
   }
@@ -1680,8 +1625,6 @@ class _MainPageState extends State<MainPage> {
                 child: Icon(isDrawerOpen ? Icons.arrow_back_ios : Icons.menu),
               ),
               actions: [
-                QuickApiSwitcher(),
-                SizedBox(width: 10),
                 IconButton(
                   icon: const Icon(Icons.print),
                   onPressed: () => showPrinterSetupDialog(context),
@@ -1713,45 +1656,7 @@ class _MainPageState extends State<MainPage> {
                   ),
                 ),
                 SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: _printReceipt,
-                  icon: const Icon(Icons.receipt_long, size: 16),
-                  label: const Text(
-                    'Test Print',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
                 SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: _printExampleReceipt,
-                  icon: const Icon(Icons.description, size: 16),
-                  label: const Text(
-                    'Print Example',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF9800),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   onPressed: () {
@@ -2967,79 +2872,115 @@ void _chargeOrder() async {
   // UNIFIED PRINTING FUNCTION - Arabic & Android Compatible
   // ===========================================================================
 
-  /// Modern unified printing function for customer and kitchen receipts.
+  /// Unified printing function for customer and kitchen receipts.
   ///
   /// Features:
-  /// - ✅ 100% Arabic support with modern design
-  /// - ✅ Customer receipt (80mm): Store name, order number, date, items table, totals, thank you
-  /// - ✅ Kitchen receipt (58mm): Kitchen name, order number, date, items table
-  /// - ✅ Center-aligned headers and tables
-  /// - ✅ Right-aligned totals
-  /// - ✅ Automatic kitchen routing
-  /// - ✅ Uses API response data
+  /// - ✅ 100% Arabic support (automatic raster rendering)
+  /// - ✅ 100% Android compatible (List<int> format)
+  /// - ✅ Automatic kitchen routing (Falafel, Shawarma, etc.)
+  /// - ✅ Auto-reconnect customer printer after kitchen printing
+  /// - ✅ Comprehensive error handling and logging
+  /// - ✅ Product name Arabic validation
   ///
   /// Usage:
   /// ```dart
   /// await _printReceipts(
-  ///   orderData: orderResponseFromAPI,
-  ///   storeName: 'مطعم فيجن',
+  ///   orderNumber: order.id.toString(),
+  ///   paymentMethod: 'CASH', // or 'VISA', 'CARD', etc.
+  ///   items: selectedItems,
+  ///   subtotal: subtotal,
+  ///   tax: tax,
+  ///   tips: tips,
+  ///   total: total,
   /// );
   /// ```
   Future<bool> _printReceipts({
-    required Map<String, dynamic> orderData,
-    String storeName = '',
+    required String orderNumber,
+    required String paymentMethod,
+    required List<OrderItemDto> items,
+    required double subtotal,
+    required double tax,
+    required double tips,
+    required double total,
   }) async {
     try {
-      final orderNumber = (orderData['orderNumber'] ??
-              orderData['OrderNumber'] ??
-              orderData['id'] ??
-              orderData['Id'] ??
-              '')
-          .toString();
-      final total = orderData['total'] ??
-          orderData['grandTotal'] ??
-          orderData['GrandTotal'] ??
-          0.0;
-
       debugPrint('🖨️ ============================================');
-      debugPrint('🖨️ Starting Modern Print Function');
+      debugPrint('🖨️ Starting Unified Print Function');
       debugPrint('🖨️ Order: $orderNumber | Total: \$$total');
-      debugPrint('🖨️ Store: $storeName');
       debugPrint('🖨️ ============================================');
 
-      // Initialize Bluetooth printer manager
+      // Step 1: Build print items with Arabic validation
+      final List<Map<String, dynamic>> printItems = items.map((it) {
+        final product = _getProductById(it.productId);
+
+        // Check if product name contains Arabic characters
+        final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
+            .hasMatch(product.productName);
+
+        // Use Arabic name - either from database or keep original
+        String arabicName;
+        if (hasArabic) {
+          // Product name is already in Arabic ✅
+          arabicName = product.productName;
+          debugPrint('   ✅ "${product.productName}" (Arabic)');
+        } else {
+          // Product name is in English - use as-is for now
+          // RECOMMENDED: Update database to use Arabic names
+          arabicName = product.productName;
+          debugPrint(
+              '   ⚠️  "${product.productName}" (English - consider translating)');
+        }
+
+        return {
+          'name': arabicName,
+          'quantity': it.quantity,
+          'price': product.sellingPrice,
+          'categoryId': product.categoryId,
+          'notes': '', // Add notes if available
+        };
+      }).toList();
+
+      debugPrint('🖨️ Total items: ${printItems.length}');
+
+      // Step 2: Prepare order data
+      final orderData = {
+        'orderNumber': orderNumber,
+        'paymentMethod': paymentMethod,
+        'subtotal': subtotal,
+        'tax': tax,
+        'tips': tips,
+        'total': total,
+        'items': printItems,
+      };
+
+      // Step 3: Initialize Bluetooth printer manager
       debugPrint('🖨️ Initializing Bluetooth printers...');
       final bt = BluetoothPrinterManager();
       await bt.load();
       debugPrint('🖨️ ✅ Bluetooth manager ready');
 
-      // Setup kitchen router with category IDs
+      // Step 4: Setup kitchen router
       final router = KitchenRouter(
         falafelCategoryIds: {7}, // Configure your category IDs
         shawarmaSnacksCategoryIds: {6, 8, 9, 10},
       );
       debugPrint('🖨️ ✅ Kitchen router configured');
 
-      // Build products map for kitchen routing
-      final productsById = <int, Product>{};
-      for (final product in products) {
-        productsById[product.productId] = product;
-      }
-
-      // Create triple printer with modern receipt builder
+      // Step 5: Create triple printer (will create per-printer builders automatically)
       final printer = TriplePrinter(
         btManager: bt,
         router: router,
-        productsById: productsById,
       );
-      debugPrint('🖨️ ✅ Triple printer initialized with modern design');
+      debugPrint(
+          '🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
 
-      // Print all receipts (customer + kitchens) with store name
+      // Step 7: Print all receipts (customer + kitchens)
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ Starting print sequence...');
       debugPrint('🖨️ ============================================');
+      await Future.delayed(const Duration(milliseconds: 1500));
 
-      await printer.printAll(orderData, storeName: storeName);
+      await printer.printAll(orderData);
 
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ ✅ Print sequence completed successfully!');

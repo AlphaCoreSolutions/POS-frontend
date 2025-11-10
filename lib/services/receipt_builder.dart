@@ -12,7 +12,7 @@ typedef ProductResolver = dynamic Function(int productId);
 /// Modern Receipt Builder for Triple Printer System
 ///
 /// Features:
-/// - Customer Receipt (80mm): Store name, order number, order date, items table, totals, thank you, datetime
+/// - Customer Receipt (80/58mm): Store name, order number, order date, items table, totals, datetime
 /// - Kitchen Receipt (58mm): Kitchen name, order number, order date, items table, current date
 /// - Full Arabic support with proper RTL text rendering
 /// - Center-aligned headers and tables
@@ -26,6 +26,15 @@ class ReceiptBuilder {
   final String arabicFontAssetPath;
   final bool debug;
   final bool useArabicIndicDigits;
+
+  // ---------------- NEW: global (cross-instance) order-number registry -------------
+  // This ensures all ReceiptBuilder instances share the same decision.
+  static String? _globalLastOrderNo;
+  static final Map<String, String> _globalOrderNoByKey = <String, String>{};
+  // ---------------------------------------------------------------------------------
+
+  // (keep a per-instance memo too; helps when the SAME object instance is reused)
+  final Expando<String> _orderNoMemo = Expando<String>('orderNo');
 
   ReceiptBuilder._(
     this.paper,
@@ -105,7 +114,8 @@ class ReceiptBuilder {
     bool useArabicIndicDigits = true,
   }) =>
       create(
-        paper: PaperSize.mm80,
+        paper: PaperSize.mm58,
+        widthPxOverride: 384,
         profileName: profileName,
         arabicFontFamily: arabicFontFamily,
         arabicFontAssetPath: arabicFontAssetPath,
@@ -220,7 +230,7 @@ class ReceiptBuilder {
     bytes.addAll(g.reset());
     bytes.addAll(g.emptyLines(1));
 
-    // 1. STORE NAME (Center-aligned)
+    // 1️⃣ STORE NAME
     if (storeName.trim().isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
@@ -231,13 +241,8 @@ class ReceiptBuilder {
       bytes.addAll(g.emptyLines(1));
     }
 
-    // 2. ORDER NUMBER (Center-aligned)
-    final extracted = _extractOrderNumber(order);
-    final orderNoStr =
-        (orderNumberOverride != null && orderNumberOverride.trim().isNotEmpty)
-            ? orderNumberOverride.trim()
-            : extracted;
-
+    // 2️⃣ ORDER NUMBER (GLOBAL resolver)
+    final orderNoStr = _orderNumberFor(order, override: orderNumberOverride);
     if (orderNoStr.isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
@@ -247,7 +252,7 @@ class ReceiptBuilder {
       ));
     }
 
-    // 3. ORDER DATE (Center-aligned)
+    // 3️⃣ ORDER DATE
     final orderDate = _extractOrderDate(order);
     if (orderDate.isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
@@ -262,11 +267,11 @@ class ReceiptBuilder {
     bytes.addAll(g.hr(ch: '='));
     bytes.addAll(g.hr(ch: '='));
 
-    // 4. ITEMS TABLE HEADER (Center-aligned)
+    // 4️⃣ HEADER (Item table)
     bytes.addAll(await _arabicThreeColumnHeader(g));
     bytes.addAll(g.hr(ch: '-'));
 
-    // ITEMS TABLE ROWS (Center-aligned table)
+    // 5️⃣ ITEMS LOOP
     final orderItems = items ?? _extractItems(order);
     for (final it in orderItems) {
       final int productId = _asInt(_pick(it, ['productId', 'ProductId']), 0);
@@ -317,7 +322,7 @@ class ReceiptBuilder {
     bytes.addAll(g.hr(ch: '='));
     bytes.addAll(g.hr(ch: '='));
 
-    // 6. TOTALS (Right-aligned)
+    // 6️⃣ TOTALS
     final totals = _extractTotals(order);
     if (totals.subtotalShown) {
       bytes.addAll(await _arabicTextLineHybrid(
@@ -352,6 +357,7 @@ class ReceiptBuilder {
       ));
     }
 
+    // FINAL TOTAL
     bytes.addAll(g.hr(ch: '='));
     bytes.addAll(await _arabicTextLineHybrid(
       g,
@@ -360,20 +366,18 @@ class ReceiptBuilder {
       fontSize: 28,
     ));
     bytes.addAll(g.hr(ch: '='));
-
     bytes.addAll(g.emptyLines(1));
 
-    // 7. THANK YOU (Center-aligned)
+    // 7️⃣ THANK YOU MESSAGE
     bytes.addAll(await _arabicTextLineHybrid(
       g,
       'شكراً لزيارتكم',
       align: PosAlign.center,
       fontSize: 26,
     ));
-
     bytes.addAll(g.emptyLines(1));
 
-    // 8. CURRENT DATE TIME (Center-aligned)
+    // 8️⃣ CURRENT DATE & TIME
     final now = DateTime.now();
     bytes.addAll(await _arabicTextLineHybrid(
       g,
@@ -382,18 +386,19 @@ class ReceiptBuilder {
       fontSize: 20,
     ));
 
+    // 9️⃣ Feed and cut
     bytes.addAll(g.emptyLines(2));
-
-    // Feed and cut
     final feedLines = (paper == PaperSize.mm80) ? 5 : 4;
     bytes.addAll(g.feed(feedLines));
     bytes.addAll(g.cut(mode: PosCutMode.partial));
 
     final out = Uint8List.fromList(bytes);
+
     developer.log(
       '🧾 Customer receipt: ${out.length} bytes in ${sw.elapsedMilliseconds}ms',
       name: 'ReceiptBuilder',
     );
+
     return out;
   }
 
@@ -421,13 +426,8 @@ class ReceiptBuilder {
 
     bytes.addAll(g.emptyLines(1));
 
-    // 2. ORDER NUMBER (Center-aligned)
-    final extracted = _extractOrderNumber(order);
-    final orderNoStr =
-        (orderNumberOverride != null && orderNumberOverride.trim().isNotEmpty)
-            ? orderNumberOverride.trim()
-            : extracted;
-
+    // 2. ORDER NUMBER (GLOBAL resolver)
+    final orderNoStr = _orderNumberFor(order, override: orderNumberOverride);
     if (orderNoStr.isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
@@ -776,6 +776,100 @@ class ReceiptBuilder {
       highDensityHorizontal: true,
       highDensityVertical: true,
     );
+  }
+
+  // =================
+  // GLOBAL Order number resolver (NEW/UPDATED)
+  // =================
+  String _orderNumberFor(
+    dynamic order, {
+    String? override,
+  }) {
+    // Build a stable key for this order (if possible).
+    final orderKey = _deriveOrderKey(order);
+
+    // 1) Explicit override wins; cache globally + by key.
+    if (override != null && override.trim().isNotEmpty) {
+      final fixed = override.trim();
+      _cacheResolvedOrderNo(orderKey, order, fixed);
+      return fixed;
+    }
+
+    // 2) If this specific instance had a memo, reuse it (fast path).
+    final memo = (order != null) ? _orderNoMemo[order] : null;
+    if (memo != null && memo.trim().isNotEmpty) {
+      _cacheResolvedOrderNo(orderKey, order, memo);
+      return memo;
+    }
+
+    // 3) If we have by-key cache (same order across instances), reuse it.
+    if (orderKey != null) {
+      final byKey = _globalOrderNoByKey[orderKey];
+      if (byKey != null && byKey.trim().isNotEmpty) {
+        _cacheResolvedOrderNo(orderKey, order, byKey);
+        return byKey;
+      }
+    }
+
+    // 4) Fall back to global last (keeps same number across sequential prints).
+    if (_globalLastOrderNo != null && _globalLastOrderNo!.trim().isNotEmpty) {
+      final fixed = _globalLastOrderNo!.trim();
+      _cacheResolvedOrderNo(orderKey, order, fixed);
+      return fixed;
+    }
+
+    // 5) Extract from order.
+    final extracted = _extractOrderNumber(order);
+    if (extracted.isNotEmpty) {
+      _cacheResolvedOrderNo(orderKey, order, extracted);
+      return extracted;
+    }
+
+    // 6) Absolute fallback: timestamp.
+    final generated = DateFormat('yyMMddHHmmss').format(DateTime.now());
+    _cacheResolvedOrderNo(orderKey, order, generated);
+    return generated;
+  }
+
+  // Store resolved number in all places that help future calls.
+  void _cacheResolvedOrderNo(String? key, dynamic order, String value) {
+    _globalLastOrderNo = value;
+    if (key != null) _globalOrderNoByKey[key] = value;
+    if (order != null) _orderNoMemo[order] = value;
+    if (order is Map) {
+      final existing = '${order['orderNumber'] ?? ''}'.trim();
+      if (existing.isEmpty) order['orderNumber'] = value;
+    }
+  }
+
+  // Try to derive a stable identity for an order across layers.
+  String? _deriveOrderKey(dynamic order) {
+    if (order == null) return null;
+    // Prefer explicit numbers/ids; check both nested and flat.
+    final candidates = <dynamic>[
+      _pick(order, ['data.orderNumber']),
+      _pick(order, ['data.OrderNumber']),
+      _pick(order, ['orderNumber']),
+      _pick(order, ['OrderNumber']),
+      _pick(order, ['data.orderId']),
+      _pick(order, ['data.OrderId']),
+      _pick(order, ['orderId']),
+      _pick(order, ['OrderId']),
+      _pick(order, ['data.id']),
+      _pick(order, ['data.Id']),
+      _pick(order, ['id']),
+      _pick(order, ['Id']),
+      _pick(order, ['number']),
+      _pick(order, ['Number']),
+    ];
+    for (final c in candidates) {
+      if (c == null) continue;
+      final s = c.toString().trim();
+      if (s.isEmpty || s.toLowerCase() == 'null' || s == '0') continue;
+      return s;
+    }
+    // If the order is just a Map with a client guid/session, you can add it here.
+    return null;
   }
 
   // =================

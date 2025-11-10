@@ -26,13 +26,11 @@ class PrinterSetupDialog extends StatefulWidget {
 class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
   final _bt = BluetoothPrinterManager();
 
-  // Paired devices from plugin. Structure: {'name': '...', 'macAdress': '...'}
   List<Map<String, dynamic>> _paired = [];
   bool _loading = true;
   bool _refreshing = false;
   String? _error;
 
-  // Local selection map by role → mac address
   final Map<PrinterRole, String?> _selectedMac = {
     PrinterRole.customer: null,
     PrinterRole.falafel: null,
@@ -51,9 +49,8 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
       _error = null;
     });
     try {
-      await _bt.load(); // loads saved assignments to _bt.assigned
+      await _bt.load();
       await _loadPaired();
-      // Prime selections from saved assignments
       for (final role in _selectedMac.keys) {
         final sp = _bt.assigned[role];
         _selectedMac[role] = sp?.mac;
@@ -61,14 +58,11 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
     } catch (e) {
       _error = 'Failed to load printers: $e';
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _loadPaired() async {
-    // For classic ESC/POS, get bonded devices from blue_thermal_printer
     final bluetooth = BlueThermalPrinter.instance;
     final devices = await bluetooth.getBondedDevices();
     _paired = devices
@@ -87,9 +81,7 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
     } catch (e) {
       _error = 'Refresh failed: $e';
     } finally {
-      if (mounted) {
-        setState(() => _refreshing = false);
-      }
+      if (mounted) setState(() => _refreshing = false);
     }
   }
 
@@ -122,8 +114,7 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
       return;
     }
     try {
-      // Minimal 80mm English test using esc_pos_utils
-      final profile = await CapabilityProfile.load(); // default profile
+      final profile = await CapabilityProfile.load();
       final generator = Generator(PaperSize.mm80, profile);
       final bytes = <int>[];
       bytes.addAll(generator.text('--- TEST PRINT ---',
@@ -132,22 +123,17 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
               height: PosTextSize.size2,
               width: PosTextSize.size2)));
       bytes.addAll(generator.hr());
-      bytes.addAll(generator.text('Role: ${role.label}',
-          styles: const PosStyles(align: PosAlign.left)));
-      bytes.addAll(generator.text('Paper: 80mm',
-          styles: const PosStyles(align: PosAlign.left)));
-      bytes.addAll(generator.text('Language: English',
-          styles: const PosStyles(align: PosAlign.left)));
+      bytes.addAll(generator.text('Role: ${role.label}'));
+      bytes.addAll(generator.text('Paper: 80mm'));
+      bytes.addAll(generator.text('Language: English'));
       bytes.addAll(generator.hr());
       bytes.addAll(generator.text('Date: ${DateTime.now()}',
           styles: const PosStyles(align: PosAlign.center)));
       bytes.addAll(generator.feed(2));
-      // optional "cut" for printers that support it
       try {
         bytes.addAll(generator.cut());
       } catch (_) {}
 
-      // withPrinter will connect, run, then disconnect safely
       final ok = await _bt.withPrinter(role, () async {
         await _bt.writeBytes(Uint8List.fromList(bytes));
       });
@@ -160,14 +146,13 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
   }
 
   Future<void> _testAll() async {
-    await _saveAssignments(); // ensure latest selections are stored
+    await _saveAssignments();
     for (final role in [
       PrinterRole.customer,
       PrinterRole.falafel,
       PrinterRole.shawarmaSnacks
     ]) {
       await _testPrint(role);
-      // small pause to avoid rapid reconnects
       await Future.delayed(const Duration(milliseconds: 250));
     }
   }
@@ -179,120 +164,148 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          const Icon(Icons.print),
-          const SizedBox(width: 8),
-          const Text('Printer Setup'),
-          const Spacer(),
-          IconButton(
-            tooltip: 'Refresh paired list',
-            onPressed: _refreshing ? null : _refreshPaired,
-            icon: _refreshing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.refresh),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFFB87333),
+          onPrimary: Colors.white,
+          background: Colors.white,
+          surface: Colors.white,
+          onSurface: Color(0xFF36454F),
+        ),
+        dialogBackgroundColor: Colors.white,
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: Color(0xFFB87333),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFFB87333),
+            foregroundColor: Colors.white,
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Color(0xFFB87333),
+            side: const BorderSide(color: Color(0xFFB87333)),
+          ),
+        ),
+      ),
+      child: AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.print, color: Color(0xFFB87333)),
+            const SizedBox(width: 8),
+            const Text(
+              'Printer Setup',
+              style: TextStyle(
+                color: Color(0xFF36454F),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Refresh paired list',
+              onPressed: _refreshing ? null : _refreshPaired,
+              icon: _refreshing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, color: Color(0xFF36454F)),
+            ),
+          ],
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+        content: SingleChildScrollView(
+          child: SizedBox(
+            width: 560,
+            child: _loading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : _buildPrinterSetupContent(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _testAll,
+            icon: const Icon(Icons.print),
+            label: const Text('Test all'),
+          ),
+          ElevatedButton.icon(
+            onPressed: _saveAssignments,
+            icon: const Icon(Icons.save),
+            label: const Text('Save'),
           ),
         ],
       ),
-      contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      content: SingleChildScrollView(
-        child: SizedBox(
-          width: 560,
-          child: _loading
-              ? const Center(
-                  child: Padding(
-                  padding: EdgeInsets.all(24.0),
-                  child: CircularProgressIndicator(),
-                ))
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_error != null)
-                      Container(
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(_error!,
-                            style: const TextStyle(color: Colors.red)),
-                      ),
+    );
+  }
 
-                    // Paired devices list as hint
-                    _PairedHint(paired: _paired),
-
-                    const Divider(),
-
-                    _RolePicker(
-                      title: 'Customer receipt',
-                      role: PrinterRole.customer,
-                      paired: _paired,
-                      value: _selectedMac[PrinterRole.customer],
-                      onChanged: (val) {
-                        setState(
-                            () => _selectedMac[PrinterRole.customer] = val);
-                      },
-                    ),
-                    _TestRow(onTest: () => _testPrint(PrinterRole.customer)),
-
-                    const SizedBox(height: 8),
-                    _RolePicker(
-                      title: 'Falafel (Category 7)',
-                      role: PrinterRole.falafel,
-                      paired: _paired,
-                      value: _selectedMac[PrinterRole.falafel],
-                      onChanged: (val) {
-                        setState(() => _selectedMac[PrinterRole.falafel] = val);
-                      },
-                    ),
-                    _TestRow(onTest: () => _testPrint(PrinterRole.falafel)),
-
-                    const SizedBox(height: 8),
-                    _RolePicker(
-                      title: 'Shawarma & Snacks (Categories 6, 8, 9)',
-                      role: PrinterRole.shawarmaSnacks,
-                      paired: _paired,
-                      value: _selectedMac[PrinterRole.shawarmaSnacks],
-                      onChanged: (val) {
-                        setState(() =>
-                            _selectedMac[PrinterRole.shawarmaSnacks] = val);
-                      },
-                    ),
-                    _TestRow(
-                        onTest: () => _testPrint(PrinterRole.shawarmaSnacks)),
-
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _bt.isConnected
-                            ? 'Status: Connected'
-                            : 'Status: Not connected',
-                        style: TextStyle(
-                          color: _bt.isConnected ? Colors.green : Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+  Widget _buildPrinterSetupContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_error != null)
+          Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
+        _PairedHint(paired: _paired),
+        const Divider(),
+        _RolePicker(
+          title: 'Customer receipt',
+          role: PrinterRole.customer,
+          paired: _paired,
+          value: _selectedMac[PrinterRole.customer],
+          onChanged: (val) {
+            setState(() => _selectedMac[PrinterRole.customer] = val);
+          },
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+        _TestRow(onTest: () => _testPrint(PrinterRole.customer)),
+        const SizedBox(height: 8),
+        _RolePicker(
+          title: 'Falafel (Category 7)',
+          role: PrinterRole.falafel,
+          paired: _paired,
+          value: _selectedMac[PrinterRole.falafel],
+          onChanged: (val) {
+            setState(() => _selectedMac[PrinterRole.falafel] = val);
+          },
         ),
-        OutlinedButton.icon(
-          onPressed: _testAll,
-          icon: const Icon(Icons.print),
-          label: const Text('Test all'),
+        _TestRow(onTest: () => _testPrint(PrinterRole.falafel)),
+        const SizedBox(height: 8),
+        _RolePicker(
+          title: 'Shawarma & Snacks (Categories 6, 8, 9)',
+          role: PrinterRole.shawarmaSnacks,
+          paired: _paired,
+          value: _selectedMac[PrinterRole.shawarmaSnacks],
+          onChanged: (val) {
+            setState(() => _selectedMac[PrinterRole.shawarmaSnacks] = val);
+          },
         ),
-        ElevatedButton.icon(
-          onPressed: _saveAssignments,
-          icon: const Icon(Icons.save),
-          label: const Text('Save'),
+        _TestRow(onTest: () => _testPrint(PrinterRole.shawarmaSnacks)),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _bt.isConnected ? 'Status: Connected' : 'Status: Not connected',
+            style: TextStyle(
+              color: _bt.isConnected ? Colors.green : Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
       ],
     );
@@ -309,8 +322,7 @@ class _PairedHint extends StatelessWidget {
       return const Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          'No paired Bluetooth printers found.\n'
-          'Pair your ESC/POS printers in device settings, then Refresh.',
+          'No paired Bluetooth printers found.\nPair your ESC/POS printers in device settings, then Refresh.',
           style: TextStyle(fontSize: 13, color: Colors.grey),
         ),
       );
@@ -318,13 +330,8 @@ class _PairedHint extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Paired devices:',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
+        const Text('Paired devices:',
+            style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Container(
           width: double.infinity,
@@ -338,8 +345,9 @@ class _PairedHint extends StatelessWidget {
             runSpacing: 8,
             children: paired
                 .map((p) => Chip(
+                      avatar: const Icon(Icons.print,
+                          size: 18, color: Color(0xFFB87333)),
                       label: Text('${p['name']}'),
-                      avatar: const Icon(Icons.print, size: 18),
                     ))
                 .toList(),
           ),
@@ -367,31 +375,36 @@ class _RolePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = paired
-        .map<DropdownMenuItem<String>>((p) => DropdownMenuItem<String>(
-              value: p['mac'],
-              child: Row(
-                children: [
-                  const Icon(Icons.print, size: 18, color: Colors.brown),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: Text('${p['name']}',
-                          overflow: TextOverflow.ellipsis)),
-                  const SizedBox(width: 8),
-                  Text(
-                    p['mac'] ?? '',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ))
+        .map<DropdownMenuItem<String>>(
+          (p) => DropdownMenuItem<String>(
+            value: p['mac'],
+            child: Row(
+              children: [
+                const Icon(Icons.print, size: 18, color: Color(0xFFB87333)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${p['name']}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFF36454F))),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  p['mac'] ?? '',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        )
         .toList();
 
     return Row(
       children: [
         SizedBox(
           width: 210,
-          child:
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          child: Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600, color: Color(0xFF36454F))),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -399,6 +412,8 @@ class _RolePicker extends StatelessWidget {
             value: value,
             isExpanded: true,
             items: items,
+            iconEnabledColor: const Color(0xFFB87333),
+            style: const TextStyle(color: Color(0xFF36454F)),
             onChanged: onChanged,
             decoration: const InputDecoration(
               labelText: 'Select printer',
@@ -423,8 +438,11 @@ class _TestRow extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: TextButton.icon(
         onPressed: onTest,
-        icon: const Icon(Icons.print),
-        label: const Text('Test'),
+        icon: const Icon(Icons.print, color: Color(0xFFB87333)),
+        label: const Text(
+          'Test',
+          style: TextStyle(color: Color(0xFF36454F)),
+        ),
       ),
     );
   }

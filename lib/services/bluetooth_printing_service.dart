@@ -212,7 +212,7 @@ class BluetoothPrinterManager with ChangeNotifier {
         '🔌 Connecting to ${role.label} printer (MAC: ${target.mac})...');
 
     // Increased settle time before connect (especially when chaining printers)
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     final ok = await connect(target.mac);
     if (!ok) {
@@ -230,7 +230,7 @@ class BluetoothPrinterManager with ChangeNotifier {
       // CRITICAL: Additional wait to ensure printer finishes printing
       // Increased for Arabic raster images which need more processing
       debugPrint('⏳ Waiting for ${role.label} printer to finish printing...');
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 1200));
       debugPrint('✅ ${role.label} printer should have completed printing');
 
       return true;
@@ -244,7 +244,7 @@ class BluetoothPrinterManager with ChangeNotifier {
       debugPrint('✅ Disconnected from ${role.label} printer');
 
       // Increased delay to avoid rapid reconnect to next printer
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 500));
     }
   }
 }

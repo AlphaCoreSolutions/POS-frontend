@@ -36,44 +36,13 @@ class TriplePrinter {
   });
 
   Future<void> printAll(dynamic order, {String storeName = ''}) async {
-    final printSessionId = DateTime.now().millisecondsSinceEpoch;
-    developer.log(
-      '🖨️ [PRINT-SESSION-$printSessionId] Starting print sequence',
-      name: 'TriplePrinter',
-    );
-
     try {
-      // 1) Customer (80mm)
-      final customerBuilder = await ReceiptBuilder.createCustomerBuilder(
-        arabicFontFamily: 'NotoNaskhArabic',
-        arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
-        useArabicIndicDigits: true,
-      );
-
-      final bytes = await customerBuilder.printCustomer(
-        order,
-        resolve: _buildResolver(),
-        storeName: storeName,
-      );
-
-      final customerPrinted = await btManager.withPrinter(
-        PrinterRole.customer,
-        () async => btManager.writeBytes(Uint8List.fromList(bytes)),
-      );
-
-      if (!customerPrinted) {
-        developer.log(
-          '⚠️ [PRINT-SESSION-$printSessionId] Customer receipt FAILED',
-          name: 'TriplePrinter',
-          level: 900,
-        );
-      }
-      await Future.delayed(_printerDelayShort);
-
-      // 2) Kitchens (58mm)
+      // 1) Build item buckets for kitchen routing
       final buckets = _makeBuckets(order);
+
+      // 2) Falafel Kitchen
       await _printKitchenBucket(
-        printSessionId,
+        DateTime.now().millisecondsSinceEpoch,
         role: PrinterRole.falafel,
         kitchenName: 'مطبخ الفلافل',
         items: buckets['falafel'] ?? const [],
@@ -82,34 +51,24 @@ class TriplePrinter {
 
       await Future.delayed(_printerDelayLong);
 
+      // 3) Shawarma & Snacks Kitchen
       await _printKitchenBucket(
-        printSessionId,
+        DateTime.now().millisecondsSinceEpoch,
         role: PrinterRole.shawarmaSnacks,
         kitchenName: 'مطبخ الشاورما والوجبات الخفيفة',
         items: buckets['shawarmaSnacks'] ?? const [],
         order: order,
       );
 
-      // 3) Reconnect customer printer (ready for next order)
+      // 4) Reconnect Customer Printer (if assigned)
       final customerPrinter = btManager.getForRole(PrinterRole.customer);
       if (customerPrinter != null) {
-        await Future.delayed(_reconnectDelay);
+        await Future.delayed(
+            _reconnectDelay); // Optional delay before reconnect
         await btManager.connect(customerPrinter.mac);
       }
-
-      developer.log(
-        '✅ [PRINT-SESSION-$printSessionId] Completed',
-        name: 'TriplePrinter',
-      );
     } catch (e, st) {
-      developer.log(
-        '❌ [PRINT-SESSION-$printSessionId] CRITICAL: $e',
-        name: 'TriplePrinter',
-        error: e,
-        stackTrace: st,
-        level: 1000,
-      );
-      // best-effort: keep customer printer ready
+      // Try reconnecting to customer printer even on error
       try {
         final customerPrinter = btManager.getForRole(PrinterRole.customer);
         if (customerPrinter != null) {
@@ -117,6 +76,7 @@ class TriplePrinter {
           await btManager.connect(customerPrinter.mac);
         }
       } catch (_) {}
+
       rethrow;
     }
   }
