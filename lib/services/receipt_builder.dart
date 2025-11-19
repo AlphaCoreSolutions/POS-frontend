@@ -225,6 +225,7 @@ class ReceiptBuilder {
   }) async {
     final g = Generator(paper, profile);
     final List<int> bytes = [];
+
     final sw = Stopwatch()..start();
 
     bytes.addAll(g.reset());
@@ -274,6 +275,11 @@ class ReceiptBuilder {
     // 5️⃣ ITEMS LOOP
     final orderItems = items ?? _extractItems(order);
     for (final it in orderItems) {
+      developer.log(
+        'RB Customer item -> type=${it.runtimeType}, additions=${_extractAdditionsFromItem(it)}, notes="${_extractNotesFromItem(it)}"',
+        name: 'ReceiptBuilder',
+      );
+
       final int productId = _asInt(_pick(it, ['productId', 'ProductId']), 0);
       final double qty = _asNumDouble(_pick(it, ['quantity', 'Quantity']), 1.0);
 
@@ -311,18 +317,40 @@ class ReceiptBuilder {
       ));
 
       // 🔥 ADDITIONS (customer)
-      final rawAdditions = _pick(it, ['additions', 'Additions']);
+      final rawAdditions = _extractAdditionsFromItem(it);
       if (rawAdditions is List && rawAdditions.isNotEmpty) {
         for (final add in rawAdditions) {
-          final int ddId =
+          int ddId =
               _asInt(_pick(add, ['domainDetailId', 'DomainDetailId']), 0);
+// Fallback for DTO objects
+          if (ddId == 0) {
+            try {
+              ddId = _asInt((add as dynamic).domainDetailId, 0);
+            } catch (_) {}
+          }
 
-          // Prefer server data: additionName + priceIncrease
           String addName =
               _asString(_pick(add, ['additionName', 'name', 'Name']), '')
                   .trim();
+          if (addName.isEmpty) {
+            try {
+              final dynName = (add as dynamic).additionName;
+              if (dynName is String && dynName.trim().isNotEmpty) {
+                addName = dynName.trim();
+              }
+            } catch (_) {}
+          }
+
           double addPrice =
               _asNumDouble(_pick(add, ['priceIncrease', 'PriceIncrease']), 0.0);
+          if (addPrice == 0.0) {
+            try {
+              final dynPrice = (add as dynamic).priceIncrease;
+              if (dynPrice is num) {
+                addPrice = dynPrice.toDouble();
+              }
+            } catch (_) {}
+          }
 
           // If we only have ID (from local DTO), resolve from product.additions[]
           if ((addName.isEmpty || addPrice == 0.0) &&
@@ -349,7 +377,7 @@ class ReceiptBuilder {
       }
 
       // existing NOTES
-      final notes = _asString(_pick(it, ['notes', 'Notes']), '').trim();
+      final notes = _extractNotesFromItem(it).trim();
       if (notes.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
           g,
@@ -498,6 +526,10 @@ class ReceiptBuilder {
     bytes.addAll(g.hr(ch: '-'));
 
     for (final it in items) {
+      developer.log(
+        'RB Kitchen item -> type=${it.runtimeType}, additions=${_extractAdditionsFromItem(it)}, notes="${_extractNotesFromItem(it)}"',
+        name: 'ReceiptBuilder',
+      );
       final int productId = _asInt(_pick(it, ['productId', 'ProductId']), 0);
       final double qty = _asNumDouble(_pick(it, ['quantity', 'Quantity']), 1.0);
 
@@ -520,7 +552,7 @@ class ReceiptBuilder {
       ));
 
       // 🔥 ADDITIONS (kitchen)
-      final rawAdditions = _pick(it, ['additions', 'Additions']);
+      final rawAdditions = _extractAdditionsFromItem(it);
       if (rawAdditions is List && rawAdditions.isNotEmpty) {
         for (final add in rawAdditions) {
           final int ddId =
@@ -557,7 +589,7 @@ class ReceiptBuilder {
       }
 
       // existing NOTES
-      final notes = _asString(_pick(it, ['notes', 'Notes']), '').trim();
+      final notes = _extractNotesFromItem(it).trim();
       if (notes.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
           g,
@@ -1262,6 +1294,48 @@ class ReceiptBuilder {
 
     return null;
   }
+}
+
+/// Extract additions list from either a Map or a Dart DTO (OrderItemDto).
+List<dynamic>? _extractAdditionsFromItem(dynamic item) {
+  developer.log(
+    'RB _extractAdditionsFromItem() called with: ${item.runtimeType}',
+    name: 'ReceiptBuilder',
+  );
+  if (item == null) return null;
+
+  // Case 1: JSON map from backend
+  if (item is Map) {
+    final a = item['additions'] ?? item['Additions'];
+    if (a is List) return a;
+  }
+
+  // Case 2: Dart class (OrderItemDto, etc.)
+  try {
+    final a = (item as dynamic).additions;
+    if (a is List) return a;
+  } catch (_) {}
+
+  return null;
+}
+
+/// Extract notes from either a Map or a Dart DTO.
+String _extractNotesFromItem(dynamic item) {
+  if (item == null) return '';
+
+  // Case 1: Map
+  if (item is Map) {
+    final n = item['notes'] ?? item['Notes'];
+    if (n is String) return n;
+  }
+
+  // Case 2: Dart class
+  try {
+    final n = (item as dynamic).notes;
+    if (n is String) return n;
+  } catch (_) {}
+
+  return '';
 }
 
 class _Totals {

@@ -1,11 +1,10 @@
-import 'package:visionpos/models/order_item_addition_dto.dart';
+import 'order_item_addition_dto.dart';
 
 class OrderItemDto {
   final int productId;
   final double quantity;
   final double discount;
 
-  // 🔥 NEW
   final String? notes;
   final List<OrderItemAdditionDto> additions;
 
@@ -22,7 +21,6 @@ class OrderItemDto {
       productId: productId,
       quantity: newQuantity,
       discount: discount,
-      // keep notes & additions
       notes: notes,
       additions: additions,
     );
@@ -34,7 +32,7 @@ class OrderItemDto {
       'quantity': quantity,
       'discount': discount,
       'notes': notes,
-      'additions': additions.map((addition) => addition.toJson()).toList(),
+      'additions': additions.map((a) => a.toJson()).toList(),
     };
   }
 
@@ -45,8 +43,8 @@ class OrderItemDto {
       discount: (json['discount'] ?? json['Discount'] ?? 0).toDouble(),
       notes: json['notes'] ?? json['Notes'],
       additions: ((json['additions'] ?? json['Additions']) as List<dynamic>?)
-              ?.map((item) =>
-                  OrderItemAdditionDto.fromJson(item as Map<String, dynamic>))
+              ?.map((e) =>
+                  OrderItemAdditionDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
     );

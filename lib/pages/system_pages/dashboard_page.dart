@@ -888,7 +888,7 @@ void _fetchOrdersForSelectedDateRange() async {
                                           color: Colors.green),
                                     ),
                                     Text(
-                                      'Tips: ${order.tip.toStringAsFixed(2)}',
+                                      'Tips: ${order.tips.toStringAsFixed(2)}',
                                       style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,

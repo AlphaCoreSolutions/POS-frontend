@@ -84,7 +84,7 @@ Future<Uint8List> buildReceiptPdfBytes(
 
         // Totals
         final grand = order.grandTotal.toDouble();
-        final tip = (order.tip != 0.0 ? order.tip : order.tips).toDouble();
+        final tip = (order.tips != 0.0 ? order.tips : order.tips).toDouble();
         final pm = order.paymentMethod;
 
         children.add(

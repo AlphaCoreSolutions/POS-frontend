@@ -315,7 +315,7 @@ class PosProvider with ChangeNotifier {
       orderItems: _selectedItems,
       grandTotal: _total,
       paymentMethod: _paymentMethod,
-      tip: _tips,
+      tips: _tips,
     );
 
     final apiHandler = ApiHandler();

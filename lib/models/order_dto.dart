@@ -1,14 +1,16 @@
-import 'order_item_dto.dart';
+import 'package:visionpos/models/order_item_dto.dart';
 
 class OrderDto {
-  final int id;
   final int organizationId;
   final int customerId;
+  final int paymentMethod;
   final double tips;
   final List<OrderItemDto> orderItems;
+
+  // You can keep extra fields if you need them elsewhere,
+  // but they don't need to go in toJson.
+  final int id;
   final double grandTotal;
-  final int paymentMethod;
-  final double tip;
   final String? orderPlaced;
 
   OrderDto({
@@ -19,7 +21,6 @@ class OrderDto {
     this.tips = 0.0,
     required this.orderItems,
     this.grandTotal = 0.0,
-    this.tip = 0.0,
     this.orderPlaced,
   });
 
@@ -28,7 +29,7 @@ class OrderDto {
       'organizationId': organizationId,
       'customerId': customerId,
       'paymentMethod': paymentMethod,
-      'tips': tips,
+      'tips': tips, // make sure you set this when building
       'orderItems': orderItems.map((item) => item.toJson()).toList(),
     };
   }
@@ -44,7 +45,6 @@ class OrderDto {
           .map((item) => OrderItemDto.fromJson(item))
           .toList(),
       grandTotal: (json['GrandTotal'] ?? json['grandTotal'] ?? 0).toDouble(),
-      tip: (json['tip'] ?? json['tips'] ?? 0).toDouble(),
       orderPlaced: json['orderPlaced'] ?? json['OrderPlaced'],
     );
   }

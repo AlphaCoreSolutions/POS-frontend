@@ -8,6 +8,7 @@ import 'package:esc_pos_utils/esc_pos_utils.dart'; // you already use it
 import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/components/printer_setup_dialog.dart';
 import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/models/domain_detail_model.dart';
 import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/models/order_item_addition_dto.dart';
 import 'package:visionpos/models/order_item_dto.dart';
@@ -28,6 +29,7 @@ import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/receipt_builder.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -777,7 +779,7 @@ class _MainPageState extends State<MainPage> {
 
     // ---------- totals ----------
     final grand = order.grandTotal.toDouble();
-    final tip = (order.tip != 0.0 ? order.tip : order.tips).toDouble();
+    final tip = (order.tips != 0.0 ? order.tips : order.tips).toDouble();
     final pm = order.paymentMethod;
 
     await _line(
@@ -1108,10 +1110,10 @@ class _MainPageState extends State<MainPage> {
     return productPrices[productId] ?? 0.0;
   }
 
-  void addToOrder(Product product) async {
-    // If product has additions, ask user first
+  Future<void> addToOrder(Product product) async {
     AdditionsSelectionResult? selection;
 
+    // 1️⃣ Show dialog if product has additions
     if (product.additions.isNotEmpty) {
       selection = await showAdditionsDialog(context, product);
       if (selection == null) {
@@ -1121,18 +1123,41 @@ class _MainPageState extends State<MainPage> {
     }
 
     setState(() {
-      // ✅ Simple rule: each click creates a new line with its own notes/additions
-      // If you want "same config → increase quantity", you can compare
-      // notes + additions here and merge.
-      selectedItems.add(
-        OrderItemDto(
-          productId: product.productId,
-          quantity: 1,
-          discount: 0.0,
-          notes: selection?.notes,
-          additions: selection?.additions ?? const [],
-        ),
-      );
+      final String? newNotes = selection?.notes;
+      final newAdditions =
+          selection?.additions ?? const <OrderItemAdditionDto>[]; // 👈 here
+
+      // 2️⃣ Find an existing line with SAME product + SAME notes + SAME additions
+      final int index = selectedItems.indexWhere((item) {
+        if (item.productId != product.productId) return false;
+
+        final existingNotes = (item.notes ?? '').trim();
+        final targetNotes = (newNotes ?? '').trim();
+        if (existingNotes != targetNotes) return false;
+
+        final existingAddIds =
+            item.additions.map((a) => a.domainDetailId).toSet();
+        final targetAddIds = newAdditions.map((a) => a.domainDetailId).toSet();
+
+        return setEquals(existingAddIds, targetAddIds);
+      });
+
+      if (index != -1) {
+        // 3️⃣ Same config → just bump quantity
+        final current = selectedItems[index];
+        selectedItems[index] = current.updateQuantity(current.quantity + 1);
+      } else {
+        // 4️⃣ New config → create new row WITH additions + notes
+        selectedItems.add(
+          OrderItemDto(
+            productId: product.productId,
+            quantity: 1,
+            discount: 0.0,
+            notes: newNotes, // ✅ notes stored here
+            additions: newAdditions, // ✅ additions stored here
+          ),
+        );
+      }
 
       productPrices[product.productId] = product.sellingPrice;
     });
@@ -1146,71 +1171,151 @@ class _MainPageState extends State<MainPage> {
     final selected = <int>{};
     final notesController = TextEditingController();
 
+    // Your custom palette
+    const Color bgColor = ui.Color.fromARGB(255, 255, 255, 255);
+    const Color accentColor = Color(0xFFB87333);
+    const Color textColor = ui.Color.fromARGB(255, 0, 0, 0);
+
     return showDialog<AdditionsSelectionResult>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(product.productName),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (additions.isNotEmpty)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: additions.map((d) {
-                      final checked = selected.contains(d.domainDetailId);
-                      return CheckboxListTile(
-                        value: checked,
-                        title: Text(
-                            '${d.name} (+${d.priceIncrease.toStringAsFixed(2)})'),
-                        onChanged: (value) {
-                          if (value == true) {
-                            selected.add(d.domainDetailId);
-                          } else {
-                            selected.remove(d.domainDetailId);
-                          }
-                          // rebuild
-                          (context as Element).markNeedsBuild();
-                        },
-                      );
-                    }).toList(),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: bgColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Text(
+                product.productName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (additions.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: additions.map((d) {
+                          final checked = selected.contains(d.domainDetailId);
+                          return CheckboxListTile(
+                            value: checked,
+                            activeColor: accentColor,
+                            checkColor: textColor,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            title: Text(
+                              '${d.name} (+${d.priceIncrease.toStringAsFixed(2)})',
+                              style: const TextStyle(
+                                color: textColor,
+                                fontSize: 14,
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setStateDialog(() {
+                                if (value == true) {
+                                  selected.add(d.domainDetailId);
+                                } else {
+                                  selected.remove(d.domainDetailId);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 2,
+                      style: const TextStyle(
+                        color: textColor,
+                        fontSize: 14,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'ملاحظات (اختياري)',
+                        labelStyle: const TextStyle(
+                          color: accentColor,
+                          fontSize: 13,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.black,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: accentColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: bgColor.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actionsAlignment: MainAxisAlignment.spaceBetween,
+              actionsPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(null),
+                  style: TextButton.styleFrom(
+                    foregroundColor: textColor,
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'ملاحظات (اختياري)',
-                    border: OutlineInputBorder(),
+                  child: const Text('إلغاء'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final additionsDtos = selected.map((id) {
+                      final dd = additions.firstWhere(
+                        (d) => d.domainDetailId == id,
+                      );
+
+                      return OrderItemAdditionDto(
+                        domainDetailId: dd.domainDetailId,
+                        additionName: dd.name,
+                        priceIncrease: dd.priceIncrease,
+                      );
+                    }).toList();
+
+                    Navigator.of(dialogContext).pop(
+                      AdditionsSelectionResult(
+                        notes: notesController.text.trim().isEmpty
+                            ? null
+                            : notesController.text.trim(),
+                        additions: additionsDtos,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: textColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'تأكيد',
+                    style: TextStyle(color: bgColor),
                   ),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final additionsDtos = selected
-                    .map((id) => OrderItemAdditionDto(domainDetailId: id))
-                    .toList();
-
-                Navigator.of(context).pop(
-                  AdditionsSelectionResult(
-                    notes: notesController.text.trim().isEmpty
-                        ? null
-                        : notesController.text.trim(),
-                    additions: additionsDtos,
-                  ),
-                );
-              },
-              child: const Text('تأكيد'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -1246,7 +1351,7 @@ class _MainPageState extends State<MainPage> {
       orderItems: selectedItems,
       grandTotal: grandTotal,
       paymentMethod: paymentMethod,
-      tip: tips,
+      tips: tips,
     );
 
     final success = await ApiHandler().postOrder(order);
@@ -2046,10 +2151,8 @@ class _MainPageState extends State<MainPage> {
                                                 'Uncategorized';
 
                                             return GestureDetector(
-                                              onTap: () {
-                                                setState(
-                                                  () => addToOrder(product),
-                                                );
+                                              onTap: () async {
+                                                await addToOrder(product);
                                               },
                                               child: Card(
                                                 elevation: 3,
@@ -2172,7 +2275,6 @@ class _MainPageState extends State<MainPage> {
                                                         CrossAxisAlignment
                                                             .start,
                                                     children: [
-                                                      // Adding ListTile here
                                                       ListTile(
                                                         title: Text(
                                                           product.productName,
@@ -2184,13 +2286,112 @@ class _MainPageState extends State<MainPage> {
                                                                 FontWeight.bold,
                                                           ),
                                                         ),
-                                                        subtitle: Text(
-                                                          'Quantity: ${selected.quantity}',
-                                                          style: TextStyle(
-                                                            fontSize:
-                                                                screenWidth *
-                                                                    0.013,
-                                                          ),
+                                                        // 🔥 quantity + additions + notes
+                                                        subtitle: Builder(
+                                                          builder: (_) {
+                                                            // Build additions display (names from product.additions)
+                                                            final List<Widget>
+                                                                additionWidgets =
+                                                                [];
+
+                                                            if (selected
+                                                                .additions
+                                                                .isNotEmpty) {
+                                                              for (final add
+                                                                  in selected
+                                                                      .additions) {
+                                                                // Find matching DomainDetail on the product
+                                                                String label =
+                                                                    '';
+                                                                for (final d
+                                                                    in product
+                                                                        .additions) {
+                                                                  if (d.domainDetailId ==
+                                                                      add.domainDetailId) {
+                                                                    final pricePart =
+                                                                        d.priceIncrease >
+                                                                                0
+                                                                            ? ' (+${d.priceIncrease.toStringAsFixed(2)})'
+                                                                            : '';
+                                                                    label =
+                                                                        '${d.name}$pricePart';
+                                                                    break;
+                                                                  }
+                                                                }
+
+                                                                if (label
+                                                                    .isEmpty) {
+                                                                  label =
+                                                                      'إضافة (${add.domainDetailId})';
+                                                                }
+
+                                                                additionWidgets
+                                                                    .add(
+                                                                  Text(
+                                                                    '• $label',
+                                                                    style:
+                                                                        TextStyle(
+                                                                      fontSize:
+                                                                          screenWidth *
+                                                                              0.0115,
+                                                                      color: Colors
+                                                                              .grey[
+                                                                          800],
+                                                                    ),
+                                                                  ),
+                                                                );
+                                                              }
+                                                            }
+
+                                                            final hasNotes =
+                                                                (selected.notes !=
+                                                                        null &&
+                                                                    selected
+                                                                        .notes!
+                                                                        .trim()
+                                                                        .isNotEmpty);
+
+                                                            return Column(
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
+                                                              children: [
+                                                                Text(
+                                                                  'Quantity: ${selected.quantity}',
+                                                                  style:
+                                                                      TextStyle(
+                                                                    fontSize:
+                                                                        screenWidth *
+                                                                            0.013,
+                                                                  ),
+                                                                ),
+                                                                if (additionWidgets
+                                                                    .isNotEmpty) ...[
+                                                                  const SizedBox(
+                                                                      height:
+                                                                          4),
+                                                                  ...additionWidgets,
+                                                                ],
+                                                                if (hasNotes) ...[
+                                                                  const SizedBox(
+                                                                      height:
+                                                                          4),
+                                                                  Text(
+                                                                    'ملاحظة: ${selected.notes}',
+                                                                    style:
+                                                                        TextStyle(
+                                                                      fontSize:
+                                                                          screenWidth *
+                                                                              0.0115,
+                                                                      color: Colors
+                                                                              .brown[
+                                                                          700],
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ],
+                                                            );
+                                                          },
                                                         ),
                                                         trailing: Text(
                                                           '${product.sellingPrice.toStringAsFixed(2)} JOD',
@@ -2210,17 +2411,16 @@ class _MainPageState extends State<MainPage> {
                                                 Row(
                                                   children: [
                                                     IconButton(
-                                                      icon: Icon(
+                                                      icon: const Icon(
                                                         Icons.remove_circle,
                                                         color: Colors.red,
                                                       ),
                                                       onPressed: () =>
                                                           _removeProductFromOrder(
-                                                        index,
-                                                      ),
+                                                              index),
                                                     ),
                                                     IconButton(
-                                                      icon: Icon(
+                                                      icon: const Icon(
                                                         Icons.add_circle,
                                                         color: Colors.green,
                                                       ),
@@ -2713,7 +2913,6 @@ class _MainPageState extends State<MainPage> {
                           ),
                         ),
                       ),
-                      // In your State class:
 
                       // 1) Put this in your widget tree—e.g. at the end of your Stack:
                       Focus(
@@ -2861,64 +3060,130 @@ void _chargeOrder() async {
       debugPrint('🖨️ Order: $orderNumber | Total: \$$total');
       debugPrint('🖨️ ============================================');
 
-      // Step 1: Build print items with Arabic validation
+      // 1️⃣ Build print items with full config (additions + notes)
       final List<Map<String, dynamic>> printItems = items.map((it) {
         final product = _getProductById(it.productId);
 
-        // Check if product name contains Arabic characters
+        // Arabic / English name selection (same as before)
+        final productName = product.productName;
         final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
-            .hasMatch(product.productName);
+            .hasMatch(productName);
 
-        // Use Arabic name - either from database or keep original
         String arabicName;
         if (hasArabic) {
-          // Product name is already in Arabic ✅
-          arabicName = product.productName;
-          debugPrint('   ✅ "${product.productName}" (Arabic)');
+          arabicName = productName;
+          debugPrint('   ✅ "$productName" (Arabic)');
         } else {
-          // Product name is in English - use as-is for now
-          // RECOMMENDED: Update database to use Arabic names
-          arabicName = product.productName;
-          debugPrint(
-              '   ⚠️  "${product.productName}" (English - consider translating)');
+          arabicName = productName;
+          debugPrint('   ⚠️ "$productName" (English - consider translating)');
         }
 
+        // 🧮 Base price
+        final double basePrice = product.sellingPrice;
+
+        // 🧮 Additions total (using Product.additions list)
+        double additionsTotal = 0.0;
+        for (final addDto in it.additions) {
+          final dd = product.additions.firstWhere(
+            (d) => d.domainDetailId == addDto.domainDetailId,
+            orElse: () => DomainDetail(
+              domainDetailId: addDto.domainDetailId,
+              name: '',
+              priceIncrease: 0.0,
+            ),
+          );
+
+          final inc = dd.priceIncrease;
+          additionsTotal += inc;
+        }
+
+        final double unitWithAdditions = basePrice + additionsTotal;
+        final double lineTotal = unitWithAdditions * it.quantity;
+
+        // Log what we are about to send
+        debugPrint(
+          '   🧾 Item ${it.productId} → qty=${it.quantity}, '
+          'base=$basePrice, add=$additionsTotal, line=$lineTotal, '
+          'adds=${it.additions.length}, notes="${it.notes ?? ''}"',
+        );
+
         return {
-          'name': arabicName,
-          'quantity': it.quantity,
-          'price': product.sellingPrice,
+          // --- IDs / routing ---
+          'productId': it.productId,
           'categoryId': product.categoryId,
-          'notes': '', // Add notes if available
+
+          // --- Name / quantity / prices ---
+          'productName': arabicName,
+          'quantity': it.quantity,
+          'price': basePrice, // unit base price
+          'totalAfterTax': lineTotal, // FULL line total including additions
+
+          // --- Additions (in a format ReceiptBuilder understands) ---
+          'additions': it.additions.map((a) {
+            final dd = product.additions.firstWhere(
+              (d) => d.domainDetailId == a.domainDetailId,
+              orElse: () => DomainDetail(
+                domainDetailId: a.domainDetailId,
+                name: '',
+                priceIncrease: 0.0,
+              ),
+            );
+
+            return {
+              'domainDetailId': a.domainDetailId,
+              // These two are optional, but if present, ReceiptBuilder
+              // will use them directly without needing ProductResolver.
+              if (dd.name.isNotEmpty) 'additionName': dd.name,
+              'priceIncrease': dd.priceIncrease,
+            };
+          }).toList(),
+
+          // --- Notes (ReceiptBuilder._extractNotesFromItem looks at 'notes') ---
+          'notes': it.notes,
         };
       }).toList();
 
       debugPrint('🖨️ Total items: ${printItems.length}');
 
-      // Step 2: Prepare order data
+      // 2️⃣ Prepare order data in a shape friendly for both:
+      //    - KitchenRouter (expects `items` with categoryId)
+      //    - ReceiptBuilder (prefers `data.orderItems` + totals)
       final orderData = {
         'orderNumber': orderNumber,
         'paymentMethod': paymentMethod,
-        'subtotal': subtotal,
-        'tax': tax,
-        'tips': tips,
-        'total': total,
+
+        // For KitchenRouter / generic routing
         'items': printItems,
+
+        // For ReceiptBuilder._extractTotals / _extractItems
+        'data': {
+          'orderNumber': orderNumber,
+          'paymentMethod': paymentMethod,
+          'totalAfterDiscount': subtotal,
+          'discountTotal': 0.0, // or your real discount if you have one
+          'taxTotal': tax,
+          'tips': tips,
+          'totalAfterTax': total,
+          'grandTotal': total,
+          'orderDate': DateTime.now().toIso8601String(),
+          'orderItems': printItems,
+        },
       };
 
-      // Step 3: Initialize Bluetooth printer manager
+      // 3️⃣ Initialize Bluetooth printer manager
       debugPrint('🖨️ Initializing Bluetooth printers...');
       final bt = BluetoothPrinterManager();
       await bt.load();
       debugPrint('🖨️ ✅ Bluetooth manager ready');
 
-      // Step 4: Setup kitchen router
+      // 4️⃣ Setup kitchen router (unchanged)
       final router = KitchenRouter(
         falafelCategoryIds: {7}, // Configure your category IDs
         shawarmaSnacksCategoryIds: {6, 8, 9, 10},
       );
       debugPrint('🖨️ ✅ Kitchen router configured');
 
-      // Step 5: Create triple printer (will create per-printer builders automatically)
+      // 5️⃣ Triple printer using ReceiptBuilder under the hood
       final printer = TriplePrinter(
         btManager: bt,
         router: router,
@@ -2926,10 +3191,10 @@ void _chargeOrder() async {
       debugPrint(
           '🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
 
-      // Step 7: Print all receipts (customer + kitchens)
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ Starting print sequence...');
       debugPrint('🖨️ ============================================');
+
       await Future.delayed(const Duration(milliseconds: 1500));
 
       await printer.printAll(orderData);
@@ -2944,9 +3209,6 @@ void _chargeOrder() async {
       debugPrint('🖨️ ❌ PRINT ERROR: $e');
       debugPrint('🖨️ Stack trace: $stackTrace');
       debugPrint('🖨️ ============================================');
-
-      // Don't throw - just return false to indicate failure
-      // This prevents blocking the POS system
       return false;
     }
   }

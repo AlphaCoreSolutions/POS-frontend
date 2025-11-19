@@ -1,7 +1,7 @@
 class OrderItemAdditionDto {
   final int domainDetailId;
-  final String? additionName; // only for responses
-  final double? priceIncrease; // only for responses
+  final String? additionName;
+  final double? priceIncrease;
 
   OrderItemAdditionDto({
     required this.domainDetailId,
@@ -18,7 +18,6 @@ class OrderItemAdditionDto {
     );
   }
 
-  /// For POST /api/orders we only need the ID.
   Map<String, dynamic> toJson() {
     return {
       'domainDetailId': domainDetailId,
