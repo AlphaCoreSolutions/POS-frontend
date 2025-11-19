@@ -9,6 +9,7 @@ import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/components/printer_setup_dialog.dart';
 import 'package:visionpos/language_changing/constants.dart';
 import 'package:visionpos/models/order_dto.dart';
+import 'package:visionpos/models/order_item_addition_dto.dart';
 import 'package:visionpos/models/order_item_dto.dart';
 import 'package:visionpos/models/promocodes_model.dart';
 import 'package:visionpos/models/taxes_model.dart';
@@ -18,7 +19,6 @@ import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/product_model.dart';
 import 'package:visionpos/services/arabic_font_loader.dart';
 import 'package:visionpos/utils/session_manager.dart';
-import 'package:visionpos/components/quick_api_switcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -28,7 +28,6 @@ import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/receipt_builder.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
-import 'package:visionpos/examples/arabic_receipt_example.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -56,18 +55,7 @@ class _MainPageState extends State<MainPage> {
   List<Category> _categories = [];
 
   // One-shot print guard
-  bool _isPrinting = false;
   late final TriplePrinter printer;
-
-  Future<void> _printOnce(Map<String, dynamic> payload) async {
-    if (_isPrinting) return;
-    _isPrinting = true;
-    try {
-      await printer.printAll(payload); // TriplePrinter only
-    } finally {
-      _isPrinting = false;
-    }
-  }
 
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
@@ -385,7 +373,7 @@ class _MainPageState extends State<MainPage> {
         final p = _getProductById(it.productId);
         return {
           'productId': it.productId,
-          'productName': (p.productName ?? '').toString().trim(),
+          'productName': (p.productName).toString().trim(),
           'quantity': it.quantity,
           'unitPrice': p.sellingPrice,
           'notes': '',
@@ -394,12 +382,12 @@ class _MainPageState extends State<MainPage> {
 
       final double sub = _calculateSubtotal(selectedItems);
       final double tax = _calculateTaxes(selectedItems);
-      final double tip = tips ?? 0.0;
+      final double tip = tips;
       final double grand = _calculateTotal(selectedItems);
 
-      final int pm = paymentMethod ?? 1;
+      final int pm = paymentMethod;
       final String orderNo =
-          (orderCount ?? 0).clamp(1, 999999).toString().padLeft(4, '0');
+          (orderCount).clamp(1, 999999).toString().padLeft(4, '0');
 
       final Map<String, dynamic> orderMap = {
         'data': {
@@ -520,121 +508,6 @@ class _MainPageState extends State<MainPage> {
                 );
               },
             ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _printExampleReceipt() async {
-    try {
-      // Show loading indicator
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text('جاري طباعة نموذج الفاتورة...'),
-              ],
-            ),
-            duration: Duration(milliseconds: 800),
-          ),
-        );
-      }
-
-      // Call the production-ready example print method
-      final success = await ArabicReceiptExample.printReceiptProductionReady(
-        context: context,
-        order: {
-          'orderNumber': '0001',
-          'paymentMethod': 'CASH',
-          'subtotal': 150.00,
-          'tax': 15.00,
-          'tips': 10.00,
-          'total': 175.00,
-        },
-        items: [
-          {
-            'name': 'برجر دجاج',
-            'quantity': 2,
-            'unitPrice': 50.00,
-            'notes': 'بدون بصل',
-          },
-          {
-            'name': 'بطاطس مقلية',
-            'quantity': 1,
-            'unitPrice': 25.00,
-            'notes': '',
-          },
-          {
-            'name': 'كوكا كولا',
-            'quantity': 1,
-            'unitPrice': 25.00,
-            'notes': 'بارد',
-          },
-        ],
-        paperSize: PaperSize.mm80,
-        useArabicDigits: true,
-        showLoadingIndicator: false, // We handle our own loading indicator
-      );
-
-      // Show result feedback
-      if (mounted) {
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('✅ تم طباعة النموذج بنجاح'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('❌ فشل في طباعة النموذج'),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Example print error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('خطأ في طباعة النموذج: ${e.toString()}'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -1235,32 +1108,111 @@ class _MainPageState extends State<MainPage> {
     return productPrices[productId] ?? 0.0;
   }
 
-  void addToOrder(Product product) {
-    setState(
-      () {
-        int index = selectedItems.indexWhere(
-          (item) => item.productId == product.productId,
+  void addToOrder(Product product) async {
+    // If product has additions, ask user first
+    AdditionsSelectionResult? selection;
+
+    if (product.additions.isNotEmpty) {
+      selection = await showAdditionsDialog(context, product);
+      if (selection == null) {
+        // user cancelled
+        return;
+      }
+    }
+
+    setState(() {
+      // ✅ Simple rule: each click creates a new line with its own notes/additions
+      // If you want "same config → increase quantity", you can compare
+      // notes + additions here and merge.
+      selectedItems.add(
+        OrderItemDto(
+          productId: product.productId,
+          quantity: 1,
+          discount: 0.0,
+          notes: selection?.notes,
+          additions: selection?.additions ?? const [],
+        ),
+      );
+
+      productPrices[product.productId] = product.sellingPrice;
+    });
+  }
+
+  Future<AdditionsSelectionResult?> showAdditionsDialog(
+    BuildContext context,
+    Product product,
+  ) {
+    final additions = product.additions;
+    final selected = <int>{};
+    final notesController = TextEditingController();
+
+    return showDialog<AdditionsSelectionResult>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(product.productName),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (additions.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: additions.map((d) {
+                      final checked = selected.contains(d.domainDetailId);
+                      return CheckboxListTile(
+                        value: checked,
+                        title: Text(
+                            '${d.name} (+${d.priceIncrease.toStringAsFixed(2)})'),
+                        onChanged: (value) {
+                          if (value == true) {
+                            selected.add(d.domainDetailId);
+                          } else {
+                            selected.remove(d.domainDetailId);
+                          }
+                          // rebuild
+                          (context as Element).markNeedsBuild();
+                        },
+                      );
+                    }).toList(),
+                  ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'ملاحظات (اختياري)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final additionsDtos = selected
+                    .map((id) => OrderItemAdditionDto(domainDetailId: id))
+                    .toList();
+
+                Navigator.of(context).pop(
+                  AdditionsSelectionResult(
+                    notes: notesController.text.trim().isEmpty
+                        ? null
+                        : notesController.text.trim(),
+                    additions: additionsDtos,
+                  ),
+                );
+              },
+              child: const Text('تأكيد'),
+            ),
+          ],
         );
-
-        //if(product.productInventory != 0){}
-        if (index != -1) {
-          selectedItems[index] = selectedItems[index].updateQuantity(
-            selectedItems[index].quantity + 1,
-          );
-        } else {
-          selectedItems
-              .add(OrderItemDto(productId: product.productId, quantity: 1));
-          productPrices[product.productId] =
-              product.sellingPrice; // Store product price
-        }
       },
-
-      /*
-   else{
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Product ${product.productName} Is Out Of Stock!'))
-    );}
-   */
     );
   }
 
@@ -3286,4 +3238,14 @@ class _AddProductDialogState extends State<AddProductDialog>
       ),
     );
   }
+}
+
+class AdditionsSelectionResult {
+  final String? notes;
+  final List<OrderItemAdditionDto> additions;
+
+  AdditionsSelectionResult({
+    this.notes,
+    this.additions = const [],
+  });
 }

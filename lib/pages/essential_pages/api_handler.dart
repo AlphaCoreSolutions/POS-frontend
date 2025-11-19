@@ -810,7 +810,18 @@ class ApiHandler {
     try {
       final response = await http.get(Uri.parse('$productUri/$productId'));
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final decoded = json.decode(response.body);
+
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          return decoded['data'] as Map<String, dynamic>;
+        }
+
+        // Fallback to old behavior if backend ever returns raw product
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+
+        throw Exception('Unexpected product response: $decoded');
       } else {
         throw Exception('Failed to load product');
       }
@@ -818,6 +829,12 @@ class ApiHandler {
       print('Error fetching product details: $e');
       return null;
     }
+  }
+
+  Future<Product?> getProductById(int id) async {
+    final map = await fetchProductDetails(id);
+    if (map == null) return null;
+    return Product.fromJson(map);
   }
 
   Future<List<Product>> searchProductByName({

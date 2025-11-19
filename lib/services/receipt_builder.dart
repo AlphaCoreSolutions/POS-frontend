@@ -281,9 +281,13 @@ class ReceiptBuilder {
       double lineTotal =
           _asNumDouble(_pick(it, ['totalAfterTax', 'total']), -1.0);
 
-      if (name.isEmpty && resolve != null) {
-        final prod = resolve(productId);
-        if (prod != null) name = _bestProductName(prod);
+      dynamic product;
+      if (resolve != null) {
+        product = resolve(productId);
+      }
+
+      if (name.isEmpty && product != null) {
+        name = _bestProductName(product);
       }
       if (name.isEmpty) name = 'صنف';
 
@@ -292,15 +296,13 @@ class ReceiptBuilder {
           _pick(it, ['unitPrice', 'price', 'sellingPrice']),
           -1,
         );
-        if (unitPrice < 0 && resolve != null) {
-          final prod = resolve(productId);
-          if (prod != null) {
-            unitPrice = _bestSellingPrice(prod, 0.0);
-          }
+        if (unitPrice < 0 && product != null) {
+          unitPrice = _bestSellingPrice(product, 0.0);
         }
         lineTotal = (unitPrice >= 0) ? unitPrice * qty : 0.0;
       }
 
+      // main row: item name + qty + total
       bytes.addAll(await _arabicThreeColumnRow(
         g,
         right: name,
@@ -308,6 +310,45 @@ class ReceiptBuilder {
         left: _digits(_money(lineTotal)),
       ));
 
+      // 🔥 ADDITIONS (customer)
+      final rawAdditions = _pick(it, ['additions', 'Additions']);
+      if (rawAdditions is List && rawAdditions.isNotEmpty) {
+        for (final add in rawAdditions) {
+          final int ddId =
+              _asInt(_pick(add, ['domainDetailId', 'DomainDetailId']), 0);
+
+          // Prefer server data: additionName + priceIncrease
+          String addName =
+              _asString(_pick(add, ['additionName', 'name', 'Name']), '')
+                  .trim();
+          double addPrice =
+              _asNumDouble(_pick(add, ['priceIncrease', 'PriceIncrease']), 0.0);
+
+          // If we only have ID (from local DTO), resolve from product.additions[]
+          if ((addName.isEmpty || addPrice == 0.0) &&
+              product != null &&
+              ddId > 0) {
+            addName = addName.isNotEmpty
+                ? addName
+                : (_resolveAdditionNameFromProduct(product, ddId) ?? '');
+            addPrice = (addPrice > 0)
+                ? addPrice
+                : (_resolveAdditionPriceFromProduct(product, ddId) ?? 0.0);
+          }
+
+          if (addName.isEmpty) continue;
+
+          final pricePart = (addPrice > 0) ? ' (+${_money(addPrice)})' : '';
+          bytes.addAll(await _arabicTextLineHybrid(
+            g,
+            '   + $addName$pricePart',
+            align: PosAlign.right,
+            fontSize: 18,
+          ));
+        }
+      }
+
+      // existing NOTES
       final notes = _asString(_pick(it, ['notes', 'Notes']), '').trim();
       if (notes.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
@@ -461,18 +502,61 @@ class ReceiptBuilder {
       final double qty = _asNumDouble(_pick(it, ['quantity', 'Quantity']), 1.0);
 
       String name = _asString(_pick(it, ['productName', 'name']), '').trim();
-      if (name.isEmpty && resolve != null) {
-        final prod = resolve(productId);
-        if (prod != null) name = _bestProductName(prod);
+
+      dynamic product;
+      if (resolve != null) {
+        product = resolve(productId);
+      }
+      if (name.isEmpty && product != null) {
+        name = _bestProductName(product);
       }
       if (name.isEmpty) name = 'صنف';
 
+      // main row: name + qty
       bytes.addAll(await _arabicTwoColumnRow(
         g,
         right: name,
         left: _digits(_fmtNum(qty)),
       ));
 
+      // 🔥 ADDITIONS (kitchen)
+      final rawAdditions = _pick(it, ['additions', 'Additions']);
+      if (rawAdditions is List && rawAdditions.isNotEmpty) {
+        for (final add in rawAdditions) {
+          final int ddId =
+              _asInt(_pick(add, ['domainDetailId', 'DomainDetailId']), 0);
+
+          String addName =
+              _asString(_pick(add, ['additionName', 'name', 'Name']), '')
+                  .trim();
+          double addPrice =
+              _asNumDouble(_pick(add, ['priceIncrease', 'PriceIncrease']), 0.0);
+
+          if ((addName.isEmpty || addPrice == 0.0) &&
+              product != null &&
+              ddId > 0) {
+            addName = addName.isNotEmpty
+                ? addName
+                : (_resolveAdditionNameFromProduct(product, ddId) ?? '');
+            addPrice = (addPrice > 0)
+                ? addPrice
+                : (_resolveAdditionPriceFromProduct(product, ddId) ?? 0.0);
+          }
+
+          if (addName.isEmpty) continue;
+
+          final pricePart = (addPrice > 0) ? ' (+${_money(addPrice)})' : '';
+          // For kitchen, highlight more (★)
+          bytes.addAll(await _arabicTextLineHybrid(
+            g,
+            '   ★ $addName$pricePart',
+            align: PosAlign.right,
+            fontSize: 18,
+          ));
+        }
+      }
+
+      // existing NOTES
       final notes = _asString(_pick(it, ['notes', 'Notes']), '').trim();
       if (notes.isNotEmpty) {
         bytes.addAll(await _arabicTextLineHybrid(
@@ -481,8 +565,9 @@ class ReceiptBuilder {
           align: PosAlign.right,
           fontSize: 18,
         ));
-        bytes.addAll(g.emptyLines(1));
       }
+
+      bytes.addAll(g.emptyLines(1));
     }
 
     bytes.addAll(g.hr(ch: '='));
@@ -1107,6 +1192,75 @@ class ReceiptBuilder {
       s = s.replaceAll(latin[i], arab[i]);
     }
     return s;
+  }
+
+  dynamic _findDomainDetail(dynamic prod, int domainDetailId) {
+    if (prod == null || domainDetailId <= 0) return null;
+
+    List<dynamic>? list;
+
+    if (prod is Map && prod['additions'] is List) {
+      list = prod['additions'] as List;
+    } else {
+      try {
+        final a = (prod as dynamic).additions;
+        if (a is List) list = a;
+      } catch (_) {}
+
+      if (list == null) {
+        try {
+          final json = (prod as dynamic).toJson?.call();
+          if (json is Map && json['additions'] is List) {
+            list = json['additions'] as List;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (list == null) return null;
+
+    for (final e in list) {
+      final int id = _asInt(_pick(e, ['domainDetailId', 'DomainDetailId']), -1);
+      if (id == domainDetailId) return e;
+
+      try {
+        final dId = (e as dynamic).domainDetailId;
+        if (dId is int && dId == domainDetailId) return e;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String? _resolveAdditionNameFromProduct(dynamic prod, int domainDetailId) {
+    final dd = _findDomainDetail(prod, domainDetailId);
+    if (dd == null) return null;
+
+    final v = _pick(dd, ['name', 'Name']);
+    if (v is String && v.trim().isNotEmpty) return v.trim();
+
+    try {
+      final n = (dd as dynamic).name;
+      if (n is String && n.trim().isNotEmpty) return n.trim();
+    } catch (_) {}
+
+    return null;
+  }
+
+  double? _resolveAdditionPriceFromProduct(dynamic prod, int domainDetailId) {
+    final dd = _findDomainDetail(prod, domainDetailId);
+    if (dd == null) return null;
+
+    final v = _pick(dd, ['priceIncrease', 'PriceIncrease']);
+    final parsed =
+        (v is num) ? v.toDouble() : (v is String ? double.tryParse(v) : null);
+    if (parsed != null) return parsed;
+
+    try {
+      final p = (dd as dynamic).priceIncrease;
+      if (p is num) return p.toDouble();
+    } catch (_) {}
+
+    return null;
   }
 }
 

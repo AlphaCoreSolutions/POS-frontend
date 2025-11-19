@@ -24,7 +24,6 @@ class TriplePrinter {
   final ProductResolver? resolve; // optional external resolver
 
   // Timing
-  static const Duration _printerDelayShort = Duration(milliseconds: 500);
   static const Duration _printerDelayLong = Duration(milliseconds: 800);
   static const Duration _reconnectDelay = Duration(milliseconds: 1000);
 
@@ -67,7 +66,7 @@ class TriplePrinter {
             _reconnectDelay); // Optional delay before reconnect
         await btManager.connect(customerPrinter.mac);
       }
-    } catch (e, st) {
+    } catch (e) {
       // Try reconnecting to customer printer even on error
       try {
         final customerPrinter = btManager.getForRole(PrinterRole.customer);

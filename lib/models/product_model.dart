@@ -1,3 +1,5 @@
+import 'domain_detail_model.dart';
+
 class Product {
   final int productId;
   final int organizationId;
@@ -9,6 +11,11 @@ class Product {
   double? productInventory;
   final String? barcode;
 
+  // 🔥 NEW
+  final int? domainId;
+  final String? domainName;
+  final List<DomainDetail> additions;
+
   Product({
     required this.productId,
     required this.organizationId,
@@ -19,6 +26,9 @@ class Product {
     required this.purchasePrice,
     this.productInventory,
     this.barcode,
+    this.domainId,
+    this.domainName,
+    this.additions = const [],
   });
 
   factory Product.fromJson(Map<String, dynamic> json) => Product(
@@ -31,6 +41,14 @@ class Product {
         productInventory: (json["productInventory"] as num?)?.toDouble(),
         organizationId: json["organizationId"] ?? 0,
         barcode: json["barcode"],
+
+        // 🔥 NEW: handle domain + additions if backend sends them
+        domainId: json['domainId'] ?? json['DomainId'],
+        domainName: json['domainName'] ?? json['DomainName'],
+        additions: ((json['additions'] ?? json['Additions']) as List<dynamic>?)
+                ?.map((e) => DomainDetail.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -43,5 +61,11 @@ class Product {
         'productInventory': productInventory,
         'organizationId': organizationId,
         'barcode': barcode,
+
+        // You usually don’t POST products from POS,
+        // but it’s safe to include:
+        'domainId': domainId,
+        'domainName': domainName,
+        'additions': additions.map((e) => e.toJson()).toList(),
       };
 }
