@@ -252,7 +252,7 @@ class ReceiptBuilder {
     if (storeName.trim().isNotEmpty) {
       bytes.addAll(await _arabicTextLineHybrid(
         g,
-        storeName,
+        'مطعم ابو كف',
         align: PosAlign.center,
         fontSize: 32,
       ));
