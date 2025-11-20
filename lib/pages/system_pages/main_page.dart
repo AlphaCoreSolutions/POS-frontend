@@ -8,7 +8,6 @@ import 'package:esc_pos_utils/esc_pos_utils.dart'; // you already use it
 import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/components/printer_setup_dialog.dart';
 import 'package:visionpos/language_changing/constants.dart';
-import 'package:visionpos/models/domain_detail_model.dart';
 import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/models/order_item_addition_dto.dart';
 import 'package:visionpos/models/order_item_dto.dart';
@@ -29,7 +28,7 @@ import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/receipt_builder.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
-import 'package:flutter/foundation.dart' show setEquals;
+import 'package:flutter/foundation.dart' show setEquals, listEquals;
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -362,26 +361,63 @@ class _MainPageState extends State<MainPage> {
         );
       }
 
-      // 🛠️ Use mm58 paper size for testing
+      // 1️⃣ Build enriched items (additions + notes) for ReceiptBuilder
+      //    We go through the in-memory products once and index them by id.
+      final productsById = {
+        for (final p in products) p.productId: p,
+      };
+
+      final List<Map<String, dynamic>> items = selectedItems.map((it) {
+        final prod = productsById[it.productId];
+
+        // base unit price: prefer item.price if user entered it,
+        // otherwise fall back to product.sellingPrice
+        final double? basePrice =
+            (it.price != 0.0 ? it.price : (prod?.sellingPrice ?? 0.0));
+
+        double additionsTotal = 0.0;
+        final List<Map<String, dynamic>> additions = it.additions.map((a) {
+          // ignore: unused_local_variable
+          dynamic dd;
+          try {
+            dd = prod?.additions
+                .firstWhere((d) => d.domainDetailId == a.domainDetailId);
+          } catch (_) {
+            dd = null;
+          }
+
+          return {
+            'domainDetailId': a.domainDetailId,
+          };
+        }).toList();
+
+        final double lineTotal =
+            (basePrice! + additionsTotal) * it.quantity.toDouble();
+
+        return {
+          'productId': it.productId,
+          'productName': (prod?.productName ?? '').toString().trim(),
+          'quantity': it.quantity,
+          'unitPrice': basePrice,
+          'price': basePrice,
+          'totalAfterTax': lineTotal, // 👈 used by ReceiptBuilder row total
+          'additions': additions, // 👈 used by ReceiptBuilder to print lines
+          'notes': it.notes ?? '', // 👈 real notes
+          'categoryId': prod?.categoryId,
+        };
+      }).toList();
+
+      // 2️⃣ Create ReceiptBuilder (customer)
       final builder = await ReceiptBuilder.create(
-        paper: PaperSize.mm80, // 👈 58mm for test
-        widthPxOverride: 512, // 👈 safe width for 58mm
+        paper: PaperSize.mm80,
+        widthPxOverride: 512,
         arabicFontFamily: 'NotoNaskhArabic',
         arabicFontAssetPath: 'lib/assets/fonts/NotoNaskhArabic-Regular.ttf',
         useArabicIndicDigits: true,
       );
 
-      final List<Map<String, dynamic>> items = selectedItems.map((it) {
-        final p = _getProductById(it.productId);
-        return {
-          'productId': it.productId,
-          'productName': (p.productName).toString().trim(),
-          'quantity': it.quantity,
-          'unitPrice': p.sellingPrice,
-          'notes': '',
-        };
-      }).toList();
-
+      // 3️⃣ Totals (you can later adjust _calculateSubtotal/_calculateTaxes
+      //    to include additions if you want the printed totals to include them)
       final double sub = _calculateSubtotal(selectedItems);
       final double tax = _calculateTaxes(selectedItems);
       final double tip = tips;
@@ -391,6 +427,7 @@ class _MainPageState extends State<MainPage> {
       final String orderNo =
           (orderCount).clamp(1, 999999).toString().padLeft(4, '0');
 
+      // 4️⃣ Order map in the format ReceiptBuilder expects
       final Map<String, dynamic> orderMap = {
         'data': {
           'orderNumber': orderNo,
@@ -401,7 +438,10 @@ class _MainPageState extends State<MainPage> {
           'taxTotal': tax,
           'tips': tip,
           'totalAfterTax': grand,
+          'grandTotal': grand,
         },
+        // Also expose items at top level so _extractItems() can see them first
+        'items': items,
       };
 
       final sw = Stopwatch()..start();
@@ -416,6 +456,7 @@ class _MainPageState extends State<MainPage> {
       debugPrint(
           'Receipt generated: ${bytes.length} bytes in ${sw.elapsedMilliseconds}ms');
 
+      // 5️⃣ Try to send to printer with retries
       bool printSuccess = false;
       int retry = 0;
       const maxRetries = 2;
@@ -1153,6 +1194,89 @@ class _MainPageState extends State<MainPage> {
             productId: product.productId,
             quantity: 1,
             discount: 0.0,
+            price: (() {
+              final p = product.sellingPrice;
+              if (p != 0.0) return p;
+
+              // If selling price is 0, schedule a dialog after this frame to ask user for a price.
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                final _priceCtrl = TextEditingController();
+                final double? entered = await showDialog<double?>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) {
+                    return AlertDialog(
+                      title: Text('Enter price for "${product.productName}"'),
+                      content: TextField(
+                        controller: _priceCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(hintText: '0.00'),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(null),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            final v = double.tryParse(_priceCtrl.text);
+                            Navigator.of(ctx).pop(v);
+                          },
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (!mounted) return;
+
+                if (entered != null) {
+                  setState(() {
+                    // Find the last added matching item (just added above with price 0)
+                    final idx = selectedItems.lastIndexWhere((it) =>
+                        it.productId == product.productId &&
+                        (it.notes ?? '') == (newNotes ?? '') &&
+                        listEquals(
+                            it.additions.map((a) => a.domainDetailId).toList(),
+                            newAdditions
+                                .map((a) => a.domainDetailId)
+                                .toList()));
+
+                    if (idx != -1) {
+                      final old = selectedItems[idx];
+                      selectedItems[idx] = OrderItemDto(
+                        productId: old.productId,
+                        quantity: old.quantity,
+                        discount: old.discount,
+                        price: entered,
+                        notes: old.notes,
+                        additions: old.additions,
+                      );
+                      productPrices[product.productId] = entered;
+                    }
+                  });
+                } else {
+                  // User cancelled: remove the placeholder item we added with price 0
+                  setState(() {
+                    final idx = selectedItems.lastIndexWhere((it) =>
+                        it.productId == product.productId &&
+                        it.price == 0.0 &&
+                        (it.notes ?? '') == (newNotes ?? '') &&
+                        listEquals(
+                            it.additions.map((a) => a.domainDetailId).toList(),
+                            newAdditions
+                                .map((a) => a.domainDetailId)
+                                .toList()));
+                    if (idx != -1) selectedItems.removeAt(idx);
+                  });
+                }
+              });
+
+              // Temporarily return 0.0 as the price (will be updated by dialog result)
+              return 0.0;
+            })(),
             notes: newNotes, // ✅ notes stored here
             additions: newAdditions, // ✅ additions stored here
           ),
@@ -1287,8 +1411,6 @@ class _MainPageState extends State<MainPage> {
 
                       return OrderItemAdditionDto(
                         domainDetailId: dd.domainDetailId,
-                        additionName: dd.name,
-                        priceIncrease: dd.priceIncrease,
                       );
                     }).toList();
 
@@ -1319,6 +1441,34 @@ class _MainPageState extends State<MainPage> {
         );
       },
     );
+  }
+
+  double _calculateItemTotal(OrderItemDto item) {
+    // 1. Base price: prefer the item's own price, fall back to product price
+    final double? basePrice =
+        (item.price != 0.0) ? item.price : _getProductPrice(item.productId);
+
+    // 2. Additions unit price
+    double additionsUnitPrice = 0.0;
+
+    // Get the product to inspect its additions list
+    final product = _getProductById(item.productId);
+
+    // Be defensive in case product/additions is null
+    final productAdditions = product.additions;
+
+    for (final add in item.additions) {
+      // Find matching domainDetail in the product's additions
+      final matches =
+          productAdditions.where((d) => d.domainDetailId == add.domainDetailId);
+
+      if (matches.isNotEmpty) {
+        additionsUnitPrice += matches.first.priceIncrease;
+      }
+    }
+
+    // 3. Line total = (base + additions) * quantity
+    return (basePrice! + additionsUnitPrice) * item.quantity;
   }
 
   double _calculateGrandTotal(List<OrderItemDto> orderItems) {
@@ -1396,15 +1546,13 @@ class _MainPageState extends State<MainPage> {
   }
 
   double _calculateSubtotal(List<OrderItemDto> orderItems) {
-    // First, calculate the subtotal for all items
+    // Sum all lines with additions included
     double subtotal = orderItems.fold(0.0, (sum, item) {
-      final price = _getProductPrice(item.productId); // Get price for each item
-      return sum + (price * item.quantity);
+      return sum + _calculateItemTotal(item);
     });
 
-    // After calculating the subtotal, apply the discount if it's not zero
+    // Apply percentage discount if any
     if (discount != 0.0) {
-      // Apply the discount as a percentage of the subtotal
       subtotal -= (discount / 100 * subtotal);
     }
 
@@ -3057,117 +3205,72 @@ void _chargeOrder() async {
     try {
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ Starting Unified Print Function');
-      debugPrint('🖨️ Order: $orderNumber | Total: \$$total');
+      debugPrint('🖨️ Order: $orderNumber | Total: $total');
       debugPrint('🖨️ ============================================');
 
-      // 1️⃣ Build print items with full config (additions + notes)
-      final List<Map<String, dynamic>> printItems = items.map((it) {
+      // 1️⃣ Build enriched items for print (WITH additions + notes)
+      final List<Map<String, dynamic>> itemsForPrint = items.map((it) {
         final product = _getProductById(it.productId);
 
-        // Arabic / English name selection (same as before)
-        final productName = product.productName;
-        final hasArabic = RegExp(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
-            .hasMatch(productName);
+        final double? basePrice =
+            (it.price != 0.0) ? it.price : (product.sellingPrice);
 
-        String arabicName;
-        if (hasArabic) {
-          arabicName = productName;
-          debugPrint('   ✅ "$productName" (Arabic)');
-        } else {
-          arabicName = productName;
-          debugPrint('   ⚠️ "$productName" (English - consider translating)');
-        }
-
-        // 🧮 Base price
-        final double basePrice = product.sellingPrice;
-
-        // 🧮 Additions total (using Product.additions list)
         double additionsTotal = 0.0;
-        for (final addDto in it.additions) {
-          final dd = product.additions.firstWhere(
-            (d) => d.domainDetailId == addDto.domainDetailId,
-            orElse: () => DomainDetail(
-              domainDetailId: addDto.domainDetailId,
-              name: '',
-              priceIncrease: 0.0,
-            ),
-          );
+        final additionsList = <Map<String, dynamic>>[];
 
-          final inc = dd.priceIncrease;
-          additionsTotal += inc;
+        for (final add in it.additions) {
+          // ignore: unused_local_variable
+          dynamic dd;
+          try {
+            dd = product.additions
+                .firstWhere((d) => d.domainDetailId == add.domainDetailId);
+          } catch (_) {
+            dd = null;
+          }
+
+          additionsList.add({
+            'domainDetailId': add.domainDetailId,
+          });
         }
 
-        final double unitWithAdditions = basePrice + additionsTotal;
-        final double lineTotal = unitWithAdditions * it.quantity;
-
-        // Log what we are about to send
-        debugPrint(
-          '   🧾 Item ${it.productId} → qty=${it.quantity}, '
-          'base=$basePrice, add=$additionsTotal, line=$lineTotal, '
-          'adds=${it.additions.length}, notes="${it.notes ?? ''}"',
-        );
+        final double unitWithAdds = basePrice! + additionsTotal;
+        final double lineTotal = unitWithAdds * it.quantity;
 
         return {
-          // --- IDs / routing ---
+          // keys used by ReceiptBuilder
           'productId': it.productId,
-          'categoryId': product.categoryId,
-
-          // --- Name / quantity / prices ---
-          'productName': arabicName,
+          'productName': product.productName,
           'quantity': it.quantity,
-          'price': basePrice, // unit base price
-          'totalAfterTax': lineTotal, // FULL line total including additions
+          'unitPrice': basePrice,
+          'totalAfterTax': lineTotal, // 👈 includes additions
+          'price': basePrice,
+          'additions': additionsList, // 👈 used in both kitchen & customer
+          'notes': it.notes ?? '', // 👈 used in both kitchen & customer
 
-          // --- Additions (in a format ReceiptBuilder understands) ---
-          'additions': it.additions.map((a) {
-            final dd = product.additions.firstWhere(
-              (d) => d.domainDetailId == a.domainDetailId,
-              orElse: () => DomainDetail(
-                domainDetailId: a.domainDetailId,
-                name: '',
-                priceIncrease: 0.0,
-              ),
-            );
-
-            return {
-              'domainDetailId': a.domainDetailId,
-              // These two are optional, but if present, ReceiptBuilder
-              // will use them directly without needing ProductResolver.
-              if (dd.name.isNotEmpty) 'additionName': dd.name,
-              'priceIncrease': dd.priceIncrease,
-            };
-          }).toList(),
-
-          // --- Notes (ReceiptBuilder._extractNotesFromItem looks at 'notes') ---
-          'notes': it.notes,
+          // optional metadata for router / kitchen
+          'categoryId': product.categoryId,
         };
       }).toList();
 
-      debugPrint('🖨️ Total items: ${printItems.length}');
+      debugPrint('🖨️ Total items: ${itemsForPrint.length}');
+      for (final m in itemsForPrint) {
+        debugPrint(
+            '🖨️ ITEM -> name=${m['productName']}, qty=${m['quantity']}, adds=${m['additions']}, notes=${m['notes']}');
+      }
 
-      // 2️⃣ Prepare order data in a shape friendly for both:
-      //    - KitchenRouter (expects `items` with categoryId)
-      //    - ReceiptBuilder (prefers `data.orderItems` + totals)
-      final orderData = {
+      // 2️⃣ Prepare order data expected by ReceiptBuilder
+      final orderData = <String, dynamic>{
         'orderNumber': orderNumber,
         'paymentMethod': paymentMethod,
+        'items': itemsForPrint,
 
-        // For KitchenRouter / generic routing
-        'items': printItems,
-
-        // For ReceiptBuilder._extractTotals / _extractItems
-        'data': {
-          'orderNumber': orderNumber,
-          'paymentMethod': paymentMethod,
-          'totalAfterDiscount': subtotal,
-          'discountTotal': 0.0, // or your real discount if you have one
-          'taxTotal': tax,
-          'tips': tips,
-          'totalAfterTax': total,
-          'grandTotal': total,
-          'orderDate': DateTime.now().toIso8601String(),
-          'orderItems': printItems,
-        },
+        // Totals for _extractTotals()
+        'grandTotal': total,
+        'totalAfterTax': total,
+        'discountTotal': 0.0, // or your real discount value
+        'taxTotal': tax,
+        'tips': tips,
+        'totalAfterDiscount': subtotal,
       };
 
       // 3️⃣ Initialize Bluetooth printer manager
@@ -3176,14 +3279,14 @@ void _chargeOrder() async {
       await bt.load();
       debugPrint('🖨️ ✅ Bluetooth manager ready');
 
-      // 4️⃣ Setup kitchen router (unchanged)
+      // 4️⃣ Setup kitchen router
       final router = KitchenRouter(
-        falafelCategoryIds: {7}, // Configure your category IDs
-        shawarmaSnacksCategoryIds: {6, 8, 9, 10},
+        falafelCategoryIds: {2}, // tweak to your real ids
+        shawarmaSnacksCategoryIds: {3, 6, 7, 8, 9},
       );
       debugPrint('🖨️ ✅ Kitchen router configured');
 
-      // 5️⃣ Triple printer using ReceiptBuilder under the hood
+      // 5️⃣ Create triple printer
       final printer = TriplePrinter(
         btManager: bt,
         router: router,
@@ -3191,6 +3294,7 @@ void _chargeOrder() async {
       debugPrint(
           '🖨️ ✅ Triple printer initialized (will create fresh builders per printer)');
 
+      // 6️⃣ Print all receipts (customer + kitchens)
       debugPrint('🖨️ ============================================');
       debugPrint('🖨️ Starting print sequence...');
       debugPrint('🖨️ ============================================');

@@ -9,6 +9,23 @@ import 'package:visionpos/services/arabic_font_loader.dart';
 
 typedef ProductResolver = dynamic Function(int productId);
 
+/// A normalized addition used internally for printing.
+class _ResolvedAddition {
+  final int domainDetailId;
+  final String name;
+  final double priceIncrease;
+
+  _ResolvedAddition({
+    required this.domainDetailId,
+    required this.name,
+    required this.priceIncrease,
+  });
+
+  @override
+  String toString() =>
+      '_ResolvedAddition(ddId=$domainDetailId, name="$name", price=$priceIncrease)';
+}
+
 /// Modern Receipt Builder for Triple Printer System
 ///
 /// Features:
@@ -68,7 +85,7 @@ class ReceiptBuilder {
         await CapabilityProfile.load(name: profileName ?? 'default');
 
     final widthPx = widthPxOverride ??
-        ((paper == PaperSize.mm58) ? 384 : (forceSafe80mmWidth ? 512 : 576));
+        ((paper == PaperSize.mm58) ? 384 : (forceSafe80mmWidth ? 524 : 576));
 
     developer.log(
       '🧱 [RB-$sessionId] create(): paper=$paper widthPx=$widthPx',
@@ -274,9 +291,20 @@ class ReceiptBuilder {
 
     // 5️⃣ ITEMS LOOP
     final orderItems = items ?? _extractItems(order);
-    for (final it in orderItems) {
+
+    if (debug) {
       developer.log(
-        'RB Customer item -> type=${it.runtimeType}, additions=${_extractAdditionsFromItem(it)}, notes="${_extractNotesFromItem(it)}"',
+        'RB Customer -> total items=${orderItems.length}',
+        name: 'ReceiptBuilder',
+      );
+    }
+
+    for (final it in orderItems) {
+      final additionsForLog = _extractAdditionsFromItem(it);
+      final notesForLog = _extractNotesFromItem(it);
+
+      developer.log(
+        'RB Customer item -> type=${it.runtimeType}, additions=$additionsForLog, notes="$notesForLog"',
         name: 'ReceiptBuilder',
       );
 
@@ -288,7 +316,7 @@ class ReceiptBuilder {
           _asNumDouble(_pick(it, ['totalAfterTax', 'total']), -1.0);
 
       dynamic product;
-      if (resolve != null) {
+      if (resolve != null && productId > 0) {
         product = resolve(productId);
       }
 
@@ -316,75 +344,61 @@ class ReceiptBuilder {
         left: _digits(_money(lineTotal)),
       ));
 
-      // 🔥 ADDITIONS (customer)
+      // 🔥 ADDITIONS (customer) – normalized (same style as kitchen)
       final rawAdditions = _extractAdditionsFromItem(it);
       if (rawAdditions is List && rawAdditions.isNotEmpty) {
+        final resolvedAdds = <_ResolvedAddition>[];
+
         for (final add in rawAdditions) {
-          int ddId =
-              _asInt(_pick(add, ['domainDetailId', 'DomainDetailId']), 0);
-// Fallback for DTO objects
-          if (ddId == 0) {
-            try {
-              ddId = _asInt((add as dynamic).domainDetailId, 0);
-            } catch (_) {}
+          final ra = _resolveAdditionForPrint(add, product);
+          if (ra != null) {
+            resolvedAdds.add(ra);
+          } else if (debug) {
+            developer.log(
+              'RB Customer: could not fully resolve addition from $add for productId=$productId',
+              name: 'ReceiptBuilder',
+            );
           }
+        }
 
-          String addName =
-              _asString(_pick(add, ['additionName', 'name', 'Name']), '')
-                  .trim();
-          if (addName.isEmpty) {
-            try {
-              final dynName = (add as dynamic).additionName;
-              if (dynName is String && dynName.trim().isNotEmpty) {
-                addName = dynName.trim();
-              }
-            } catch (_) {}
-          }
-
-          double addPrice =
-              _asNumDouble(_pick(add, ['priceIncrease', 'PriceIncrease']), 0.0);
-          if (addPrice == 0.0) {
-            try {
-              final dynPrice = (add as dynamic).priceIncrease;
-              if (dynPrice is num) {
-                addPrice = dynPrice.toDouble();
-              }
-            } catch (_) {}
-          }
-
-          // If we only have ID (from local DTO), resolve from product.additions[]
-          if ((addName.isEmpty || addPrice == 0.0) &&
-              product != null &&
-              ddId > 0) {
-            addName = addName.isNotEmpty
-                ? addName
-                : (_resolveAdditionNameFromProduct(product, ddId) ?? '');
-            addPrice = (addPrice > 0)
-                ? addPrice
-                : (_resolveAdditionPriceFromProduct(product, ddId) ?? 0.0);
-          }
-
-          if (addName.isEmpty) continue;
-
-          final pricePart = (addPrice > 0) ? ' (+${_money(addPrice)})' : '';
+        for (final ra in resolvedAdds) {
+          final pricePart =
+              (ra.priceIncrease > 0) ? ' (+${_money(ra.priceIncrease)})' : '';
+          const String rlm = '\u200F';
           bytes.addAll(await _arabicTextLineHybrid(
             g,
-            '   + $addName$pricePart',
+            // Change '★' to '*' or '-'
+
+            '$rlm   ★ ${ra.name}$pricePart',
             align: PosAlign.right,
             fontSize: 18,
+            forceRTL: true,
           ));
         }
+      } else if (debug) {
+        developer.log(
+          'RB Customer: NO additions found for item (productId=$productId)',
+          name: 'ReceiptBuilder',
+        );
       }
 
-      // existing NOTES
+// NOTES – same format as kitchen receipt
       final notes = _extractNotesFromItem(it).trim();
       if (notes.isNotEmpty) {
+        const String rlm = '\u200F';
         bytes.addAll(await _arabicTextLineHybrid(
           g,
-          '   ← $notes',
+          // Change '★' to '*' or '-'
+          '$rlm   * $notes',
           align: PosAlign.right,
           fontSize: 18,
+          forceRTL: true,
         ));
+      } else if (debug) {
+        developer.log(
+          'RB Customer: NO notes for item (productId=$productId)',
+          name: 'ReceiptBuilder',
+        );
       }
     }
 
@@ -525,18 +539,29 @@ class ReceiptBuilder {
     bytes.addAll(await _arabicTwoColumnHeader(g));
     bytes.addAll(g.hr(ch: '-'));
 
-    for (final it in items) {
+    if (debug) {
       developer.log(
-        'RB Kitchen item -> type=${it.runtimeType}, additions=${_extractAdditionsFromItem(it)}, notes="${_extractNotesFromItem(it)}"',
+        'RB Kitchen -> total items=${items.length}',
         name: 'ReceiptBuilder',
       );
+    }
+
+    for (final it in items) {
+      final additionsForLog = _extractAdditionsFromItem(it);
+      final notesForLog = _extractNotesFromItem(it);
+
+      developer.log(
+        'RB Kitchen item -> type=${it.runtimeType}, additions=$additionsForLog, notes="$notesForLog"',
+        name: 'ReceiptBuilder',
+      );
+
       final int productId = _asInt(_pick(it, ['productId', 'ProductId']), 0);
       final double qty = _asNumDouble(_pick(it, ['quantity', 'Quantity']), 1.0);
 
       String name = _asString(_pick(it, ['productName', 'name']), '').trim();
 
       dynamic product;
-      if (resolve != null) {
+      if (resolve != null && productId > 0) {
         product = resolve(productId);
       }
       if (name.isEmpty && product != null) {
@@ -554,38 +579,36 @@ class ReceiptBuilder {
       // 🔥 ADDITIONS (kitchen)
       final rawAdditions = _extractAdditionsFromItem(it);
       if (rawAdditions is List && rawAdditions.isNotEmpty) {
+        final resolvedAdds = <_ResolvedAddition>[];
+
         for (final add in rawAdditions) {
-          final int ddId =
-              _asInt(_pick(add, ['domainDetailId', 'DomainDetailId']), 0);
-
-          String addName =
-              _asString(_pick(add, ['additionName', 'name', 'Name']), '')
-                  .trim();
-          double addPrice =
-              _asNumDouble(_pick(add, ['priceIncrease', 'PriceIncrease']), 0.0);
-
-          if ((addName.isEmpty || addPrice == 0.0) &&
-              product != null &&
-              ddId > 0) {
-            addName = addName.isNotEmpty
-                ? addName
-                : (_resolveAdditionNameFromProduct(product, ddId) ?? '');
-            addPrice = (addPrice > 0)
-                ? addPrice
-                : (_resolveAdditionPriceFromProduct(product, ddId) ?? 0.0);
+          final ra = _resolveAdditionForPrint(add, product);
+          if (ra != null && ra.name.trim().isNotEmpty) {
+            resolvedAdds.add(ra);
+          } else if (debug) {
+            developer.log(
+              'RB Kitchen: could not fully resolve addition from $add for productId=$productId',
+              name: 'ReceiptBuilder',
+            );
           }
+        }
 
-          if (addName.isEmpty) continue;
-
-          final pricePart = (addPrice > 0) ? ' (+${_money(addPrice)})' : '';
-          // For kitchen, highlight more (★)
+        for (final ra in resolvedAdds) {
+          final pricePart =
+              (ra.priceIncrease > 0) ? ' (+${_money(ra.priceIncrease)})' : '';
           bytes.addAll(await _arabicTextLineHybrid(
             g,
-            '   ★ $addName$pricePart',
+            '   ★ ${ra.name}$pricePart',
             align: PosAlign.right,
             fontSize: 18,
+            forceRTL: true, // FIX: Force RTL for additions
           ));
         }
+      } else if (debug) {
+        developer.log(
+          'RB Kitchen: NO additions found for item (productId=$productId)',
+          name: 'ReceiptBuilder',
+        );
       }
 
       // existing NOTES
@@ -596,7 +619,13 @@ class ReceiptBuilder {
           '   ★ $notes',
           align: PosAlign.right,
           fontSize: 18,
+          forceRTL: true, // FIX: Force RTL for notes
         ));
+      } else if (debug) {
+        developer.log(
+          'RB Kitchen: NO notes for item (productId=$productId)',
+          name: 'ReceiptBuilder',
+        );
       }
 
       bytes.addAll(g.emptyLines(1));
@@ -825,6 +854,7 @@ class ReceiptBuilder {
     String text, {
     PosAlign align = PosAlign.center,
     double fontSize = 22,
+    bool forceRTL = false, // NEW: Added forceRTL parameter
   }) {
     return _arabicTextLineAsRaster(
       g,
@@ -832,6 +862,7 @@ class ReceiptBuilder {
       align: align,
       fontSize: fontSize,
       verticalPadding: 2,
+      forceRTL: forceRTL, // Pass it through
     );
   }
 
@@ -841,9 +872,11 @@ class ReceiptBuilder {
     PosAlign align = PosAlign.center,
     double fontSize = 22,
     double verticalPadding = 2,
+    bool forceRTL = false, // NEW: Added forceRTL parameter
   }) async {
     text = useArabicIndicDigits ? _toArabicDigits(text) : text;
-    final bool hasArabic = _containsArabic(text);
+    final bool hasArabic =
+        _containsArabic(text) || forceRTL; // FIX: Use forceRTL
 
     const int horizontalMargin = 8;
     final int usableWidth = widthPx - (horizontalMargin * 2);
@@ -896,30 +929,26 @@ class ReceiptBuilder {
   }
 
   // =================
-  // GLOBAL Order number resolver (NEW/UPDATED)
+  // GLOBAL Order number resolver
   // =================
   String _orderNumberFor(
     dynamic order, {
     String? override,
   }) {
-    // Build a stable key for this order (if possible).
     final orderKey = _deriveOrderKey(order);
 
-    // 1) Explicit override wins; cache globally + by key.
     if (override != null && override.trim().isNotEmpty) {
       final fixed = override.trim();
       _cacheResolvedOrderNo(orderKey, order, fixed);
       return fixed;
     }
 
-    // 2) If this specific instance had a memo, reuse it (fast path).
     final memo = (order != null) ? _orderNoMemo[order] : null;
     if (memo != null && memo.trim().isNotEmpty) {
       _cacheResolvedOrderNo(orderKey, order, memo);
       return memo;
     }
 
-    // 3) If we have by-key cache (same order across instances), reuse it.
     if (orderKey != null) {
       final byKey = _globalOrderNoByKey[orderKey];
       if (byKey != null && byKey.trim().isNotEmpty) {
@@ -928,27 +957,23 @@ class ReceiptBuilder {
       }
     }
 
-    // 4) Fall back to global last (keeps same number across sequential prints).
     if (_globalLastOrderNo != null && _globalLastOrderNo!.trim().isNotEmpty) {
       final fixed = _globalLastOrderNo!.trim();
       _cacheResolvedOrderNo(orderKey, order, fixed);
       return fixed;
     }
 
-    // 5) Extract from order.
     final extracted = _extractOrderNumber(order);
     if (extracted.isNotEmpty) {
       _cacheResolvedOrderNo(orderKey, order, extracted);
       return extracted;
     }
 
-    // 6) Absolute fallback: timestamp.
     final generated = DateFormat('yyMMddHHmmss').format(DateTime.now());
     _cacheResolvedOrderNo(orderKey, order, generated);
     return generated;
   }
 
-  // Store resolved number in all places that help future calls.
   void _cacheResolvedOrderNo(String? key, dynamic order, String value) {
     _globalLastOrderNo = value;
     if (key != null) _globalOrderNoByKey[key] = value;
@@ -959,10 +984,8 @@ class ReceiptBuilder {
     }
   }
 
-  // Try to derive a stable identity for an order across layers.
   String? _deriveOrderKey(dynamic order) {
     if (order == null) return null;
-    // Prefer explicit numbers/ids; check both nested and flat.
     final candidates = <dynamic>[
       _pick(order, ['data.orderNumber']),
       _pick(order, ['data.OrderNumber']),
@@ -985,7 +1008,6 @@ class ReceiptBuilder {
       if (s.isEmpty || s.toLowerCase() == 'null' || s == '0') continue;
       return s;
     }
-    // If the order is just a Map with a client guid/session, you can add it here.
     return null;
   }
 
@@ -996,7 +1018,6 @@ class ReceiptBuilder {
     if (order == null) return '';
 
     final candidates = <dynamic>[
-      // data envelope
       _pick(order, ['data.orderNumber']),
       _pick(order, ['data.OrderNumber']),
       _pick(order, ['data.orderNo']),
@@ -1005,7 +1026,6 @@ class ReceiptBuilder {
       _pick(order, ['data.Id']),
       _pick(order, ['data.orderId']),
       _pick(order, ['data.OrderId']),
-      // flat
       _pick(order, ['orderNumber']),
       _pick(order, ['OrderNumber']),
       _pick(order, ['orderNo']),
@@ -1022,7 +1042,7 @@ class ReceiptBuilder {
       if (c == null) continue;
       final s = c.toString().trim();
       if (s.isEmpty) continue;
-      if (s == '0' || s.toLowerCase() == 'null') continue; // invalid
+      if (s == '0' || s.toLowerCase() == 'null') continue;
       return s;
     }
     return '';
@@ -1030,7 +1050,6 @@ class ReceiptBuilder {
 
   String _extractOrderDate(dynamic order) {
     if (order == null) return '';
-
     final candidates = <dynamic>[
       _pick(order, ['data.orderPlaced']),
       _pick(order, ['data.OrderPlaced']),
@@ -1055,12 +1074,10 @@ class ReceiptBuilder {
       final s = c.toString().trim();
       if (s.isEmpty || s.toLowerCase() == 'null') continue;
 
-      // Try to parse as DateTime and format nicely
       try {
         final dt = DateTime.parse(s);
         return DateFormat('yyyy/MM/dd', 'ar').format(dt);
       } catch (_) {
-        // If parsing fails, return as-is (might already be formatted)
         return s;
       }
     }
@@ -1092,10 +1109,18 @@ class ReceiptBuilder {
   }
 
   List<dynamic> _extractItems(dynamic order) {
-    final l = (_pick(order, ['data.orderItems']) as List?) ??
+    final l = (_pick(order, ['items']) as List?) ??
+        (_pick(order, ['data.orderItems']) as List?) ??
         (_pick(order, ['orderItems']) as List?) ??
-        (_pick(order, ['items']) as List?) ??
         <dynamic>[];
+
+    if (debug) {
+      developer.log(
+        'RB _extractItems -> found ${l.length} items',
+        name: 'ReceiptBuilder',
+      );
+    }
+
     return l;
   }
 
@@ -1267,12 +1292,51 @@ class ReceiptBuilder {
     final dd = _findDomainDetail(prod, domainDetailId);
     if (dd == null) return null;
 
-    final v = _pick(dd, ['name', 'Name']);
-    if (v is String && v.trim().isNotEmpty) return v.trim();
+    // جرّب أكثر من مفتاح محتمل للاسم (عربي/إنجليزي)
+    final candidates = [
+      _pick(dd, ['additionNameEn', 'AdditionNameEn']),
+      _pick(dd, ['nameEn', 'NameEn']),
+      _pick(dd, ['additionName', 'AdditionName']),
+      _pick(dd, ['name', 'Name']),
+      _pick(dd, ['titleEn', 'TitleEn']),
+      _pick(dd, ['title', 'Title']),
+      _pick(dd, ['label', 'Label']),
+      _pick(dd, ['description', 'Description']),
+    ];
+
+    for (final c in candidates) {
+      if (c is String && c.trim().isNotEmpty) {
+        return c.trim();
+      }
+    }
+
+    // لو ولا واحد نفع، نحاول من الـ object نفسه بـ dynamic
+    try {
+      final dynName = (dd as dynamic).additionNameEn;
+      if (dynName is String && dynName.trim().isNotEmpty) {
+        return dynName.trim();
+      }
+    } catch (_) {}
 
     try {
-      final n = (dd as dynamic).name;
-      if (n is String && n.trim().isNotEmpty) return n.trim();
+      final dynName = (dd as dynamic).nameEn;
+      if (dynName is String && dynName.trim().isNotEmpty) {
+        return dynName.trim();
+      }
+    } catch (_) {}
+
+    try {
+      final dynName = (dd as dynamic).additionName;
+      if (dynName is String && dynName.trim().isNotEmpty) {
+        return dynName.trim();
+      }
+    } catch (_) {}
+
+    try {
+      final dynName = (dd as dynamic).name;
+      if (dynName is String && dynName.trim().isNotEmpty) {
+        return dynName.trim();
+      }
     } catch (_) {}
 
     return null;
@@ -1294,6 +1358,70 @@ class ReceiptBuilder {
 
     return null;
   }
+
+  /// Resolve an addition from either a Map or a DTO object into a normalized
+  /// [_ResolvedAddition], using the product as a fallback to fill name/price.
+  _ResolvedAddition? _resolveAdditionForPrint(dynamic add, dynamic product) {
+    if (add == null) return null;
+
+    // 1) domainDetailId
+    int ddId = _asInt(_pick(add, ['domainDetailId', 'DomainDetailId']), 0);
+    if (ddId == 0) {
+      try {
+        ddId = _asInt((add as dynamic).domainDetailId, 0);
+      } catch (_) {}
+    }
+    if (ddId <= 0) return null;
+
+    // 2) name
+    String addName =
+        _asString(_pick(add, ['additionName', 'name', 'Name']), '').trim();
+    if (addName.isEmpty) {
+      try {
+        final dynName = (add as dynamic).additionName;
+        if (dynName is String && dynName.trim().isNotEmpty) {
+          addName = dynName.trim();
+        }
+      } catch (_) {}
+    }
+
+    // 3) price
+    double addPrice =
+        _asNumDouble(_pick(add, ['priceIncrease', 'PriceIncrease']), 0.0);
+    if (addPrice == 0.0) {
+      try {
+        final dynPrice = (add as dynamic).priceIncrease;
+        if (dynPrice is num) addPrice = dynPrice.toDouble();
+      } catch (_) {}
+    }
+
+    // 4) fallback من الـ product
+    if (product != null) {
+      if (addName.isEmpty) {
+        final fallbackName = _resolveAdditionNameFromProduct(product, ddId);
+        if (fallbackName != null && fallbackName.trim().isNotEmpty) {
+          addName = fallbackName.trim();
+        }
+      }
+      if (addPrice == 0.0) {
+        final fallbackPrice = _resolveAdditionPriceFromProduct(product, ddId);
+        if (fallbackPrice != null) {
+          addPrice = fallbackPrice;
+        }
+      }
+    }
+
+    // 5) لو لسا بدون اسم -> اسم إنجليزي مفهوم
+    if (addName.isEmpty) {
+      addName = 'إضافة $ddId';
+    }
+
+    return _ResolvedAddition(
+      domainDetailId: ddId,
+      name: addName,
+      priceIncrease: addPrice,
+    );
+  }
 }
 
 /// Extract additions list from either a Map or a Dart DTO (OrderItemDto).
@@ -1304,13 +1432,11 @@ List<dynamic>? _extractAdditionsFromItem(dynamic item) {
   );
   if (item == null) return null;
 
-  // Case 1: JSON map from backend
   if (item is Map) {
     final a = item['additions'] ?? item['Additions'];
     if (a is List) return a;
   }
 
-  // Case 2: Dart class (OrderItemDto, etc.)
   try {
     final a = (item as dynamic).additions;
     if (a is List) return a;
@@ -1323,13 +1449,11 @@ List<dynamic>? _extractAdditionsFromItem(dynamic item) {
 String _extractNotesFromItem(dynamic item) {
   if (item == null) return '';
 
-  // Case 1: Map
   if (item is Map) {
     final n = item['notes'] ?? item['Notes'];
     if (n is String) return n;
   }
 
-  // Case 2: Dart class
   try {
     final n = (item as dynamic).notes;
     if (n is String) return n;

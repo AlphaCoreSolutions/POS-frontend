@@ -4,6 +4,7 @@ class OrderItemDto {
   final int productId;
   final double quantity;
   final double discount;
+  final double price;
 
   final String? notes;
   final List<OrderItemAdditionDto> additions;
@@ -12,6 +13,7 @@ class OrderItemDto {
     required this.productId,
     required this.quantity,
     this.discount = 0.0,
+    this.price = 0.0,
     this.notes,
     this.additions = const [],
   });
@@ -21,6 +23,7 @@ class OrderItemDto {
       productId: productId,
       quantity: newQuantity,
       discount: discount,
+      price: price,
       notes: notes,
       additions: additions,
     );
@@ -31,6 +34,7 @@ class OrderItemDto {
       'productId': productId,
       'quantity': quantity,
       'discount': discount,
+      'price': price,
       'notes': notes,
       'additions': additions.map((a) => a.toJson()).toList(),
     };
@@ -41,6 +45,7 @@ class OrderItemDto {
       productId: json['productId'] ?? json['ProductId'] ?? 0,
       quantity: (json['quantity'] ?? json['Quantity'] ?? 0).toDouble(),
       discount: (json['discount'] ?? json['Discount'] ?? 0).toDouble(),
+      price: (json['price'] ?? json['Price'] ?? 0).toDouble(),
       notes: json['notes'] ?? json['Notes'],
       additions: ((json['additions'] ?? json['Additions']) as List<dynamic>?)
               ?.map((e) =>

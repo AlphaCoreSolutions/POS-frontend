@@ -38,9 +38,9 @@ class KitchenRouter {
     for (final it in order.orderItems) {
       final p = productsById[it.productId];
       if (p == null) continue;
-      if (p.categoryId == 7) {
+      if (p.categoryId == 2) {
         falafel.add(it);
-      } else if ({6, 8, 9}.contains(p.categoryId)) {
+      } else if ({3, 6, 7, 8, 9}.contains(p.categoryId)) {
         shawarma.add(it);
       }
     }
