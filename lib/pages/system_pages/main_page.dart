@@ -169,8 +169,8 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
-  Map<int, Category> _catById = {};
-  Map<int, List<int>> _subIdsByRoot = {};
+  final Map<int, Category> _catById = {};
+  final Map<int, List<int>> _subIdsByRoot = {};
 
   void _onRootTap(Category? cat) {
     setState(() {
@@ -231,7 +231,7 @@ class _MainPageState extends State<MainPage> {
         : "Bluetooth not enabled";
 
     setState(() {
-      _info = "$platformVersion";
+      _info = platformVersion;
     });
   }
 
@@ -372,7 +372,7 @@ class _MainPageState extends State<MainPage> {
 
         // base unit price: prefer item.price if user entered it,
         // otherwise fall back to product.sellingPrice
-        final double? basePrice =
+        final double basePrice =
             (it.price != 0.0 ? it.price : (prod?.sellingPrice ?? 0.0));
 
         double additionsTotal = 0.0;
@@ -579,7 +579,7 @@ class _MainPageState extends State<MainPage> {
     final gen = Generator(paper, profile);
     final bytes = <int>[];
 
-    Future<img.Image?> _render(String text) async {
+    Future<img.Image?> render(String text) async {
       final style = ui.TextStyle(
         fontFamily: 'NotoNaskhArabic',
         color: const ui.Color(0xFF000000),
@@ -609,7 +609,7 @@ class _MainPageState extends State<MainPage> {
       return img.decodePng(bd.buffer.asUint8List());
     }
 
-    final im = await _render('مرحبا بالعالم — اختبار العربية');
+    final im = await render('مرحبا بالعالم — اختبار العربية');
     if (im == null) {
       // ignore: avoid_print
       print('SmokeTest: failed to render image');
@@ -677,14 +677,14 @@ class _MainPageState extends State<MainPage> {
     final byId = <int, Product>{for (final p in products) p.productId: p};
 
     // ---------- helpers ----------
-    PosAlign _pos(TextAlign a) => a == TextAlign.center
+    PosAlign pos(TextAlign a) => a == TextAlign.center
         ? PosAlign.center
         : a == TextAlign.right
             ? PosAlign.right
             : PosAlign.left;
 
     // Render one line with Flutter text engine
-    Future<img.Image?> _renderLine({
+    Future<img.Image?> renderLine({
       required String text,
       required bool rtl,
       required TextAlign align,
@@ -733,7 +733,7 @@ class _MainPageState extends State<MainPage> {
     }
 
     // Convert to pure black/white with a threshold (no error-diffusion dithering)
-    img.Image _toBW(img.Image src, {int threshold = 200}) {
+    img.Image toBW(img.Image src, {int threshold = 200}) {
       final out = img.Image.from(src);
       for (int y = 0; y < out.height; y++) {
         for (int x = 0; x < out.width; x++) {
@@ -750,42 +750,42 @@ class _MainPageState extends State<MainPage> {
       return out;
     }
 
-    Future<void> _line({
+    Future<void> line({
       required String text,
       bool rtl = false,
       TextAlign align = TextAlign.left,
       double size = 30, // larger default
       bool bold = true,
     }) async {
-      final im = await _renderLine(
+      final im = await renderLine(
           text: text, rtl: rtl, align: align, fontSize: size, bold: bold);
       if (im == null) return;
 
       // Ensure exact width & binarize
       final resized =
           im.width == widthPx ? im : img.copyResize(im, width: widthPx);
-      final bw = _toBW(resized, threshold: 200); // tweak 180..220 if needed
+      final bw = toBW(resized, threshold: 200); // tweak 180..220 if needed
 
       // Some printers hate GS v 0; try raster first, then legacy
       try {
-        bytes.addAll(gen.imageRaster(bw, align: _pos(align)));
+        bytes.addAll(gen.imageRaster(bw, align: pos(align)));
       } catch (_) {
-        bytes.addAll(gen.image(bw, align: _pos(align)));
+        bytes.addAll(gen.image(bw, align: pos(align)));
       }
     }
 
-    String _fmtQty(double q) => (q.truncateToDouble() == q)
+    String fmtQty(double q) => (q.truncateToDouble() == q)
         ? q.toStringAsFixed(0)
         : q.toStringAsFixed(2);
 
     // ---------- header ----------
-    await _line(
+    await line(
         text: 'أبو كاف',
         rtl: true,
         align: TextAlign.center,
         size: 34,
         bold: true);
-    await _line(text: '', size: 12, bold: false);
+    await line(text: '', size: 12, bold: false);
 
     // ---------- items ----------
     for (final it in order.orderItems) {
@@ -796,8 +796,8 @@ class _MainPageState extends State<MainPage> {
       final disc = it.discount;
       final lineTotal = (unit * qty) - disc;
 
-      await _line(
-        text: '$name ×${_fmtQty(qty)}  —  ${lineTotal.toStringAsFixed(2)}',
+      await line(
+        text: '$name ×${fmtQty(qty)}  —  ${lineTotal.toStringAsFixed(2)}',
         rtl: true,
         align: TextAlign.left,
         size: 28,
@@ -805,7 +805,7 @@ class _MainPageState extends State<MainPage> {
       );
 
       if (disc > 0) {
-        await _line(
+        await line(
           text: 'خصم: ${disc.toStringAsFixed(2)}',
           rtl: true,
           align: TextAlign.right,
@@ -815,7 +815,7 @@ class _MainPageState extends State<MainPage> {
       }
     }
 
-    await _line(
+    await line(
         text: '——————————————', align: TextAlign.center, size: 22, bold: false);
 
     // ---------- totals ----------
@@ -823,7 +823,7 @@ class _MainPageState extends State<MainPage> {
     final tip = (order.tips != 0.0 ? order.tips : order.tips).toDouble();
     final pm = order.paymentMethod;
 
-    await _line(
+    await line(
       text: 'الإجمالي: ${grand.toStringAsFixed(2)}',
       rtl: true,
       align: TextAlign.right,
@@ -832,7 +832,7 @@ class _MainPageState extends State<MainPage> {
     );
 
     if (tip > 0) {
-      await _line(
+      await line(
         text: 'البقشيش: ${tip.toStringAsFixed(2)}',
         rtl: true,
         align: TextAlign.right,
@@ -841,7 +841,7 @@ class _MainPageState extends State<MainPage> {
       );
     }
 
-    await _line(
+    await line(
       text: 'طريقة الدفع: $pm',
       rtl: true,
       align: TextAlign.right,
@@ -849,8 +849,8 @@ class _MainPageState extends State<MainPage> {
       bold: false,
     );
 
-    await _line(text: '', size: 12, bold: false);
-    await _line(
+    await line(text: '', size: 12, bold: false);
+    await line(
         text: 'شكرًا لزيارتكم',
         rtl: true,
         align: TextAlign.center,
@@ -889,12 +889,11 @@ class _MainPageState extends State<MainPage> {
                 colorScheme: Theme.of(context).colorScheme.copyWith(
                       primary: const Color(0xFFB87333), // dark orange
                     ),
-                dialogBackgroundColor: Colors.grey[100],
                 textButtonTheme: TextButtonThemeData(
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF8B5C42), // brown
                   ),
-                ),
+                ), dialogTheme: DialogThemeData(backgroundColor: Colors.grey[100]),
               ),
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -1200,7 +1199,7 @@ class _MainPageState extends State<MainPage> {
 
               // If selling price is 0, schedule a dialog after this frame to ask user for a price.
               WidgetsBinding.instance.addPostFrameCallback((_) async {
-                final _priceCtrl = TextEditingController();
+                final priceCtrl = TextEditingController();
                 final double? entered = await showDialog<double?>(
                   context: context,
                   barrierDismissible: false,
@@ -1208,7 +1207,7 @@ class _MainPageState extends State<MainPage> {
                     return AlertDialog(
                       title: Text('Enter price for "${product.productName}"'),
                       content: TextField(
-                        controller: _priceCtrl,
+                        controller: priceCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         decoration: const InputDecoration(hintText: '0.00'),
@@ -1220,7 +1219,7 @@ class _MainPageState extends State<MainPage> {
                         ),
                         ElevatedButton(
                           onPressed: () {
-                            final v = double.tryParse(_priceCtrl.text);
+                            final v = double.tryParse(priceCtrl.text);
                             Navigator.of(ctx).pop(v);
                           },
                           child: const Text('OK'),
@@ -1445,7 +1444,7 @@ class _MainPageState extends State<MainPage> {
 
   double _calculateItemTotal(OrderItemDto item) {
     // 1. Base price: prefer the item's own price, fall back to product price
-    final double? basePrice =
+    final double basePrice =
         (item.price != 0.0) ? item.price : _getProductPrice(item.productId);
 
     // 2. Additions unit price
@@ -2609,7 +2608,7 @@ class _MainPageState extends State<MainPage> {
                                               double paddingVertical =
                                                   screenHeight * 0.015;
 
-                                              return Container(
+                                              return SizedBox(
                                                 width:
                                                     textFieldWidth, // Ensure it scales dynamically
                                                 child: TextField(
@@ -2872,7 +2871,7 @@ class _MainPageState extends State<MainPage> {
                                               value: isCash, // Toggle value
                                               onChanged:
                                                   _togglePaymentMethod, // Update payment method on change
-                                              activeColor: Colors
+                                              activeThumbColor: Colors
                                                   .green, // Color when 'Visa' is selected
                                               inactiveThumbColor: Colors
                                                   .blue, // Color when 'Cash' is selected
@@ -2927,7 +2926,7 @@ class _MainPageState extends State<MainPage> {
                                         ),
                                       ),
                                       Text(
-                                        '${_calculateTaxes(selectedItems).toStringAsFixed(2)}',
+                                        _calculateTaxes(selectedItems).toStringAsFixed(2),
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -3212,7 +3211,7 @@ void _chargeOrder() async {
       final List<Map<String, dynamic>> itemsForPrint = items.map((it) {
         final product = _getProductById(it.productId);
 
-        final double? basePrice =
+        final double basePrice =
             (it.price != 0.0) ? it.price : (product.sellingPrice);
 
         double additionsTotal = 0.0;
@@ -3320,7 +3319,7 @@ void _chargeOrder() async {
 
 class AddProductDialog extends StatefulWidget {
   final String barcode;
-  const AddProductDialog({required this.barcode});
+  const AddProductDialog({super.key, required this.barcode});
 
   @override
   State<AddProductDialog> createState() => _AddProductDialogState();

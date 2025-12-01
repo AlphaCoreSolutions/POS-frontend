@@ -487,7 +487,7 @@ class ArabicReceiptBuilder {
 
   String _formatNow() {
     final now = DateTime.now();
-    final two = (int n) => n.toString().padLeft(2, '0');
+    String two(int n) => n.toString().padLeft(2, '0');
     return '${now.year}-${two(now.month)}-${two(now.day)} ${two(now.hour)}:${two(now.minute)}:${two(now.second)}';
   }
 

@@ -7,10 +7,10 @@ class PrintPreviewDialog extends StatelessWidget {
   final VoidCallback onPrint;
 
   const PrintPreviewDialog({
-    Key? key,
+    super.key,
     required this.orderData,
     required this.onPrint,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +293,7 @@ class PrintPreviewDialog extends StatelessWidget {
                 ],
               ),
             );
-          }).toList(),
+          }),
 
           const Divider(thickness: 2, height: 32),
 

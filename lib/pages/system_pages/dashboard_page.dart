@@ -400,7 +400,7 @@ void _fetchOrdersForSelectedDateRange() async {
         _dashboardCard(translation(context).transactions,
             ordersList.length.toString(), Icons.shopping_cart, Colors.blue),
         _dashboardCard(translation(context).topSellingProducts,
-            "$bestSellerText", Icons.coffee, Colors.orange),
+            bestSellerText, Icons.coffee, Colors.orange),
         _dashboardCardProfit(
             'Profit', Icons.trending_up, Colors.teal, ordersList)
 

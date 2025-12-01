@@ -169,11 +169,9 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
         colorScheme: const ColorScheme.light(
           primary: Color(0xFFB87333),
           onPrimary: Colors.white,
-          background: Colors.white,
           surface: Colors.white,
           onSurface: Color(0xFF36454F),
         ),
-        dialogBackgroundColor: Colors.white,
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
             foregroundColor: Color(0xFFB87333),
@@ -190,7 +188,7 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
             foregroundColor: Color(0xFFB87333),
             side: const BorderSide(color: Color(0xFFB87333)),
           ),
-        ),
+        ), dialogTheme: DialogThemeData(backgroundColor: Colors.white),
       ),
       child: AlertDialog(
         title: Row(
@@ -409,7 +407,7 @@ class _RolePicker extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             isExpanded: true,
             items: items,
             iconEnabledColor: const Color(0xFFB87333),

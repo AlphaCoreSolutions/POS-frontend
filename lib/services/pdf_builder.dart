@@ -20,10 +20,10 @@ Future<Uint8List> buildReceiptPdfBytes(
   final pageFormat = is80mm ? PdfPageFormat.roll80 : PdfPageFormat.roll57;
   final doc = pw.Document();
 
-  String _fmtQty(double q) =>
+  String fmtQty(double q) =>
       (q.truncateToDouble() == q) ? q.toStringAsFixed(0) : q.toStringAsFixed(2);
 
-  pw.Widget _rtl(String text,
+  pw.Widget rtl(String text,
       {double size = 11,
       pw.TextAlign align = pw.TextAlign.left,
       pw.FontWeight? weight}) {
@@ -47,7 +47,7 @@ Future<Uint8List> buildReceiptPdfBytes(
         final children = <pw.Widget>[];
 
         // Header
-        children.add(_rtl('أبو كاف',
+        children.add(rtl('أبو كاف',
             size: 16, align: pw.TextAlign.center, weight: pw.FontWeight.bold));
         children.add(pw.SizedBox(height: 6));
         children.add(pw.Divider());
@@ -65,7 +65,7 @@ Future<Uint8List> buildReceiptPdfBytes(
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Expanded(child: _rtl('$name ×${_fmtQty(qty)}', size: 11)),
+                pw.Expanded(child: rtl('$name ×${fmtQty(qty)}', size: 11)),
                 pw.SizedBox(width: 8),
                 pw.Text(lineTotal.toStringAsFixed(2),
                     style: pw.TextStyle(font: ttf, fontSize: 11)),
@@ -74,7 +74,7 @@ Future<Uint8List> buildReceiptPdfBytes(
           );
 
           if (disc > 0) {
-            children.add(_rtl('خصم: ${disc.toStringAsFixed(2)}',
+            children.add(rtl('خصم: ${disc.toStringAsFixed(2)}',
                 size: 9, align: pw.TextAlign.right));
           }
         }
@@ -91,7 +91,7 @@ Future<Uint8List> buildReceiptPdfBytes(
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              _rtl('الإجمالي', size: 12, weight: pw.FontWeight.bold),
+              rtl('الإجمالي', size: 12, weight: pw.FontWeight.bold),
               pw.Text(grand.toStringAsFixed(2),
                   style: pw.TextStyle(
                       font: ttf, fontSize: 12, fontWeight: pw.FontWeight.bold)),
@@ -104,7 +104,7 @@ Future<Uint8List> buildReceiptPdfBytes(
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                _rtl('البقشيش', size: 11),
+                rtl('البقشيش', size: 11),
                 pw.Text(tip.toStringAsFixed(2),
                     style: pw.TextStyle(font: ttf, fontSize: 11)),
               ],
@@ -116,7 +116,7 @@ Future<Uint8List> buildReceiptPdfBytes(
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              _rtl('طريقة الدفع', size: 11),
+              rtl('طريقة الدفع', size: 11),
               pw.Text(pm.toString(),
                   style: pw.TextStyle(font: ttf, fontSize: 11)),
             ],
@@ -128,7 +128,7 @@ Future<Uint8List> buildReceiptPdfBytes(
         children.add(pw.SizedBox(height: 6));
 
         // Footer
-        children.add(_rtl('شكرًا لزيارتكم',
+        children.add(rtl('شكرًا لزيارتكم',
             size: 12, align: pw.TextAlign.center, weight: pw.FontWeight.bold));
         children.add(pw.SizedBox(height: 6));
         children.add(
