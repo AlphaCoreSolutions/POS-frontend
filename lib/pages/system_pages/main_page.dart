@@ -318,8 +318,8 @@ class _MainPageState extends State<MainPage> {
             : GridView.builder(
                 padding: EdgeInsets.all(isMobile ? 4 : 6),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 7),
-                  childAspectRatio: isMobile ? 0.65 : isTablet ? 0.7 : 0.65,
+                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 6),
+                  childAspectRatio: isMobile ? 0.85 : isTablet ? 0.9 : 0.9,
                   crossAxisSpacing: isMobile ? 4 : 6,
                   mainAxisSpacing: isMobile ? 4 : 6,
                 ),
@@ -397,9 +397,9 @@ class _MainPageState extends State<MainPage> {
   Widget _buildProductCard(Product p) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    const textPadding = 4.0;
-    const double fontSize = 7.5;
-    const double iconSize = 18.0;
+    const textPadding = 3.0;
+    const double fontSize = 11;
+    const double iconSize = 8.0;
     
     return Card(
       elevation: 2,
@@ -410,7 +410,8 @@ class _MainPageState extends State<MainPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
+            SizedBox(
+              height: 50,
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
@@ -422,7 +423,7 @@ class _MainPageState extends State<MainPage> {
             Padding(
               padding: const EdgeInsets.all(textPadding),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     p.productName,
@@ -430,8 +431,8 @@ class _MainPageState extends State<MainPage> {
                       fontWeight: FontWeight.bold,
                       fontSize: fontSize,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    softWrap: true,
                   ),
                   SizedBox(height: 2),
                   Text(
@@ -441,6 +442,7 @@ class _MainPageState extends State<MainPage> {
                       fontWeight: FontWeight.w600,
                       fontSize: fontSize - 1.5,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
