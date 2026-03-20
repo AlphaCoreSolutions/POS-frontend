@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/components/printer_setup_dialog.dart';
 import 'package:visionpos/components/side_menu.dart';
 import 'package:visionpos/models/order_dto.dart';
@@ -16,6 +15,7 @@ import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:visionpos/services/bluetooth_printing_service.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
+import 'package:visionpos/services/print_category_manager.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class MainPage extends StatefulWidget {
@@ -33,6 +33,7 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
   final _barcodeFocus = FocusNode();
+  final PrintCategoryManager _printCategoryManager = PrintCategoryManager();
   List<Product> _allProducts = [];
   List<Product> _filteredProducts = [];
   bool isLoading = false;
@@ -60,6 +61,7 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
+    _printCategoryManager.load(); // Load saved category routing
     _loadInitialData();
     if (!kIsWeb) {
       requestPermissions();
@@ -260,7 +262,10 @@ class _MainPageState extends State<MainPage> {
           ),
         ) : null,
         actions: [
-          if (!isMobile && !kIsWeb) IconButton(icon: const Icon(Icons.print), onPressed: () => showPrinterSetupDialog(context)),
+          if (!isMobile && !kIsWeb) IconButton(
+            icon: const Icon(Icons.print), 
+            onPressed: () => showPrinterSetupDialog(context, categories: _allCategories, categoryManager: _printCategoryManager)
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadInitialData),
         ],
       ),
@@ -590,11 +595,24 @@ class _MainPageState extends State<MainPage> {
     try {
       final bt = BluetoothPrinterManager();
       await bt.load();
-      final router = KitchenRouter(falafelCategoryIds: {2}, shawarmaSnacksCategoryIds: {3, 6, 7, 8, 9});
+      
+      // Use saved category routing if configured, otherwise use defaults
+      final falafelIds = _printCategoryManager.falafelCategoryIds.isNotEmpty 
+          ? _printCategoryManager.falafelCategoryIds 
+          : {2};
+      final shawarmaIds = _printCategoryManager.shawarmaSnacksCategoryIds.isNotEmpty 
+          ? _printCategoryManager.shawarmaSnacksCategoryIds 
+          : {3, 6, 7, 8, 9};
+      
+      final router = KitchenRouter(
+        falafelCategoryIds: falafelIds, 
+        shawarmaSnacksCategoryIds: shawarmaIds
+      );
       final p = TriplePrinter(btManager: bt, router: router);
       await p.printAll({'orderNumber': orderNumber, 'items': items.map((it) => it.toJson()).toList(), 'grandTotal': total});
       return true;
     } catch (e) {
+      debugPrint('❌ Print error: $e');
       return false;
     }
   }

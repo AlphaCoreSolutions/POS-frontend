@@ -7,17 +7,27 @@ import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 
 import 'package:visionpos/services/bluetooth_printing_service.dart'
     show BluetoothPrinterManager, SavedPrinter, PrinterRole, PrinterRoleX;
+import 'package:visionpos/models/category_model.dart';
+import 'package:visionpos/services/print_category_manager.dart';
+import 'package:visionpos/components/print_category_selection_dialog.dart';
 
-Future<void> showPrinterSetupDialog(BuildContext context) {
+Future<void> showPrinterSetupDialog(BuildContext context, {List<Category>? categories, PrintCategoryManager? categoryManager}) {
   return showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const PrinterSetupDialog(),
+    builder: (_) => PrinterSetupDialog(categories: categories, categoryManager: categoryManager),
   );
 }
 
 class PrinterSetupDialog extends StatefulWidget {
-  const PrinterSetupDialog({super.key});
+  final List<Category>? categories;
+  final PrintCategoryManager? categoryManager;
+  
+  const PrinterSetupDialog({
+    super.key,
+    this.categories,
+    this.categoryManager,
+  });
 
   @override
   State<PrinterSetupDialog> createState() => _PrinterSetupDialogState();
@@ -162,6 +172,23 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  Future<void> _showCategoryConfig() async {
+    if (widget.categories == null || widget.categoryManager == null) {
+      _showSnack('Categories data not available. Please retry.');
+      return;
+    }
+    
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => PrintCategorySelectionDialog(
+        allCategories: widget.categories!,
+        categoryManager: widget.categoryManager!,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -244,6 +271,14 @@ class _PrinterSetupDialogState extends State<PrinterSetupDialog> {
             onPressed: _saveAssignments,
             icon: const Icon(Icons.save),
             label: const Text('Save'),
+          ),
+          ElevatedButton.icon(
+            onPressed: _showCategoryConfig,
+            icon: const Icon(Icons.category),
+            label: const Text('Configure Categories'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+            ),
           ),
         ],
       ),

@@ -3,11 +3,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
-import 'package:visionpos/utils/pdf_service.dart';
 import 'package:visionpos/utils/session_manager.dart';
 
 // Conditionally import path_provider and pdfx only for non-web platforms
-import 'dart:io' if (dart.library.html) 'dart:html' as io;
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
