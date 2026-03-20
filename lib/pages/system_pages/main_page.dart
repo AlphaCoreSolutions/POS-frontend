@@ -1,37 +1,30 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'package:image/image.dart' as img;
-import 'package:esc_pos_utils/esc_pos_utils.dart';
-
 import 'package:visionpos/L10n/app_localizations.dart';
 import 'package:visionpos/components/printer_setup_dialog.dart';
-import 'package:visionpos/language_changing/constants.dart';
+import 'package:visionpos/components/side_menu.dart';
 import 'package:visionpos/models/order_dto.dart';
 import 'package:visionpos/models/order_item_addition_dto.dart';
 import 'package:visionpos/models/order_item_dto.dart';
-import 'package:visionpos/models/promocodes_model.dart';
 import 'package:visionpos/models/taxes_model.dart';
-import 'package:visionpos/pages/add_pages/add_category.dart';
 import 'package:visionpos/pages/essential_pages/api_handler.dart';
 import 'package:visionpos/models/category_model.dart';
 import 'package:visionpos/models/product_model.dart';
-import 'package:visionpos/services/arabic_font_loader.dart';
 import 'package:visionpos/utils/session_manager.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
-import 'package:intl/intl.dart';
 import 'package:visionpos/services/bluetooth_printing_service.dart';
-import 'package:visionpos/services/receipt_builder.dart';
 import 'package:visionpos/services/kitchen_router.dart';
 import 'package:visionpos/services/triple_printer.dart';
-import 'package:flutter/foundation.dart' show setEquals, listEquals;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+  final bool sidebarCollapsed;
+
+  const MainPage({
+    super.key,
+    this.sidebarCollapsed = false,
+  });
 
   @override
   State<MainPage> createState() => _MainPageState();
@@ -39,97 +32,84 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
-  final _barcodeController = TextEditingController();
   final _barcodeFocus = FocusNode();
-  String _barcodeBuffer = '';
-  late List<dynamic> data = [];
-  Product? selectedProduct;
-  List<Product> products = [];
+  List<Product> _allProducts = [];
+  List<Product> _filteredProducts = [];
   bool isLoading = false;
-  List<Product> searchResults = [];
-  Product? productSearch;
-  OverlayEntry? overlayEntry;
-  int userId = 1;
-  int ordeId = 0;
   int? _orgId;
-  List<Category> _categories = [];
+
+  Category? selectedCategory;
+  List<Category> _allCategories = [];
+  List<Category> _rootCategories = [];
+  List<Category> _activeSubs = [];
+  int? _selectedSubId;
+  
+  ApiHandler apiHandler = ApiHandler();
+  TextEditingController searchController = TextEditingController();
+  
+  List<OrderItemDto> selectedItems = [];
+  double tips = 0.0;
+  int paymentMethod = 1; 
+  bool isCash = true; 
+  double discount = 0.0;
+  Taxes? currentTaxes;
+  String selectedTaxType = 'In-House'; 
+
+  final Map<int, List<int>> _subIdsByRoot = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+    if (!kIsWeb) {
+      requestPermissions();
+    }
+    _fetchTaxes();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _barcodeFocus.requestFocus();
+    });
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() => isLoading = true);
+    await _loadOrganizationId();
+    await Future.wait([
+      _loadCategories(),
+      _loadProducts(),
+    ]);
+    setState(() => isLoading = false);
+  }
 
   Future<void> _loadOrganizationId() async {
     final orgId = await SessionManager.getOrganizationId();
-    if (mounted) setState(() => _orgId = orgId);
-  }
-
-  Future<void> _loadCategories() async {
-    final org = await SessionManager.getOrganizationId();
-    final cats = await ApiHandler().getCategoriesForOrg(org ?? 0);
     if (mounted) {
       setState(() {
-        _all = cats;
-        _rootCategories = cats.where((c) => c.mainCategoryId == null).toList();
-        _buildCategoryIndices(cats);
+        _orgId = orgId;
       });
     }
   }
 
-  Category? selectedCategory;
-  List<Category> _all = [];
-  List<Category> _rootCategories = [];
-  List<Category> _activeSubs = [];
-  int? _selectedSubId;
-  late final ScrollController _subsCtrl;
-  Map<int, String> get _catNameById => {
-        for (final c in _all) c.id: c.categoryName,
-      };
-
-  ApiHandler apiHandler = ApiHandler();
-  TextEditingController searchController = TextEditingController();
-  final LayerLink _layerLink = LayerLink();
-  
-  List<OrderItemDto> selectedItems = [];
-  Map<int, double> productPrices = {};
-  double tips = 0.0;
-  int paymentMethod = 1; 
-  bool isCash = true; 
-  double switchScale = 0.8;
-
-  int? _toInt(dynamic v) {
-    if (v == null) return null;
-    if (v is int) return v;
-    if (v is String) return int.tryParse(v);
-    return null;
+  Future<void> _loadCategories() async {
+    final cats = await apiHandler.getCategoriesForOrg(_orgId ?? 0);
+    setState(() {
+      _allCategories = cats;
+      _rootCategories = cats.where((c) => c.mainCategoryId == null).toList();
+      _buildCategoryIndices(cats);
+    });
   }
 
-  int? get selectedRootId => selectedCategory?.id;
-
-  final TextEditingController promoCodeController = TextEditingController();
-  final TextEditingController _tipController = TextEditingController();
-  OverlayEntry? overlayEntrypromo;
-  final LayerLink _layerLinkpromo = LayerLink();
-  List<Promocodes> searchResultspromo = [];
-  Promocodes? selectedPromoCode;
-  double discount = 0.0;
-  int orderCount = 0;
-  
-  Taxes? currentTaxes;
-  String selectedTaxType = 'In-House'; 
-  
-  double xOffset = 0;
-  double yOffset = 0;
-  bool isDrawerOpen = false;
-  
-  bool connected = false;
-  List<BluetoothDevice> items = [];
-  
-  final Map<int, Category> _catById = {};
-  final Map<int, List<int>> _subIdsByRoot = {};
+  Future<void> _loadProducts() async {
+    final prods = await apiHandler.getProductData();
+    setState(() {
+      _allProducts = prods;
+      _filteredProducts = prods;
+    });
+  }
 
   void _buildCategoryIndices(List<Category> all) {
-    _catById.clear();
     _subIdsByRoot.clear();
-
     for (final c in all) {
-      _catById[c.id] = c;
-      final parentId = _toInt(c.mainCategoryId);
+      final parentId = c.mainCategoryId;
       if (parentId != null) {
         (_subIdsByRoot[parentId] ??= <int>[]).add(c.id);
       }
@@ -138,147 +118,56 @@ class _MainPageState extends State<MainPage> {
 
   void _onRootTap(Category? cat) {
     setState(() {
-      selectedCategory = cat; 
-      _selectedSubId = null; 
+      selectedCategory = cat;
+      _selectedSubId = null;
       if (cat == null) {
         _activeSubs = const [];
+        _filteredProducts = _allProducts;
       } else {
-        _activeSubs = _all.where((c) => _toInt(c.mainCategoryId) == cat.id).toList();
+        _activeSubs = _allCategories.where((c) => c.mainCategoryId == cat.id).toList();
+        _filterProducts();
       }
     });
   }
 
   void _onSubTap(Category sub) {
-    setState(() => _selectedSubId = sub.id);
+    setState(() {
+      _selectedSubId = sub.id;
+      _filterProducts();
+    });
+  }
+
+  void _filterProducts() {
+    setState(() {
+      _filteredProducts = _allProducts.where((p) {
+        if (selectedCategory == null) return true;
+        if (_selectedSubId != null) return p.categoryId == _selectedSubId;
+        return p.categoryId == selectedCategory!.id || (_subIdsByRoot[selectedCategory!.id]?.contains(p.categoryId) ?? false);
+      }).toList();
+    });
+  }
+
+  void _searchProducts(String query) {
+    setState(() {
+      _filteredProducts = _allProducts.where((p) => p.productName.toLowerCase().contains(query.toLowerCase())).toList();
+    });
   }
 
   Future<void> requestPermissions() async {
-    await [
-      Permission.bluetooth,
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-      Permission.location,
-    ].request();
-  }
-
-  Future<void> getBluetoothDevices() async {
-    final List<BluetoothDevice> listResult = await _bluetooth.getBondedDevices();
-    if (mounted) {
-      setState(() {
-        items = listResult;
-      });
-    }
-  }
-
-  Future<void> connectToPrinter(String macAddress) async {
-    try {
-      final devices = await _bluetooth.getBondedDevices();
-      final device = devices.firstWhere((d) => d.address == macAddress);
-      await _bluetooth.connect(device).timeout(const Duration(seconds: 5));
-      if (mounted) setState(() => connected = true);
-    } catch (e) {
-      if (mounted) setState(() => connected = false);
-    }
-  }
-
-  Future<void> _printReceipt() async {
-    try {
-      if (selectedItems.isEmpty) return;
-
-      final btConnected = await _bluetooth.isConnected;
-      if (!(connected == true && btConnected == true)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Printer not connected')),
-          );
-        }
-        return;
-      }
-
-      final productsById = {for (final p in data.cast<Product>()) p.productId: p};
-
-      final List<Map<String, dynamic>> itemsForPrint = selectedItems.map((it) {
-        final prod = productsById[it.productId];
-        final double basePrice = (it.price != 0.0 ? it.price : (prod?.sellingPrice ?? 0.0));
-        return {
-          'productId': it.productId,
-          'productName': (prod?.productName ?? '').toString().trim(),
-          'quantity': it.quantity,
-          'price': basePrice,
-          'totalAfterTax': basePrice * it.quantity,
-          'additions': it.additions.map((a) => {'domainDetailId': a.domainDetailId}).toList(),
-          'notes': it.notes ?? '',
-        };
-      }).toList();
-
-      final builder = await ReceiptBuilder.create(paper: PaperSize.mm80);
-      final double sub = _calculateSubtotal(selectedItems);
-      final double tax = _calculateTaxes(selectedItems);
-      final double grand = _calculateTotal(selectedItems);
-
-      final Map<String, dynamic> orderMap = {
-        'data': {
-          'orderNumber': (orderCount).toString().padLeft(4, '0'),
-          'paymentMethod': paymentMethod,
-          'orderItems': itemsForPrint,
-          'totalAfterDiscount': sub,
-          'taxTotal': tax,
-          'tips': tips,
-          'grandTotal': grand,
-        },
-        'items': itemsForPrint,
-      };
-
-      final List<int> bytes = await builder.printCustomer(
-        orderMap,
-        items: itemsForPrint,
-        orderNumber: (orderCount).toString().padLeft(4, '0'),
-        storeName: 'VisionPOS',
-        resolve: (int id) => _getProductById(id),
-      );
-
-      await _bluetooth.writeBytes(Uint8List.fromList(bytes));
-    } catch (e) {
-      debugPrint('Print error: $e');
-    }
-  }
-
-  void _togglePaymentMethod(bool value) {
-    setState(() {
-      isCash = value;
-      paymentMethod = isCash ? 1 : 2;
-    });
+    if (kIsWeb) return;
+    await [Permission.bluetooth, Permission.bluetoothScan, Permission.bluetoothConnect, Permission.location].request();
   }
 
   Future<void> _fetchTaxes() async {
     try {
-      final taxes = await apiHandler.getTaxes();
-      if (mounted) setState(() => currentTaxes = taxes);
+      currentTaxes = await apiHandler.getTaxes();
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error fetching taxes: $e');
     }
   }
 
-  void _removeProductFromOrder(int index) {
-    setState(() {
-      int productId = selectedItems[index].productId;
-      selectedItems[index] = selectedItems[index].updateQuantity(selectedItems[index].quantity - 1);
-      if (selectedItems[index].quantity <= 0) {
-        productPrices.remove(productId);
-        selectedItems.removeAt(index);
-      }
-    });
-  }
-
-  void _addQuantity(int index) {
-    setState(() {
-      selectedItems[index] = selectedItems[index].updateQuantity(selectedItems[index].quantity + 1);
-    });
-  }
-
-  double _getProductPrice(int productId) => productPrices[productId] ?? 0.0;
-
-  Future<void> addToOrder(Product product) async {
+  void _addToOrder(Product product) async {
     AdditionsSelectionResult? selection;
     if (product.additions.isNotEmpty) {
       selection = await showAdditionsDialog(context, product);
@@ -286,17 +175,7 @@ class _MainPageState extends State<MainPage> {
     }
 
     setState(() {
-      final String? newNotes = selection?.notes;
-      final newAdditions = selection?.additions ?? const <OrderItemAdditionDto>[];
-
-      final int index = selectedItems.indexWhere((item) {
-        if (item.productId != product.productId) return false;
-        if ((item.notes ?? '').trim() != (newNotes ?? '').trim()) return false;
-        final existingAddIds = item.additions.map((a) => a.domainDetailId).toSet();
-        final targetAddIds = newAdditions.map((a) => a.domainDetailId).toSet();
-        return setEquals(existingAddIds, targetAddIds);
-      });
-
+      final int index = selectedItems.indexWhere((it) => it.productId == product.productId && (it.notes ?? '') == (selection?.notes ?? ''));
       if (index != -1) {
         selectedItems[index] = selectedItems[index].updateQuantity(selectedItems[index].quantity + 1);
       } else {
@@ -304,11 +183,10 @@ class _MainPageState extends State<MainPage> {
           productId: product.productId,
           quantity: 1,
           price: product.sellingPrice,
-          notes: newNotes,
-          additions: newAdditions,
+          notes: selection?.notes,
+          additions: selection?.additions ?? [],
         ));
       }
-      productPrices[product.productId] = product.sellingPrice;
     });
   }
 
@@ -348,182 +226,195 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  double _calculateSubtotal(List<OrderItemDto> items) {
-    double sub = items.fold(0.0, (sum, it) {
-      double adds = it.additions.fold(0.0, (s, a) {
-        final product = _getProductById(it.productId);
-        final match = product.additions.where((d) => d.domainDetailId == a.domainDetailId);
-        return s + (match.isNotEmpty ? match.first.priceIncrease : 0.0);
-      });
-      return sum + ((it.price + adds) * it.quantity);
-    });
-    return sub * (1 - discount / 100);
+  double _calculateSubtotal() {
+    return selectedItems.fold(0.0, (sum, it) => sum + (it.price * it.quantity)) * (1 - discount / 100);
   }
 
-  double _calculateTaxes(List<OrderItemDto> items) {
+  double _calculateTaxes() {
     if (currentTaxes == null) return 0.0;
     final rate = selectedTaxType == 'In-House' ? currentTaxes!.inHouse : currentTaxes!.takeOut;
-    return _calculateSubtotal(items) * (rate / 100);
+    return _calculateSubtotal() * (rate / 100);
   }
 
-  double _calculateTotal(List<OrderItemDto> items) => _calculateSubtotal(items) + _calculateTaxes(items) + tips;
-
-  void submitOrder() async {
-    if (_orgId == null) await _loadOrganizationId();
-    if (_orgId == null) return;
-
-    final order = OrderDto(
-      organizationId: _orgId!,
-      orderItems: selectedItems,
-      grandTotal: _calculateTotal(selectedItems),
-      paymentMethod: paymentMethod,
-      tips: tips,
-    );
-
-    if (await ApiHandler().postOrder(order)) {
-      await _printReceipts(
-        orderNumber: order.id.toString(),
-        paymentMethod: paymentMethod == 1 ? 'CASH' : 'VISA',
-        items: selectedItems,
-        subtotal: _calculateSubtotal(selectedItems),
-        tax: _calculateTaxes(selectedItems),
-        tips: tips,
-        total: _calculateTotal(selectedItems),
-      );
-      if (mounted) {
-        setState(() => selectedItems.clear());
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order submitted!')));
-      }
-    }
-  }
-
-  void getData() async {
-    final fetched = await apiHandler.getProductData();
-    if (mounted) setState(() => data = fetched);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _subsCtrl = ScrollController();
-    getData();
-    _loadOrganizationId().then((_) => _loadCategories());
-    requestPermissions();
-    _fetchTaxes();
-    getBluetoothDevices();
-    WidgetsBinding.instance.addPostFrameCallback((_) => FocusScope.of(context).requestFocus(_barcodeFocus));
-  }
-
-  void toggleMenu() {
-    setState(() {
-      isDrawerOpen = !isDrawerOpen;
-      xOffset = isDrawerOpen ? 290 : 0;
-      yOffset = isDrawerOpen ? 80 : 0;
-    });
-  }
+  double _calculateTotal() => _calculateSubtotal() + _calculateTaxes() + tips;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      transform: Matrix4.translationValues(xOffset, yOffset, 0)..scale(isDrawerOpen ? 0.85 : 1.0),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('VisionPOS'),
-          leading: IconButton(icon: Icon(isDrawerOpen ? Icons.arrow_back_ios : Icons.menu), onPressed: toggleMenu),
-          actions: [
-            IconButton(icon: const Icon(Icons.refresh), onPressed: () { getData(); _loadCategories(); }),
-          ],
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isDesktop = screenWidth >= 1024;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'VisionPOS',
+          style: TextStyle(
+            fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+          ),
         ),
-        body: Row(
+        leading: isMobile ? Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ) : null,
+        actions: [
+          if (!isMobile && !kIsWeb) IconButton(icon: const Icon(Icons.print), onPressed: () => showPrinterSetupDialog(context)),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadInitialData),
+        ],
+      ),
+      drawer: isMobile ? Drawer(child: DrawerPage(isCollapsed: widget.sidebarCollapsed)) : null,
+      body: Row(
+        children: [
+          Expanded(
+            flex: isMobile ? 1 : isTablet ? 3 : 4,
+            child: _buildMainContent(isMobile, isTablet),
+          ),
+          if (!isMobile)
+            SizedBox(
+              width: isTablet ? 280 : 320,
+              child: _buildOrderSidebar(),
+            ),
+        ],
+      ),
+      floatingActionButton: isMobile ? FloatingActionButton(
+        onPressed: () => _showOrderModal(context),
+        child: const Icon(Icons.shopping_cart),
+      ) : null,
+    );
+  }
+
+  Widget _buildMainContent(bool isMobile, bool isTablet) {
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(isMobile ? 6.0 : 8.0),
+          child: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: 'Search products...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              contentPadding: EdgeInsets.symmetric(
+                vertical: isMobile ? 6 : 8,
+                horizontal: isMobile ? 10 : 12,
+              ),
+              isDense: true,
+            ),
+            onChanged: _searchProducts,
+          ),
+        ),
+        _buildCategoryList(),
+        if (_activeSubs.isNotEmpty) _buildSubCategoryList(),
+        Expanded(
+          child: isLoading 
+            ? const Center(child: CircularProgressIndicator())
+            : GridView.builder(
+                padding: EdgeInsets.all(isMobile ? 4 : 6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 5),
+                  childAspectRatio: isMobile ? 0.65 : isTablet ? 0.7 : 0.72,
+                  crossAxisSpacing: isMobile ? 4 : 6,
+                  mainAxisSpacing: isMobile ? 4 : 6,
+                ),
+                itemCount: _filteredProducts.length,
+                itemBuilder: (ctx, i) => _buildProductCard(_filteredProducts[i]),
+              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryList() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final categoryHeight = isMobile ? 40 : 45;
+    
+    return SizedBox(
+      height: categoryHeight.toDouble(),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _rootCategories.length + 1,
+        itemBuilder: (ctx, i) {
+          final cat = i == 0 ? null : _rootCategories[i - 1];
+          final isSelected = selectedCategory?.id == cat?.id;
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 2 : 3),
+            child: ChoiceChip(
+              label: Text(
+                cat?.categoryName ?? 'All',
+                style: TextStyle(fontSize: isMobile ? 10 : 11),
+              ),
+              selected: isSelected,
+              onSelected: (_) => _onRootTap(cat),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSubCategoryList() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final subHeight = isMobile ? 38 : 42;
+    
+    return Container(
+      height: subHeight.toDouble(),
+      color: Colors.grey[100],
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _activeSubs.length,
+        itemBuilder: (ctx, i) {
+          final sub = _activeSubs[i];
+          final isSelected = _selectedSubId == sub.id;
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 2 : 3),
+            child: ChoiceChip(
+              label: Text(
+                sub.categoryName,
+                style: TextStyle(fontSize: isMobile ? 9.5 : 10.5),
+              ),
+              selected: isSelected,
+              onSelected: (_) => _onSubTap(sub),
+              backgroundColor: Colors.white,
+              selectedColor: Colors.blue[100],
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProductCard(Product p) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _addToOrder(p),
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              flex: 3,
-              child: Column(
-                children: [
-                  // Categories
-                  SizedBox(
-                    height: 80,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _rootCategories.length + 1,
-                      itemBuilder: (ctx, i) {
-                        final cat = i == 0 ? null : _rootCategories[i - 1];
-                        return ActionChip(
-                          label: Text(cat?.categoryName ?? 'All'),
-                          onPressed: () => _onRootTap(cat),
-                        );
-                      },
-                    ),
-                  ),
-                  // Subcategories
-                  if (_activeSubs.isNotEmpty)
-                    SizedBox(
-                      height: 50,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _activeSubs.length,
-                        itemBuilder: (ctx, i) => ActionChip(
-                          label: Text(_activeSubs[i].categoryName),
-                          onPressed: () => _onSubTap(_activeSubs[i]),
-                        ),
-                      ),
-                    ),
-                  // Products
-                  Expanded(
-                    child: GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
-                      itemCount: data.where((p) {
-                        if (selectedCategory == null) return true;
-                        if (_selectedSubId != null) return p.categoryId == _selectedSubId;
-                        return p.categoryId == selectedCategory!.id || (_subIdsByRoot[selectedCategory!.id]?.contains(p.categoryId) ?? false);
-                      }).length,
-                      itemBuilder: (ctx, i) {
-                        final filtered = data.where((p) {
-                          if (selectedCategory == null) return true;
-                          if (_selectedSubId != null) return p.categoryId == _selectedSubId;
-                          return p.categoryId == selectedCategory!.id || (_subIdsByRoot[selectedCategory!.id]?.contains(p.categoryId) ?? false);
-                        }).toList();
-                        final p = filtered[i];
-                        return Card(
-                          child: InkWell(
-                            onTap: () => addToOrder(p),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [Text(p.productName), Text('${p.sellingPrice} JOD')],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: const Icon(Icons.fastfood, size: 40, color: Colors.grey),
               ),
             ),
-            // Order Side
-            Expanded(
-              flex: 2,
+            Padding(
+              padding: const EdgeInsets.all(8.0),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: selectedItems.length,
-                      itemBuilder: (ctx, i) => ListTile(
-                        title: Text(_getProductById(selectedItems[i].productId).productName),
-                        subtitle: Text('Qty: ${selectedItems[i].quantity}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.remove), onPressed: () => _removeProductFromOrder(i)),
-                            IconButton(icon: const Icon(Icons.add), onPressed: () => _addQuantity(i)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Divider(),
-                  Text('Total: ${_calculateTotal(selectedItems).toStringAsFixed(2)} JOD'),
-                  ElevatedButton(onPressed: submitOrder, child: const Text('Checkout')),
+                  Text(p.productName, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text('${p.sellingPrice.toStringAsFixed(2)} JOD', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -533,11 +424,147 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
+  Widget _buildOrderSidebar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(left: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Column(
+        children: [
+          Expanded(child: _buildOrderList()),
+          _buildOrderSummary(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderList() {
+    return ListView.separated(
+      itemCount: selectedItems.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (ctx, i) {
+        final item = selectedItems[i];
+        final prod = _getProductById(item.productId);
+        return ListTile(
+          title: Text(prod.productName),
+          subtitle: Text('Qty: ${item.quantity}'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => _updateItemQty(i, -1)),
+              Text('${item.quantity.toInt()}'),
+              IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _updateItemQty(i, 1)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _updateItemQty(int index, double delta) {
+    setState(() {
+      final newQty = selectedItems[index].quantity + delta;
+      if (newQty <= 0) {
+        selectedItems.removeAt(index);
+      } else {
+        selectedItems[index] = selectedItems[index].updateQuantity(newQty);
+      }
+    });
+  }
+
+  Widget _buildOrderSummary() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        border: Border(top: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Column(
+        children: [
+          _summaryRow('Subtotal', _calculateSubtotal()),
+          _summaryRow('Tax', _calculateTaxes()),
+          const Divider(),
+          _summaryRow('Total', _calculateTotal(), isTotal: true),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: selectedItems.isEmpty ? null : _submitOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFB87333),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('CHECKOUT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, double value, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: isTotal ? 18 : 14)),
+          Text('${value.toStringAsFixed(2)} JOD', style: TextStyle(fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: isTotal ? 18 : 14)),
+        ],
+      ),
+    );
+  }
+
+  void _submitOrder() async {
+    if (_orgId == null) await _loadOrganizationId();
+    if (_orgId == null) return;
+
+    final order = OrderDto(
+      organizationId: _orgId!,
+      orderItems: selectedItems,
+      grandTotal: _calculateTotal(),
+      paymentMethod: paymentMethod,
+      tips: tips,
+    );
+
+    if (await apiHandler.postOrder(order)) {
+      if (!kIsWeb) {
+        await _printReceipts(
+          orderNumber: order.id.toString(),
+          paymentMethod: paymentMethod == 1 ? 'CASH' : 'VISA',
+          items: selectedItems,
+          subtotal: _calculateSubtotal(),
+          tax: _calculateTaxes(),
+          tips: tips,
+          total: _calculateTotal(),
+        );
+      }
+      if (mounted) {
+        setState(() => selectedItems.clear());
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order submitted!')));
+      }
+    }
+  }
+
+  void _showOrderModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: _buildOrderSidebar(),
+      ),
+    );
+  }
+
   Product _getProductById(int id) {
-    return data.cast<Product>().firstWhere((p) => p.productId == id, orElse: () => Product(productId: 0, organizationId: 0, categoryId: 0, productName: 'Unknown', sellingPrice: 0, purchasePrice: 0));
+    return _allProducts.firstWhere((p) => p.productId == id, orElse: () => Product(productId: 0, organizationId: 0, categoryId: 0, productName: 'Unknown', sellingPrice: 0, purchasePrice: 0));
   }
 
   Future<bool> _printReceipts({required String orderNumber, required String paymentMethod, required List<OrderItemDto> items, required double subtotal, required double tax, required double tips, required double total}) async {
+    if (kIsWeb) return false;
     try {
       final bt = BluetoothPrinterManager();
       await bt.load();
