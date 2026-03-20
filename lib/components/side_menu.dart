@@ -172,13 +172,14 @@ class _DrawerPageState extends State<DrawerPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      data[0].fullName,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize:
-                                            screenWidth < 600 ? 12 : screenWidth * 0.015,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                                  data[0].fullName,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: screenWidth < 600
+                                                        ? 11.0
+                                                        : (screenWidth * 0.012).clamp(11.0, 16.0).toDouble(),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
@@ -378,10 +379,16 @@ class _SideBar_ItemState extends State<SideBar_Item> {
     double screenWidth = MediaQuery.of(context).size.width;
     double screenHeight = MediaQuery.of(context).size.height;
 
-    double iconSize = screenWidth < 600 ? 18 : screenWidth * 0.025;
-    double fontSize = screenWidth < 600 ? 12 : screenWidth * 0.017;
-    double spacing = screenWidth < 600 ? 12 : screenWidth * 0.03;
-    double verticalPadding = screenHeight < 600 ? 12 : 16;
+    double iconSize = screenWidth < 600
+      ? 18.0
+      : (screenWidth * 0.018).clamp(18.0, 28.0).toDouble();
+    double fontSize = screenWidth < 600
+      ? 11.0
+      : (screenWidth * 0.012).clamp(11.0, 15.0).toDouble();
+    double spacing = screenWidth < 600
+      ? 10.0
+      : (screenWidth * 0.02).clamp(10.0, 20.0).toDouble();
+    double verticalPadding = screenHeight < 600 ? 10.0 : 14.0;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),

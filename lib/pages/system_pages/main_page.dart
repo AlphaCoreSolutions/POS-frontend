@@ -313,8 +313,8 @@ class _MainPageState extends State<MainPage> {
             : GridView.builder(
                 padding: EdgeInsets.all(isMobile ? 4 : 6),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 5),
-                  childAspectRatio: isMobile ? 0.65 : isTablet ? 0.7 : 0.72,
+                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 7),
+                  childAspectRatio: isMobile ? 0.65 : isTablet ? 0.7 : 0.65,
                   crossAxisSpacing: isMobile ? 4 : 6,
                   mainAxisSpacing: isMobile ? 4 : 6,
                 ),
@@ -329,7 +329,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildCategoryList() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final categoryHeight = isMobile ? 40 : 45;
+    final categoryHeight = isMobile ? 40 : 42;
     
     return SizedBox(
       height: categoryHeight.toDouble(),
@@ -344,7 +344,7 @@ class _MainPageState extends State<MainPage> {
             child: ChoiceChip(
               label: Text(
                 cat?.categoryName ?? 'All',
-                style: TextStyle(fontSize: isMobile ? 10 : 11),
+                style: TextStyle(fontSize: isMobile ? 10 : 10.5),
               ),
               selected: isSelected,
               onSelected: (_) => _onRootTap(cat),
@@ -359,7 +359,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildSubCategoryList() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final subHeight = isMobile ? 38 : 42;
+    final subHeight = isMobile ? 38 : 40;
     
     return Container(
       height: subHeight.toDouble(),
@@ -390,12 +390,18 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildProductCard(Product p) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    const textPadding = 4.0;
+    const double fontSize = 7.5;
+    const double iconSize = 18.0;
+    
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: InkWell(
         onTap: () => _addToOrder(p),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -403,18 +409,34 @@ class _MainPageState extends State<MainPage> {
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                 ),
-                child: const Icon(Icons.fastfood, size: 40, color: Colors.grey),
+                child: const Icon(Icons.fastfood, size: iconSize, color: Colors.grey),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(textPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(p.productName, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text('${p.sellingPrice.toStringAsFixed(2)} JOD', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
+                  Text(
+                    p.productName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: fontSize,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '${p.sellingPrice.toStringAsFixed(2)} JOD',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                      fontSize: fontSize - 1.5,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -475,7 +497,7 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildOrderSummary() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         border: Border(top: BorderSide(color: Colors.grey[300]!)),
@@ -484,19 +506,19 @@ class _MainPageState extends State<MainPage> {
         children: [
           _summaryRow('Subtotal', _calculateSubtotal()),
           _summaryRow('Tax', _calculateTaxes()),
-          const Divider(),
+          const Divider(height: 8),
           _summaryRow('Total', _calculateTotal(), isTotal: true),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: selectedItems.isEmpty ? null : _submitOrder,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFB87333),
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('CHECKOUT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text('CHECKOUT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
             ),
           ),
         ],
@@ -506,12 +528,12 @@ class _MainPageState extends State<MainPage> {
 
   Widget _summaryRow(String label, double value, {bool isTotal = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: isTotal ? 18 : 14)),
-          Text('${value.toStringAsFixed(2)} JOD', style: TextStyle(fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: isTotal ? 18 : 14)),
+          Text(label, style: TextStyle(fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: isTotal ? 13 : 11)),
+          Text('${value.toStringAsFixed(2)} JOD', style: TextStyle(fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: isTotal ? 13 : 11)),
         ],
       ),
     );
