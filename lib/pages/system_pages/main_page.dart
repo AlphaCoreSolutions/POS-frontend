@@ -316,9 +316,9 @@ class _MainPageState extends State<MainPage> {
           child: isLoading 
             ? const Center(child: CircularProgressIndicator())
             : GridView.builder(
-                padding: EdgeInsets.all(isMobile ? 4 : 6),
+                padding: EdgeInsets.all(isMobile ? 4 : 5),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 6),
+                  crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 5),
                   childAspectRatio: isMobile ? 1.4 : isTablet ? 0.9 : 0.9,
                   crossAxisSpacing: isMobile ? 4 : 6,
                   mainAxisSpacing: isMobile ? 4 : 6,
@@ -334,7 +334,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildCategoryList() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final categoryHeight = isMobile ? 40 : 42;
+    final categoryHeight = isMobile ? 65 : 85;
     
     return SizedBox(
       height: categoryHeight.toDouble(),
@@ -349,7 +349,7 @@ class _MainPageState extends State<MainPage> {
             child: ChoiceChip(
               label: Text(
                 cat?.categoryName ?? 'All',
-                style: TextStyle(fontSize: isMobile ? 10 : 10.5),
+                style: TextStyle(fontSize: isMobile ? 12 : 13.5),
               ),
               selected: isSelected,
               onSelected: (_) => _onRootTap(cat),
@@ -364,7 +364,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildSubCategoryList() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final subHeight = isMobile ? 38 : 40;
+    final subHeight = isMobile ? 65 : 85;
     
     return Container(
       height: subHeight.toDouble(),
@@ -380,7 +380,7 @@ class _MainPageState extends State<MainPage> {
             child: ChoiceChip(
               label: Text(
                 sub.categoryName,
-                style: TextStyle(fontSize: isMobile ? 9.5 : 10.5),
+                style: TextStyle(fontSize: isMobile ? 12 : 13.5),
               ),
               selected: isSelected,
               onSelected: (_) => _onSubTap(sub),
@@ -400,7 +400,7 @@ class _MainPageState extends State<MainPage> {
     final textPadding = isMobile ? 2.0 : 3.0;
     final fontSize = isMobile ? 9.5 : 12.0;
     final iconSize = isMobile ? 7.0 : 9.0;
-    final iconHeight = isMobile ? 80.0 : 56.0;
+    final iconHeight = isMobile ? 80.0 : 65.0;
     
     return Card(
       elevation: 2,
