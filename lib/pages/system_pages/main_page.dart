@@ -319,7 +319,7 @@ class _MainPageState extends State<MainPage> {
                 padding: EdgeInsets.all(isMobile ? 4 : 6),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: isMobile ? 2 : (isTablet ? 4 : 6),
-                  childAspectRatio: isMobile ? 0.85 : isTablet ? 0.9 : 0.9,
+                  childAspectRatio: isMobile ? 1.4 : isTablet ? 0.9 : 0.9,
                   crossAxisSpacing: isMobile ? 4 : 6,
                   mainAxisSpacing: isMobile ? 4 : 6,
                 ),
@@ -397,9 +397,10 @@ class _MainPageState extends State<MainPage> {
   Widget _buildProductCard(Product p) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    const textPadding = 3.0;
-    const double fontSize = 11;
-    const double iconSize = 8.0;
+    final textPadding = isMobile ? 2.0 : 3.0;
+    final fontSize = isMobile ? 9.5 : 12.0;
+    final iconSize = isMobile ? 7.0 : 9.0;
+    final iconHeight = isMobile ? 80.0 : 56.0;
     
     return Card(
       elevation: 2,
@@ -411,23 +412,23 @@ class _MainPageState extends State<MainPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: 50,
+              height: iconHeight,
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                 ),
-                child: const Icon(Icons.fastfood, size: iconSize, color: Colors.grey),
+                child: Icon(Icons.fastfood, size: iconSize, color: Colors.grey),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(textPadding),
+              padding: EdgeInsets.all(textPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     p.productName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: fontSize,
                     ),
@@ -437,7 +438,7 @@ class _MainPageState extends State<MainPage> {
                   SizedBox(height: 2),
                   Text(
                     '${p.sellingPrice.toStringAsFixed(2)} JOD',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.green,
                       fontWeight: FontWeight.w600,
                       fontSize: fontSize - 1.5,
