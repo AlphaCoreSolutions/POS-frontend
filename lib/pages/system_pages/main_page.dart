@@ -334,7 +334,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildCategoryList() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final categoryHeight = isMobile ? 65 : 85;
+    final categoryHeight = isMobile ? 75 : 95;
     
     return SizedBox(
       height: categoryHeight.toDouble(),
@@ -364,7 +364,7 @@ class _MainPageState extends State<MainPage> {
   Widget _buildSubCategoryList() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final subHeight = isMobile ? 65 : 85;
+    final subHeight = isMobile ? 75 : 95;
     
     return Container(
       height: subHeight.toDouble(),
